@@ -9,3 +9,4 @@ export * from './sectors';
 export * from './series';
 export * from './playback';
 export * from './heat';
+export * from './correctPreview';

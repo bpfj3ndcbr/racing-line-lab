@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { MemoryStore } from '../src/io/storage';
 import { Session } from '../src/store/session';
@@ -22,6 +23,8 @@ describe('About', () => {
     expect(dlg.textContent).toContain('個人開発');
     expect(dlg.textContent).toContain('悪しからず');
     expect(dlg.textContent).toContain('© 2026 bpfj3ndcbr');
+    const { version } = JSON.parse(readFileSync('package.json', 'utf8')) as { version: string };
+    expect(dlg.querySelector('.about-ver')!.textContent).toBe(`バージョン ${version}`);         // package.json の版
     const hrefs = Array.from(dlg.querySelectorAll('a')).map((a) => a.getAttribute('href'));
     expect(hrefs).toContain('https://github.com/bpfj3ndcbr/racing-line-lab');
     expect(hrefs).toContain('https://github.com/bpfj3ndcbr/racing-line-lab/blob/main/THIRD-PARTY-NOTICES.txt');

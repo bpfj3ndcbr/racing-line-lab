@@ -462,6 +462,7 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .about-head{display:flex;align-items:center;gap:14px}
 .about-ttl{font-size:18px;font-weight:700}
 .about-sub{color:var(--muted)}
+.about-ver{margin-top:2px;font-size:11px;color:var(--muted)}
 
 /* 使い方タブ(README の「使い方」「そのほかの操作」を表示する)。上部バーは残して、本文だけをスクロールする */
 #view-help{height:calc(100vh - var(--top-h));height:calc(100dvh - var(--top-h));overflow:auto}

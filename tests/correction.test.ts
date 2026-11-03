@@ -112,9 +112,9 @@ describe('データ管理画面から位置補正の画面へ', () => {
     expect($('#cor-title').textContent).toBe('Run 1 の位置補正');
     expect($('#cor-file').textContent).toBe('u.vbo');
     const m = mapOf();
-    expect(m.tracks).toHaveLength(1);
+    expect(m.tracks.length).toBeGreaterThan(0);                                     // 完了ラップが無いログなので、走行中の区間
     expect(m.tracks[0].points.length).toBeGreaterThan(100);
-    expect(m.tracks[0].points.length).toBeLessThanOrEqual(4001);
+    expect($('#cor-shown').textContent).toContain('ラップが無いため');
     expect(m.lines.map((l) => l.label)).toContain('計測ライン');
     expect(m.fitted).toBeGreaterThan(0);
     expect($('.navtab[data-view="import"]').getAttribute('aria-current')).toBe('page');   // 「データ管理」にいると分かる
@@ -249,13 +249,14 @@ describe('適用して保存', () => {
 
 const bigPath = fx('session_20260506_094550_autopolis.vbo');
 describe.skipIf(!existsSync(bigPath))('長いログ(13 ラップ)', () => {
-  it('補正量の見込みにラップ数・ベストが出る。地図に出す点は間引かれる', () => {
+  it('補正量の見込みにラップ数・ベストが出る。地図にはベスト 3 ラップだけを描く', () => {
     vi.useFakeTimers();
     session.addLog(parseVbo(readFileSync(bigPath, 'utf8'), 'big.vbo'), 'big');
     const row = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-act="correct"]'))[1];
     row.click();
     vi.advanceTimersByTime(300);
     expect($('#cor-laps').textContent).toMatch(/^この補正量では 1\d ラップ ・ ベスト \d:\d\d\.\d$/);
-    expect(mapOf().tracks[0].points.length).toBeLessThanOrEqual(4001);
+    expect(mapOf().tracks).toHaveLength(3);
+    expect($('#cor-shown').textContent).toMatch(/^表示中: ベスト 3 ラップ(LAP \d+・\d+・\d+)$/);
   });
 });

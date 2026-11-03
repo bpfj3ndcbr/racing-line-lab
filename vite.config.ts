@@ -6,9 +6,12 @@ const haveFixtures = existsSync('fixtures/20260913140139_UTC.vbo') && existsSync
 const needFixtures = haveFixtures ? [] : readdirSync('tests')
   .filter((f) => f.endsWith('.test.ts') && /fixtures|fx\(/.test(readFileSync(`tests/${f}`, 'utf8')))
   .map((f) => `tests/${f}`);
+const pkg = JSON.parse(readFileSync('package.json', 'utf8')) as { version: string };
 
 export default defineConfig({
   // Electron 化(file:// 読み込み)でも動くよう相対パスにする
   base: './',
+  // About に出す版(package.json の version)
+  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   test: { include: ['tests/**/*.test.ts'], exclude: ['node_modules/**', ...needFixtures] },
 });

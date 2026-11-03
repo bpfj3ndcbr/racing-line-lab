@@ -3,9 +3,9 @@ import { logoSvg } from './logo';
 
 const GH = 'https://github.com/bpfj3ndcbr/racing-line-lab';
 
-/** 「About」ダイアログの中身。文面は ABOUT.md と同じ(ABOUT.md を直したら、ここも合わせる)。 */
+/** 「About」ダイアログの中身。文面は ABOUT.md と同じ(ABOUT.md を直したら、ここも合わせる)。版の表示だけはアプリのみ */
 const ABOUT_HTML = `
-<div class="about-head">${logoSvg(72)}<div><div class="about-ttl">Racing Line Lab</div><div class="about-sub">シンプル走行ライン比較ツール</div></div></div>
+<div class="about-head">${logoSvg(72)}<div><div class="about-ttl">Racing Line Lab</div><div class="about-sub">シンプル走行ライン比較ツール</div><div class="about-ver">バージョン ${__APP_VERSION__}</div></div></div>
 <p>RaceChronoなどのサーキットの走行ログ(.vbo)を読み込み、ラップごとの走行ラインと速度を、航空写真の地図の上で見比べる個人開発のアプリです。</p>
 <p>自分の過去の走行と比べたり、他の方の走行とじっくりと比較して、次に走る時に<b>目指す走行ラインのイメージを脳内に描く</b>ための手助けとなるアプリを目指していますが、素人開発なので不具合があるかも知れません。悪しからずご了承ください。</p>
 <h4>主な機能</h4>

@@ -1,4 +1,4 @@
-import { SLOTS, detectLaps, findCrossings, formatLapTime, metersPerDegree } from '../core';
+import { type PreviewPick, SLOTS, detectLaps, findCrossings, formatLapTime, metersPerDegree, pickPreviewRanges } from '../core';
 import type { LoadedLog, Session } from '../store/session';
 import type { MapFactory, TrackMap } from './mapTypes';
 import type { ThemeController } from './theme';
@@ -12,8 +12,8 @@ export interface CorrectDeps {
 export interface CorrectView { show(logId: string, set?: number): void; hide(): void }
 
 const STEPS = [0.1, 0.5, 1];
-/** 地図に出す点の数の目安(長いログでも軽く動かせるように間引く) */
-const MAX_POINTS = 4000;
+/** 地図に出す点の数の上限(描く区間が長いときだけ間引く) */
+const MAX_POINTS = 20000;
 const PREVIEW_DELAY_MS = 250;
 const round2 = (v: number) => Math.round(v * 100) / 100;
 const fmtM = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
@@ -23,6 +23,17 @@ const fmtM = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
  * 地図の上でドラッグするとラインが動く / 矢印キーで微調整 / 数値でも入力できる。
  * 「適用して保存」で補正量を保存し、ラップ・セクターを検出し直す。
  */
+/** 地図に何を描いているかの説明 */
+function shownText(p: PreviewPick): string {
+  if (p.kind === 'laps') return `表示中: ベスト ${p.laps.length} ラップ(LAP ${p.laps.join('・')})`;
+  if (p.kind === 'moving') {
+    const min = Math.max(1, Math.round(p.seconds / 60));
+    // 10 分(既定の上限)に届けば先頭の 10 分、届かなければ走行中の全部
+    return `表示中: 走行中(30 km/h 以上)の${p.seconds >= 590 ? '最初の' : ''}約 ${min} 分(ラップが無いため)`;
+  }
+  return '表示中: 走行ログ全体';
+}
+
 export function mountCorrectView(root: HTMLElement, session: Session, deps: CorrectDeps): CorrectView {
   root.innerHTML = `
     <div class="corr">
@@ -38,6 +49,7 @@ export function mountCorrectView(root: HTMLElement, session: Session, deps: Corr
       <aside class="corr-side" aria-label="位置補正">
         <div class="h" id="cor-title">位置補正</div>
         <div class="sub" id="cor-file"></div>
+        <div class="sub" id="cor-shown"></div>
         <div class="sub">地図の上をドラッグするとラインが動きます。矢印キーで微調整(Shift で 10 倍)。</div>
         <div class="corr-fields">
           <label class="frow2"><span>東へ</span><input id="cor-east" type="number" step="0.1" aria-label="東への補正量(メートル)"><span>m</span></label>
@@ -72,17 +84,20 @@ export function mountCorrectView(root: HTMLElement, session: Session, deps: Corr
   let draft = { east: 0, north: 0 };
   let step = 0.5;
   let mode: 'line' | 'map' = 'line';
-  let base: { lat: Float64Array; lon: Float64Array } | null = null;
+  /** 地図に描く区間ごとの点(補正なし)。区間ごとに別の線にする */
+  let base: { lat: Float64Array; lon: Float64Array }[] = [];
   let mPer = metersPerDegree(33);
   let timer: ReturnType<typeof setTimeout> | null = null;
 
   const accent = () => getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#4aa3ff';
 
   function pushTrack() {
-    if (!map || !base) return;
-    const dLat = draft.north / mPer.lat, dLon = draft.east / mPer.lon;
-    const pts = Array.from(base.lat, (la, i) => [la + dLat, base!.lon[i] + dLon] as [number, number]);
-    map.setTracks([{ slot: 'A', color: accent(), points: pts }]);
+    if (!map) return;
+    const dLat = draft.north / mPer.lat, dLon = draft.east / mPer.lon, color = accent();
+    map.setTracks(base.map((b) => ({
+      slot: 'A' as const, color,
+      points: Array.from(b.lat, (la, i) => [la + dLat, b.lon[i] + dLon] as [number, number]),
+    })));
   }
 
   function pushLines() {
@@ -194,10 +209,19 @@ export function mountCorrectView(root: HTMLElement, session: Session, deps: Corr
       document.addEventListener('keydown', onKey);
       saved = { ...l.offset };
       draft = { ...l.offset };
-      // 地図に出す点(間引く)。補正量は、あとから足して動かす
-      const n = l.log.t.length, every = Math.max(1, Math.ceil(n / MAX_POINTS));
-      const idx = Array.from({ length: Math.ceil(n / every) }, (_, i) => i * every);
-      base = { lat: Float64Array.from(idx, (i) => l.log.lat[i]), lon: Float64Array.from(idx, (i) => l.log.lon[i]) };
+      // 地図に出すのは、合わせるのに足りる数ラップだけ(開いたときの補正量で選び、操作中は替えない)。
+      // 補正量は、あとから足して動かす
+      const pick = pickPreviewRanges(l.log, l.laps);
+      const total = pick.ranges.reduce((s, r) => s + r.to - r.from + 1, 0);
+      const every = Math.max(1, Math.ceil(total / MAX_POINTS));
+      base = pick.ranges.map((r) => {
+        const idx: number[] = [];
+        for (let i = r.from; i < r.to; i += every) idx.push(i);
+        idx.push(r.to);
+        return { lat: Float64Array.from(idx, (i) => l.log.lat[i]), lon: Float64Array.from(idx, (i) => l.log.lon[i]) };
+      });
+      $('cor-shown').textContent = shownText(pick);
+      const n = l.log.t.length;
       mPer = metersPerDegree(l.log.lat[Math.floor(n / 2)] ?? 33);
       $('cor-title').textContent = `Run ${l.no} の位置補正`;
       $('cor-file').textContent = l.log.fileName;
