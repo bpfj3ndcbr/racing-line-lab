@@ -28,7 +28,7 @@ RaceChronoなどのサーキットの走行ログ(.vbo)を読み込み、ラッ�
 また、Web版ではアプリの改善のため、Google アナリティクスで利用状況を送ります(詳しくは「[利用状況の送信](#利用状況の送信web-版のみ)」)。
 
 [公開URL]
-https://bpfj3ndcbr.github.io/racing-line-lab/ (GitHub Pages。公開の設定が済むと開けます)
+<https://bpfj3ndcbr.github.io/racing-line-lab/>
 
 ## 主な機能
 
