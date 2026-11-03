@@ -4,7 +4,7 @@ const ZOOM_STOPS = [0, ...ZOOM_CHOICES];   // スライダーの位置 → 倍�
 const zoomText = (z: number) => (z === 0 ? 'サーキット全体' : `Z${z}`);
 
 type Opt = { v: string; label: string };
-type Plain = { name: string; kind: 'ymin' | 'startpos' | 'autoload'; hint?: string };
+type Plain = { name: string; kind: 'ymin' | 'startpos' | 'autoload' | 'analytics'; hint?: string };
 type Row =
   | { key: PrefKey; name: string; kind: 'seg'; opts: Opt[]; hint?: string }
   | { key: PrefKey; name: string; kind: 'switch'; on: string; off: string; hint?: string }
@@ -34,6 +34,9 @@ const GROUPS: { title: string; rows: (Row | Plain)[] }[] = [
   { title: '起動時', rows: [
     { name: '最後の走行データを自動で読み込む', kind: 'autoload', hint: '前回読み込んだファイルと、A〜D の割り当てを元に戻します。ファイルの場所を覚えるので、Electron 版のみ使えます。移動・削除したファイルは読み込まれません。' },
   ] },
+  { title: 'プライバシー', rows: [
+    { name: '利用状況の送信', kind: 'analytics', hint: 'Web 版では、アプリの改善のため、Google アナリティクスで利用状況(ページの表示、使っている環境など)を送ります。走行ログの中身や位置、ファイル名は送りません。オフにすると送りません。デスクトップ版(Electron)では送りません。' },
+  ] },
 ];
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
@@ -42,7 +45,7 @@ const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
  * 設定タブ。各項目は「最初の状態」を選ぶ。「最後の状態を記憶する」にチェックすると、その項目は前回の状態で始まるので、
  * 選ぶ部分は押せなくなる。
  */
-export function mountSettingsView(root: HTMLElement, prefs: Prefs, onChange: (key: PrefKey | 'yMin' | 'startPos' | 'autoLoad') => void, onFactoryReset: () => void = () => {}): { refresh(): void } {
+export function mountSettingsView(root: HTMLElement, prefs: Prefs, onChange: (key: PrefKey | 'yMin' | 'startPos' | 'autoLoad' | 'analytics') => void, onFactoryReset: () => void = () => {}): { refresh(): void } {
   let resetArmed = false;
   let wipeArmed = false;
 
@@ -77,6 +80,11 @@ export function mountSettingsView(root: HTMLElement, prefs: Prefs, onChange: (ke
           return `<div class="srow"><div class="sname">${r.name}</div><div class="sctl"><button type="button" role="switch" class="switch${on ? ' on' : ''}" data-autoload aria-checked="${on}" aria-label="${r.name}"${can ? '' : ' disabled'}><i></i></button>`
             + `<span class="swl">${on ? '有効' : '無効'}${can ? '' : '(Electron 版のみ)'}</span></div><div class="srem"></div>${r.hint ? `<div class="shint">${r.hint}</div>` : ''}</div>`;
         }
+        if (r.kind === 'analytics') {
+          const can = !window.rllNative, on = prefs.analytics && can;      // デスクトップ版は「オフ」のまま変えられない
+          return `<div class="srow"><div class="sname">${r.name}</div><div class="sctl"><button type="button" role="switch" class="switch${on ? ' on' : ''}" data-analytics aria-checked="${on}" aria-label="${r.name}"${can ? '' : ' disabled'}><i></i></button>`
+            + `<span class="swl">${on ? '送信する' : '送信しない'}${can ? '' : '(デスクトップ版では送りません)'}</span></div><div class="srem"></div>${r.hint ? `<div class="shint">${r.hint}</div>` : ''}</div>`;
+        }
         if (r.kind === 'ymin') {
           return `<div class="srow"><div class="sname">${r.name}</div><div class="sctl">
             <input type="range" class="slider" data-ymin min="${YMIN_CHOICES.min}" max="${YMIN_CHOICES.max}" step="${YMIN_CHOICES.step}" value="${prefs.yMin}" aria-label="最低速度" aria-valuetext="${prefs.yMin} km/h">
@@ -108,6 +116,8 @@ export function mountSettingsView(root: HTMLElement, prefs: Prefs, onChange: (ke
     if (sp) { resetArmed = false; prefs.setStartPos(sp.dataset.startpos as 'center' | 'control'); onChange('startPos'); render(); return; }
     const al = t.closest<HTMLButtonElement>('[data-autoload]');
     if (al && !al.disabled) { resetArmed = false; prefs.setAutoLoad(!prefs.autoLoad); onChange('autoLoad'); render(); return; }
+    const an = t.closest<HTMLButtonElement>('[data-analytics]');
+    if (an && !an.disabled) { resetArmed = false; prefs.setAnalytics(!prefs.analytics); onChange('analytics'); render(); return; }
     const sw = t.closest<HTMLButtonElement>('[data-switch]');
     if (sw && !sw.disabled) {
       resetArmed = false;
@@ -127,7 +137,7 @@ export function mountSettingsView(root: HTMLElement, prefs: Prefs, onChange: (ke
       resetArmed = false;
       prefs.reset();
       render();
-      (['theme', 'mapMode', 'labels', 'zoom', 'follow', 'xKind', 'sync', 'rate', 'yMin', 'startPos', 'autoLoad'] as const).forEach((k) => onChange(k));
+      (['theme', 'mapMode', 'labels', 'zoom', 'follow', 'xKind', 'sync', 'rate', 'yMin', 'startPos', 'autoLoad', 'analytics'] as const).forEach((k) => onChange(k));
     }
   });
 

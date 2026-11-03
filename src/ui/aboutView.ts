@@ -19,6 +19,8 @@ const ABOUT_HTML = `
 <li><b>設定タブ</b>: 初期値と「最後の状態を記憶する」を項目ごとに選べます。</li>
 <li><b>前回の走行データの自動読み込み</b>(デスクトップ版のみ)</li>
 </ul>
+<h4>利用状況の送信(Web 版のみ)</h4>
+<p>Web 版では、アプリの改善のため、Google アナリティクスで利用状況(ページの表示、使っている環境など)を送ります。走行ログの中身や位置、ファイル名は送りません。「設定」タブの「利用状況の送信」でオフにできます。デスクトップ版(Electron)では送りません。</p>
 <h4>開発者</h4>
 <ul>
 <li>開発・公開: <a href="https://github.com/bpfj3ndcbr" target="_blank" rel="noopener noreferrer">bpfj3ndcbr</a>(個人開発)</li>

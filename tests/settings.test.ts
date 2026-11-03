@@ -44,12 +44,12 @@ describe('設定タブ', () => {
     expect($<HTMLElement>('#view-settings').hidden).toBe(false);
     expect($<HTMLElement>('#view-import').hidden).toBe(true);
     expect($('[data-act="nav"][data-view="settings"]').getAttribute('aria-current')).toBe('page');
-    expect(Array.from(root.querySelectorAll('#view-settings h3')).map((h) => h.textContent)).toEqual(['外観', 'マップ', '速度グラフ', '再生・セクター', '起動時']);
+    expect(Array.from(root.querySelectorAll('#view-settings h3')).map((h) => h.textContent)).toEqual(['外観', 'マップ', '速度グラフ', '再生・セクター', '起動時', 'プライバシー']);
   });
 
-  it('項目: テーマ / 描画 / 引き出し線の表示 / 倍率 / 初期位置 / 追従 / 最低速度 / 横軸 / 再生速度 / セクターボタンの動作 / 自動読み込み と、初期化ボタン', () => {
+  it('項目: テーマ / 描画 / 引き出し線の表示 / 倍率 / 初期位置 / 追従 / 最低速度 / 横軸 / 再生速度 / セクターボタンの動作 / 自動読み込み / 利用状況の送信 と、初期化ボタン', () => {
     const names = Array.from(root.querySelectorAll('#view-settings .sname')).map((e) => e.textContent);
-    expect(names).toEqual(['テーマ', '描画', '引き出し線の表示', '倍率', '初期位置', '追従', '最低速度', '横軸', '再生速度', 'セクターボタンの動作', '最後の走行データを自動で読み込む']);
+    expect(names).toEqual(['テーマ', '描画', '引き出し線の表示', '倍率', '初期位置', '追従', '最低速度', '横軸', '再生速度', 'セクターボタンの動作', '最後の走行データを自動で読み込む', '利用状況の送信']);
     expect($('[data-reset]')).toBeTruthy();
   });
 

@@ -9,6 +9,7 @@ import { mountSettingsView } from './settingsView';
 import { logoSvg } from './logo';
 import { showAbout } from './aboutView';
 import { mountHelpView } from './helpView';
+import { applyAnalytics } from '../io/analytics';
 
 const esc = (s: string) =>
   s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
@@ -108,8 +109,10 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
   // 設定タブ: 「記憶しない」項目は、起動時と変更時に初期値を反映する
   const prefs = new Prefs(session);
   if (!prefs.get('theme').remember) theme.set(prefs.get('theme').value);
+  applyAnalytics(prefs.analytics);          // 利用状況の送信(Web 版の公開用ビルドで、オンのときだけ)
   mountSettingsView(settingsEl, prefs, (key) => {
     if (key === 'theme') { if (!prefs.get('theme').remember) theme.set(prefs.get('theme').value); }
+    else if (key === 'analytics') applyAnalytics(prefs.analytics);
     else if (key !== 'autoLoad') compare?.applyPref(key);
   }, () => {            // 「アプリを初期状態に戻す」: 保存したものをすべて消して、画面を読み直す
     session.factoryReset();

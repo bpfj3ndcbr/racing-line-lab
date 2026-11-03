@@ -59,7 +59,7 @@ const clean: { [K in PrefKey]: (v: unknown) => PrefValues[K] | null } = {
 };
 
 export type StartPos = 'center' | 'control';
-interface Saved { items?: Partial<Record<PrefKey, { remember?: unknown; value?: unknown }>>; yMin?: unknown; startPos?: unknown; autoLoad?: unknown }
+interface Saved { items?: Partial<Record<PrefKey, { remember?: unknown; value?: unknown }>>; yMin?: unknown; startPos?: unknown; autoLoad?: unknown; analytics?: unknown }
 
 export class Prefs {
   constructor(private s: PrefStore) {}
@@ -95,6 +95,10 @@ export class Prefs {
   /** 起動時に、前回の走行データ(ファイルと A〜D の割り当て)を自動で読み込む */
   get autoLoad(): boolean { return this.saved().autoLoad !== false; }
   setAutoLoad(v: boolean) { this.write({ ...this.saved(), autoLoad: v }); }
+
+  /** 利用状況の送信(Google アナリティクス。Web 版のみ)。初期値はオン */
+  get analytics(): boolean { return this.saved().analytics !== false; }
+  setAnalytics(v: boolean) { this.write({ ...this.saved(), analytics: v }); }
 
   /** 前回の状態(保存が無い・読めないときは null) */
   last<K extends PrefKey>(k: K): PrefValues[K] | null {
