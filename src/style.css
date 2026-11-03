@@ -472,7 +472,7 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .help p{margin:0 0 12px}
 .help ul,.help ol{margin:0 0 12px;padding-left:24px}
 .help li{margin:2px 0}
-.help img{display:block;max-width:100%;height:auto;margin:4px 0 16px;border:1px solid var(--border);border-radius:var(--r-m)}
+.help img{display:block;max-width:100%;height:auto;margin:4px 0 16px}     /* 枠線は画像そのものに入っている(GitHub でも同じに見えるように) */
 .help blockquote{margin:0 0 12px;padding:8px 12px;border-left:4px solid var(--accent);background:var(--sec-bg);color:var(--muted)}
 .help blockquote p:last-child{margin-bottom:0}
 .help code{font-size:12px;padding:1px 5px;border-radius:var(--r-s);background:var(--surface-2);border:1px solid var(--cell-line)}
