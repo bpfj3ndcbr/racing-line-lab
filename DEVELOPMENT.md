@@ -1,0 +1,102 @@
+# 開発者向けの情報
+
+Racing Line Lab の、開発・ビルド・仕様についての情報です。使い方は [README.md](https://github.com/bpfj3ndcbr/racing-line-lab/blob/main/README.md) をご覧ください。
+AI コーディングエージェントへの手引きは [AGENTS.md](https://github.com/bpfj3ndcbr/racing-line-lab/blob/main/AGENTS.md) にあります。
+
+## 必要なもの
+
+- Node.js 20 以上
+
+## ブラウザで動かす
+
+```
+npm install
+npm run dev
+```
+
+表示されたアドレス(通常は http://localhost:5173)をブラウザで開きます。
+
+## デスクトップ版(Electron)
+
+```
+npm install
+npm run electron          # ビルドして起動
+```
+
+開発中は、1 つ目のターミナルで `npm run dev`、2 つ目で `npm run electron:dev` を実行すると、画面の変更がすぐ反映されます。
+
+配布用アプリを作る(macOS):
+
+```
+npm run dist        # release/ に .dmg ができます
+npm run dist:dir    # インストーラ無しで、アプリだけを作る(動作確認用)
+```
+
+署名・公証はしていません。他の Mac に配るときは、初回に右クリック →「開く」が必要です。
+
+## テストと型チェック
+
+```
+npm test             # テスト(vitest)
+npm run typecheck    # 型チェックだけ
+npm run build        # 型チェック + ビルド(dist/)
+```
+
+走行ログを使うテストは `fixtures/` のファイルを読みます。ファイルが無いテストは自動で飛ばされます(公開用の状態では `fixtures/` は空です)。
+
+## ファイル形式
+
+.vbo はRaceChronoで .vbo 形式でエクスポートしたファイルを使用する想定です。
+
+.cln、.sci はデジスパイスの形式の想定です。
+
+補正データは走行ログの走行ラインを東西南北に補正した補正情報で、このアプリ独自のものです。
+
+走行ログがあれば、アプリ内でコントロールラインなどは引けるので .vbo だけあれば使えます。
+
+| 種類               | 形式                                           |
+|------------------|----------------------------------------------|
+| 走行ログ             | `.vbo`(RaceChrono)                           |
+| コントロールライン `.cln` | 1 行目 `1`、続く 4 行が `緯度 経度 緯度 経度`(線の始点と終点)      |
+| セクターライン `.sci`   | 1 行 1 本、`緯度,経度,緯度,経度,1`(1 本目は S1 としてセクターにする) |
+| 補正データ            | JSON(アプリから書き出し / 読み込み)                       |
+
+## データの保存先
+
+- **ブラウザ版**: ブラウザの localStorage
+- **デスクトップ版**: ユーザーデータ内の `settings.json`(macOS: `~/Library/Application Support/racing-line-lab/settings.json`)
+
+サーキット・位置補正・画面の設定・比較セット1〜5の状態が保存されます。走行ログ(.vbo)そのものは保存せず、自動読み込みを有効にしたときだけ、元のファイルの場所を覚えます。
+
+### 保存のキー
+
+保存は `KeyValueStore`(`src/io/storage.ts`)越しに行います。キーの名前は次のとおりです(デスクトップ版では、全体に接頭辞 `rll.` が付きます)。
+
+| キー | 内容 |
+|---|---|
+| `circuits` | 登録したサーキット |
+| `offsets` | 位置補正の値(ファイルごと) |
+| `lastSession` | 比較セット1〜5のファイルの場所・割り当て・サーキット指定(自動読み込み用) |
+| `theme` | テーマ(ライト/ダーク) |
+| `ui.prefs` | 設定タブの値と「記憶する」の選択 |
+| `ui.compare.mapMode` / `labels` / `zoom` / `follow` / `xKind` / `sync` / `rate` | 比較画面の「前回の状態」 |
+| `ui.compare.layout` | 比較画面の右パネルの幅・グラフの高さ(`v` が保存形式の版。形式を変えるときは版を上げる) |
+| `ui.setAliases` / `ui.slotAliases` | 比較セットの別名 / カード(セットごとの A〜D)の別名 |
+| `ui.guideClosed` / `ui.guideSeen` | はじめかたの表示状態 |
+
+保存の形式を変えるときは、古い形式を読み替える処理を足すか、版を上げて初期値に戻してください。
+
+## 比較画面の再生
+
+速度グラフの横軸が「時間」のときは、全車が同じ経過時間の位置に出ます。「距離」のときは、基準の車(いちばん若い枠)の時間で進め、ほかの車は基準の車と同じ走行距離の位置に出ます(`src/ui/compareView.ts` の `updateFrame`)。
+
+## 構成
+
+```
+src/core      ラップ検出・セクター・速度/加減速の計算など(画面に依存しない)
+src/store     読み込んだログ・割り当て・設定の状態(Session は 5 つの比較セットを持つ)
+src/ui        画面(使い方 / データ管理 / 比較 / 設定)と地図
+electron/     デスクトップ版(main / preload / 設定ファイルの保存)
+tests/        テスト(vitest)
+docs/images/  README.md のスクリーンショット
+```

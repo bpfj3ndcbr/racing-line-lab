@@ -1,0 +1,69 @@
+{
+  "name": "racing-line-lab",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "electron": "npm run build && electron .",
+    "electron:dev": "ELECTRON_DEV_URL=http://localhost:5173 electron .",
+    "dist": "npm run build && electron-builder --mac",
+    "dist:dir": "npm run build && electron-builder --dir"
+  },
+  "devDependencies": {
+    "@types/leaflet": "^1.9.22",
+    "@types/node": "^22.0.0",
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8",
+    "jsdom": "^25.0.0",
+    "typescript": "^5.6.0",
+    "vite": "^5.4.0",
+    "vitest": "^2.1.0"
+  },
+  "dependencies": {
+    "leaflet": "^1.9.4"
+  },
+  "main": "electron/main.cjs",
+  "description": "シンプル走行ライン比較ツール",
+  "author": "racing-line-lab",
+  "license": "MIT",
+  "build": {
+    "appId": "io.github.bpfj3ndcbr.racing-line-lab",
+    "productName": "Racing Line Lab",
+    "files": [
+      "dist/**",
+      "electron/**",
+      "package.json",
+      "LICENSE",
+      "THIRD-PARTY-NOTICES.txt"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.sports",
+      "icon": "build/icon.png"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "extraResources": [
+      {
+        "from": "THIRD-PARTY-NOTICES.txt",
+        "to": "THIRD-PARTY-NOTICES.txt"
+      },
+      {
+        "from": "LICENSE",
+        "to": "LICENSE.txt"
+      }
+    ]
+  }
+}

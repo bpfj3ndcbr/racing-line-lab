@@ -1,0 +1,607 @@
+/* ==========================================================================
+   デザイントークン
+   見た目(色・影・角丸)はここの変数だけで決まる。配色を変えるときはこの2ブロックを編集する。
+   部品側のルール(下の方)は、トークン以外の色を直接書かない。
+   ========================================================================== */
+:root, :root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #e8ecf1;           /* ページ背景 */
+  --bar: #dde2e9;          /* 上部バー・割り当て欄の背景 */
+  --surface: #ffffff;      /* カード・表の背景 */
+  --surface-2: #eef1f5;    /* 表の見出し・ファイル見出し */
+  --sec-bg: #f4f6f9;       /* セクション枠の中 */
+  --sec-head: #e3e8ee;     /* セクション見出し */
+  --border: #c3cad4;
+  --border-strong: #9aa4b2;
+  --cell-line: #d5dae1;    /* 表の罫線 */
+  --text: #1c2430;
+  --muted: #566274;
+  --dim: #6b7686;          /* 外れ値ラップの文字 */
+  --accent: #1f6fd1;
+  --accent-on: #ffffff;
+  --good: #0a7a3d;         /* ベストタイム */
+  --bsec: #7a35c9;         /* セクター最速 */
+  --warn: #8a5a00;
+  --focus: #1f6fd1;
+  --row-assigned: #e2edfb;
+  /* ボタン(うっすら立体) */
+  --btn-top: #fafbfc; --btn-bottom: #dfe3e9; --btn-border: #a3acb9;
+  --btn-shadow: 0 1px 0 rgba(255,255,255,.9) inset, 0 1px 2px rgba(20,30,50,.25);
+  --btn-pressed: 0 1px 3px rgba(20,30,50,.35) inset;
+  --sec-shadow: 0 1px 3px rgba(20,30,50,.12);
+  --r-s: 3px; --r-m: 4px; --r-l: 5px;   /* 角丸(小/中/大) */
+  --tint: 11%;             /* A〜D の色を面に混ぜる割合 */
+  /* A〜D: 地色 / その上の文字 / 薄い面の上の文字 */
+  --a: #d63a3a; --a-on: #ffffff; --a-fg: #b02020;
+  --b: #1f6fd1; --b-on: #ffffff; --b-fg: #1757a6;
+  --c: #1f8f55; --c-on: #ffffff; --c-fg: #17703f;
+  --d: #f2b705; --d-on: #231a00; --d-fg: #7a5600;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #1d2124;
+  --bar: #262b2f;
+  --surface: #2a2f33;
+  --surface-2: #22262a;
+  --sec-bg: #23282c;
+  --sec-head: #2e3439;
+  --border: #40474e;
+  --border-strong: #5a636c;
+  --cell-line: #394047;
+  --text: #e6e9ec;
+  --muted: #a6afb8;
+  --dim: #8a94a2;
+  --accent: #4aa3ff;
+  --accent-on: #0b1220;
+  --good: #4be09a;
+  --bsec: #c792ff;
+  --warn: #ffc83d;
+  --focus: #6cb6ff;
+  --row-assigned: #2f3b4a;
+  --btn-top: #474d53; --btn-bottom: #353a3f; --btn-border: #171a1d;
+  --btn-shadow: 0 1px 0 rgba(255,255,255,.12) inset, 0 2px 3px rgba(0,0,0,.5);
+  --btn-pressed: 0 2px 4px rgba(0,0,0,.6) inset;
+  --sec-shadow: 0 2px 6px rgba(0,0,0,.35);
+  --tint: 20%;
+  --a: #ff6b6b; --a-on: #1a0a0a; --a-fg: #ff8d8d;
+  --b: #4aa3ff; --b-on: #08121f; --b-fg: #7dbcff;
+  --c: #3ecf8e; --c-on: #06180f; --c-fg: #6be0a8;
+  --d: #ffc83d; --d-on: #231a00; --d-fg: #ffd970;
+}
+
+/* ==========================================================================
+   基本
+   ========================================================================== */
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:13px/1.5 "Hiragino Sans","Noto Sans JP",sans-serif}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+h2{margin:0}
+.num{font-variant-numeric:tabular-nums}
+.mut{color:var(--muted)}.sub{font-size:11px;color:var(--muted)}.grow{flex:1}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* ボタン */
+.btn,.seg button,.navtab{min-height:44px}
+.btn{display:inline-flex;align-items:center;padding:0 14px;color:var(--text);cursor:pointer;
+  background:linear-gradient(var(--btn-top),var(--btn-bottom));border:1px solid var(--btn-border);border-radius:var(--r-s);box-shadow:var(--btn-shadow)}
+.btn:active{box-shadow:var(--btn-pressed)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-on);font-weight:700}
+.btn.sm{font-size:12px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.seg{display:inline-flex;border:1px solid var(--btn-border);border-radius:var(--r-s);overflow:hidden;box-shadow:var(--btn-shadow)}
+.seg button{padding:0 14px;border:0;border-right:1px solid var(--btn-border);cursor:pointer;color:var(--text);
+  background:linear-gradient(var(--btn-top),var(--btn-bottom))}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--accent);color:var(--accent-on);font-weight:700;box-shadow:var(--btn-pressed)}
+
+/* 上部バー */
+.top{display:flex;align-items:center;gap:20px;padding:6px 24px;min-height:60px;background:var(--bar);border-bottom:1px solid var(--border)}
+.ttl{font-weight:700;font-size:14.5px}
+.navtabs{display:flex;gap:8px}
+.navtab{display:inline-flex;align-items:center;padding:0 16px;font:inherit;cursor:pointer;border:1px solid var(--btn-border);border-radius:var(--r-s);
+  background:linear-gradient(var(--btn-top),var(--btn-bottom));box-shadow:var(--btn-shadow);color:var(--text)}
+.navtab.on{box-shadow:var(--btn-pressed);font-weight:700}
+.navtab.dim,.navtab:disabled{opacity:.6;cursor:not-allowed}
+.top-right{display:flex;align-items:center;gap:16px}
+.cur b{font-weight:700}
+
+/* A〜D の割り当て欄 */
+.slots{display:flex;gap:12px;align-items:center;padding:16px 24px;background:var(--bar);border-bottom:1px solid var(--border)}
+.slot{flex:1;display:flex;gap:10px;align-items:center;min-height:56px;padding:8px 12px;border-radius:var(--r-m);
+  background:var(--surface);border:1px solid var(--border)}
+.chip{display:inline-flex;align-items:center;justify-content:center;flex:none;width:28px;height:28px;border-radius:50%;font-weight:800}
+.st{font-weight:700}
+.slot-a{background:color-mix(in srgb,var(--a) var(--tint),var(--surface));border-color:color-mix(in srgb,var(--a) 55%,var(--border))}
+.slot-b{background:color-mix(in srgb,var(--b) var(--tint),var(--surface));border-color:color-mix(in srgb,var(--b) 55%,var(--border))}
+.slot-c{background:color-mix(in srgb,var(--c) var(--tint),var(--surface));border-color:color-mix(in srgb,var(--c) 55%,var(--border))}
+.slot-d{background:color-mix(in srgb,var(--d) var(--tint),var(--surface));border-color:color-mix(in srgb,var(--d) 55%,var(--border))}
+.sa{background:var(--a);color:var(--a-on)}.sb{background:var(--b);color:var(--b-on)}
+.sc{background:var(--c);color:var(--c-on)}.sd{background:var(--d);color:var(--d-on)}
+
+/* セクション(枠で囲み、開閉できる) */
+.body{max-width:1440px;padding:24px;display:flex;flex-direction:column;gap:24px}
+summary{list-style:none;cursor:pointer}
+summary::-webkit-details-marker{display:none}
+.sec{border:1px solid var(--border-strong);border-radius:var(--r-l);background:var(--sec-bg);box-shadow:var(--sec-shadow)}
+.sec-h{display:flex;align-items:center;gap:12px;min-height:48px;padding:0 16px;background:var(--sec-head);border-radius:calc(var(--r-l) - 1px)}
+.sec[open]>.sec-h{border-bottom:1px solid var(--border-strong);border-radius:calc(var(--r-l) - 1px) calc(var(--r-l) - 1px) 0 0}
+.sec-h h2{font-size:14px}
+.badge{font-size:11px;color:var(--muted);border:1px solid var(--border);border-radius:var(--r-l);padding:0 8px;background:var(--surface)}
+.sec-hint{font-size:11px;color:var(--muted)}
+.h-closed{display:none}
+.sec:not([open])>.sec-h .h-open{display:none}
+.sec:not([open])>.sec-h .h-closed{display:inline}
+.chev{width:9px;height:9px;flex:none;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);
+  transform:rotate(-45deg);transition:transform .15s;margin:0 4px 0 2px}
+details[open]>summary .chev{transform:rotate(45deg)}
+.sec-body{padding:16px;display:flex;flex-direction:column;gap:14px}
+.toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.sel{display:flex;align-items:center;gap:8px;color:var(--muted)}
+select{min-height:44px;padding:0 10px;background:var(--surface);border:1px solid var(--btn-border);border-radius:var(--r-s)}
+.msg{min-height:18px;color:var(--warn);font-size:12px}
+
+.circ-form{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.circ-form label{display:flex;align-items:center;gap:8px;color:var(--muted)}
+.circ-form input[type=text]{min-height:44px;padding:0 10px;background:var(--surface-2);border:1px solid var(--btn-border);border-radius:var(--r-s)}
+
+/* 走行データ(ファイルごとのカード+表) */
+.file{border:1px solid var(--border-strong);border-radius:var(--r-l);background:var(--surface);overflow:hidden;margin-bottom:16px}
+.fh{display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--surface-2);border-bottom:1px solid var(--border);flex-wrap:wrap}
+.fno{font-weight:800;font-size:14px}
+.fn{flex:1;min-width:200px}
+.tag{font-size:11px;padding:2px 8px;border-radius:var(--r-l);border:1px solid var(--border-strong);color:var(--muted)}
+.tag.ok{color:var(--good);border-color:var(--good)}.tag.ng{color:var(--warn);border-color:var(--warn)}
+.scroll{overflow-x:auto}
+.scroll:focus-visible{outline-offset:-2px}
+.tbl{display:grid;min-width:100%;width:max-content}
+.row{display:grid;align-items:stretch;min-height:44px;border-bottom:1px solid var(--cell-line)}
+.row:last-child{border-bottom:0}
+.row>div{display:flex;align-items:center;padding:0 12px;border-right:1px solid var(--cell-line);min-width:0}
+.row>div:last-child{border-right:0}
+.row.hd{min-height:36px;font-size:11px;color:var(--muted);background:var(--surface-2)}
+.row.ex{color:var(--dim)}
+.row.as{background:var(--row-assigned)}
+.hbtn{background:none;border:0;padding:0;min-height:36px;color:var(--text);font-size:11px;text-decoration:underline dotted;cursor:pointer}
+.best{color:var(--good);font-weight:700}
+.bsec{color:var(--bsec);font-weight:700}
+
+/* A〜D の割り当てボタン: 未割り当ては色の薄い面、割り当て済みは塗りつぶし */
+.pk{gap:8px}
+.pk button{width:36px;height:36px;border-radius:var(--r-m);font-weight:800;cursor:pointer;box-shadow:var(--btn-shadow);border:2px solid transparent}
+.pk button.a{background:color-mix(in srgb,var(--a) 16%,var(--surface));border-color:color-mix(in srgb,var(--a) 55%,transparent);color:var(--a-fg)}
+.pk button.b{background:color-mix(in srgb,var(--b) 16%,var(--surface));border-color:color-mix(in srgb,var(--b) 55%,transparent);color:var(--b-fg)}
+.pk button.c{background:color-mix(in srgb,var(--c) 16%,var(--surface));border-color:color-mix(in srgb,var(--c) 55%,transparent);color:var(--c-fg)}
+.pk button.d{background:color-mix(in srgb,var(--d) 16%,var(--surface));border-color:color-mix(in srgb,var(--d) 55%,transparent);color:var(--d-fg)}
+.pk button.on{box-shadow:inset 0 0 0 2px var(--surface),0 0 0 1px var(--text)}
+.pk button.on.a{background:var(--a);border-color:var(--a);color:var(--a-on)}
+.pk button.on.b{background:var(--b);border-color:var(--b);color:var(--b-on)}
+.pk button.on.c{background:var(--c);border-color:var(--c);color:var(--c-on)}
+.pk button.on.d{background:var(--d);border-color:var(--d);color:var(--d-on)}
+
+.empty{padding:16px;color:var(--muted)}
+.empty.big{text-align:center;padding:40px 16px;border:1px dashed var(--border-strong);border-radius:var(--r-l)}
+.foot{display:flex;gap:16px;flex-wrap:wrap;color:var(--muted);font-size:11px}
+.legend{display:inline-flex;align-items:center;gap:6px}
+.bsec-dot{width:10px;height:10px;border-radius:2px;background:var(--bsec);display:inline-block}
+
+/* サーキットのタブ(サーキット登録 / 登録済みサーキット) */
+.tablist{display:flex;gap:4px;padding-left:8px}
+.tab{min-height:44px;padding:0 18px;font-weight:700;cursor:pointer;position:relative;margin-bottom:-1px;
+  background:var(--surface-2);color:var(--muted);border:1px solid var(--border-strong);
+  border-radius:var(--r-m) var(--r-m) 0 0}
+.tab[aria-selected="true"]{background:var(--surface);color:var(--text);border-bottom-color:var(--surface);z-index:1}
+.tab-body{padding:16px;display:flex;flex-direction:column;gap:12px;background:var(--surface);
+  border:1px solid var(--border-strong);border-radius:var(--r-m)}
+.tab-body[hidden]{display:none}
+
+/* 登録済みサーキットの一覧 */
+.clist{list-style:none;margin:0;padding:0;border:1px solid var(--cell-line);border-radius:var(--r-m);overflow:hidden}
+.citem{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid var(--cell-line)}
+.citem:last-child{border-bottom:0}
+.cinfo{flex:1;min-width:180px;display:flex;flex-direction:column}
+.cact{display:flex;gap:8px;flex-wrap:wrap}
+
+/* ダイアログ */
+.modal-back{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.45)}
+.modal{width:min(420px,calc(100vw - 32px));display:flex;flex-direction:column;gap:12px;padding:20px;
+  background:var(--surface);color:var(--text);border:1px solid var(--border-strong);border-radius:var(--r-l);
+  box-shadow:0 8px 28px rgba(0,0,0,.4)}
+.modal h3{margin:0;font-size:14.5px}
+.modal p{margin:0;color:var(--muted)}
+.modal-field{display:flex;flex-direction:column;gap:6px;color:var(--muted)}
+.modal-field input{min-height:44px;padding:0 10px;color:var(--text);background:var(--surface-2);
+  border:1px solid var(--btn-border);border-radius:var(--r-s)}
+.modal-actions{display:flex;justify-content:flex-end;gap:8px}
+
+/* 登録フォーム: 1行1項目、最後の行に「登録」 */
+.circ-form{display:flex;flex-direction:column;gap:10px;max-width:640px}
+.frow{display:grid;grid-template-columns:200px 1fr;align-items:center;gap:12px;color:var(--muted)}
+.frow input[type=text]{max-width:320px}
+
+/* 比較画面: 左 = 地図 + その下に再生の操作 / 右 = 走行データ・セクター・速度グラフ */
+:root{--top-h:61px}
+.cmp{--side-w:300px;--graph-h:420px;display:flex;flex-direction:column;height:calc(100vh - var(--top-h));height:calc(100dvh - var(--top-h));min-height:520px}
+.cmp-main{flex:1;display:flex;min-height:0}
+.cmp-main[hidden],.cmp-empty[hidden]{display:none}
+.cmp-left{flex:1;min-width:0;display:flex;flex-direction:column}
+.cmp-map{flex:1;min-height:0;position:relative;background:var(--surface-2)}
+.map{position:absolute;inset:0}
+.cmp-ctl{flex:none;display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:6px 10px;background:var(--bar);border-top:1px solid var(--border-strong)}
+.cmp-time{min-width:130px;font-weight:700;font-size:12px}
+.cmp-seek{flex:1;min-width:120px;accent-color:var(--accent)}
+.cmp-side{width:var(--side-w);flex:none;display:flex;flex-direction:column;min-height:0;overflow:hidden;
+  background:var(--sec-bg);border-left:1px solid var(--border-strong)}
+.side-upper{flex:1 1 0;min-height:0;overflow:hidden}
+.side-upper-in{padding:10px 12px 8px;display:flex;flex-direction:column;gap:8px}
+.cmp-cards{display:flex;flex-direction:column;gap:6px}
+.side-graph{flex:none;height:var(--graph-h);display:flex;flex-direction:column;padding:4px 6px 6px;min-height:0}
+.graph-bar{flex:none;display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;padding:0 2px 4px}
+.graph-host{flex:1;min-height:0;width:100%;position:relative;overflow:hidden;display:flex;flex-direction:column}
+.cmp-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--muted)}
+.secs{display:flex;flex-wrap:wrap;gap:6px}
+.cmp-side .h{font-weight:700;font-size:11px}
+
+/* 走行データのカード(A〜D)。3 段: Run / LAP とタイム / 速度と時間差 */
+.card{display:flex;gap:10px;align-items:center;min-height:56px;padding:4px 12px;border-radius:var(--r-m);background:var(--surface);border:1px solid var(--border)}
+.card.off{opacity:.6}
+.card .c1{font-weight:700;font-size:10px}
+.card .c2{font-weight:700;font-size:10px}
+.card .c3{font-size:12px;line-height:1.35}
+.card-body{display:flex;flex-direction:column;min-width:0}
+button.card{font:inherit;color:inherit;text-align:left;width:100%;cursor:pointer;box-shadow:var(--btn-shadow)}
+button.card:active{box-shadow:var(--btn-pressed)}
+.card.muted{opacity:.5}
+.card.muted .chip{background:transparent;color:var(--muted);border:1px solid var(--muted)}
+.tag-hidden{font-weight:400;color:var(--muted)}
+.card .chip{width:24px;height:24px;font-size:12px}
+
+/* 速度グラフ */
+.speed-graph{display:block;touch-action:none;cursor:ew-resize;user-select:none}
+.g-grid{stroke:var(--cell-line);stroke-width:1}
+.g-tick{fill:var(--muted);font-size:9px}
+.g-unit{fill:var(--muted);font-size:8px}
+.g-mark{stroke:var(--border-strong);stroke-width:1;stroke-dasharray:3 3}
+.g-marklabel{fill:var(--text);font-size:9px;font-weight:700}
+.g-line{stroke-width:2}
+.s-a{stroke:var(--a);fill:var(--a)}.s-b{stroke:var(--b);fill:var(--b)}.s-c{stroke:var(--c);fill:var(--c)}.s-d{stroke:var(--d);fill:var(--d)}
+.g-line.s-a,.g-line.s-b,.g-line.s-c,.g-line.s-d{fill:none}
+.g-dot{stroke:var(--surface);stroke-width:2}
+.g-cursor-line{stroke:var(--text);stroke-width:1.5;stroke-dasharray:4 3}
+.g-handle{fill:var(--text)}
+
+/* 地図の車両(小さな三角形。向きは進行方向、色で A〜D を区別する) */
+.car{background:none;border:0}
+.car-tri{display:block;overflow:visible;filter:drop-shadow(0 0 1px rgba(0,0,0,.8))}
+.car-tri polygon{stroke:#fff;stroke-width:1;stroke-linejoin:round}
+.car-a .car-tri polygon{fill:var(--a)}.car-b .car-tri polygon{fill:var(--b)}
+.car-c .car-tri polygon{fill:var(--c)}.car-d .car-tri polygon{fill:var(--d)}
+.map-label span{position:absolute;transform:translate(6px,-50%);white-space:nowrap;padding:1px 5px;border-radius:var(--r-s);
+  font-size:10px;font-weight:700;background:rgba(0,0,0,.65);color:#fff}
+.map-label.control span{color:#ffd23f}
+
+/* 分割バー(境界のドラッグ) */
+.splitter{flex:none;position:relative;background:var(--border-strong);z-index:2;touch-action:none}
+.splitter[hidden]{display:none}
+.splitter.v{width:6px;cursor:col-resize}
+.splitter.h{height:6px;cursor:row-resize}
+.splitter::before{content:"";position:absolute;inset:0;background-repeat:no-repeat;background-position:center;opacity:.9}
+.splitter.v::before{background-image:radial-gradient(circle,var(--surface) 1.2px,transparent 1.6px);background-size:6px 8px;background-repeat:repeat-y;
+  inset:calc(50% - 16px) 0 auto 0;height:32px}
+.splitter.h::before{background-image:radial-gradient(circle,var(--surface) 1.2px,transparent 1.6px);background-size:8px 6px;background-repeat:repeat-x;
+  inset:0 auto 0 calc(50% - 16px);width:32px}
+.splitter::after{content:"";position:absolute}   /* つかみやすいよう、見た目より広く反応させる */
+.splitter.v::after{inset:0 -5px}
+.splitter.h::after{inset:-5px 0}
+.splitter:hover,.splitter:focus-visible,body.resizing .splitter{background:var(--accent)}
+.splitter:focus-visible{outline:2px solid var(--focus);outline-offset:0}
+body.resizing{user-select:none}
+body.resizing-x{cursor:col-resize}
+body.resizing-y{cursor:row-resize}
+body.resizing iframe,body.resizing .map{pointer-events:none}
+
+/* 再生系の行: ボタンを小さく(アイコン化) */
+.cmp-ctl{gap:6px}
+.cmp-ctl .btn,.cmp-ctl .seg button,.ib{min-height:26px;height:26px}
+.btn.xs{min-height:26px;height:26px;padding:0 10px;font-size:11px}
+.ib{width:28px;padding:0;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text);
+  background:linear-gradient(var(--btn-top),var(--btn-bottom));border:1px solid var(--btn-border);border-radius:var(--r-s);box-shadow:var(--btn-shadow)}
+.ib:active{box-shadow:var(--btn-pressed)}
+.ib:disabled{opacity:.45;cursor:not-allowed}
+.ib.pri[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-on)}
+.ib[aria-label="一時停止"][aria-pressed="true"]{box-shadow:var(--btn-pressed)}
+.seg.sm button{padding:0 9px;font-size:11px;min-height:26px;height:26px}
+.cmp-time{font-size:12px;min-width:130px}
+.cmp-ctl .sub{font-size:11px}
+
+/* 地図の上の操作(表示位置・走行ライン / ヒートマップ) */
+.map-ov{position:absolute;z-index:1100}
+.map-ov.tl{left:10px;top:10px}
+.map-ov.tr{right:10px;top:10px}
+.map-legend{position:absolute;z-index:1100;right:10px;bottom:34px;display:flex;align-items:center;gap:8px;padding:4px 10px;
+  font-size:11px;font-weight:700;color:var(--text);background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r-s)}
+.map-legend[hidden]{display:none}
+.legend-bar{display:block;width:140px;height:10px;border-radius:2px}
+.legend-bar.accel{background:linear-gradient(90deg,rgb(255,59,48),rgb(231,137,132) 25%,rgb(208,214,222) 50%,rgb(127,209,164) 75%,rgb(46,204,113))}
+.legend-bar.speed{background:linear-gradient(90deg,rgb(68,1,84),rgb(59,82,139) 25%,rgb(33,145,140) 50%,rgb(94,201,98) 75%,rgb(253,231,37))}
+
+/* 速度グラフ: ズームとルーラー */
+.g-plot{flex:1;min-height:0;position:relative;overflow:hidden}
+.g-ruler{flex:none;height:24px}
+.g-ruler[hidden]{display:none}
+.graph-ruler{display:block;touch-action:none;cursor:pointer}
+.g-rtrack{fill:var(--surface-2);stroke:var(--border-strong);stroke-width:1}
+.g-rmark{stroke:var(--muted);stroke-width:1}
+.g-rtick{stroke:var(--text);stroke-width:1.5}
+.g-thumb{fill:var(--accent);fill-opacity:.3;stroke:var(--accent);stroke-width:1.5;cursor:grab}
+.g-thumb:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+.g-line{vector-effect:non-scaling-stroke}
+.g-line.muted{opacity:.2}
+.g-dot.muted{opacity:.25}
+.zoom-grp{display:inline-flex;align-items:center;gap:4px}
+.cmp-zoom{min-width:28px;text-align:center;font-size:11px}
+
+/* 上部のタブ(データ管理 / 比較): 枠で囲み、下の水平線とつながる「フォルダ型」のタブ */
+.top{padding:0 24px;align-items:flex-end;gap:20px}
+.top .ttl,.top .top-right{align-self:center}
+.navtabs{align-self:flex-end;gap:4px;margin-bottom:-1px}
+.navtab{align-self:flex-end;background:color-mix(in srgb,var(--bar) 88%,var(--text));border:1px solid var(--border-strong);border-bottom:1px solid var(--border-strong);
+  border-radius:var(--r-s) var(--r-s) 0 0;box-shadow:none;min-height:40px;padding:0 20px;color:var(--muted);font-weight:600;position:relative}
+.navtab:hover:not(:disabled){color:var(--text);background:color-mix(in srgb,var(--bar) 80%,var(--accent))}
+.navtab.on,.navtab[aria-current="page"]{color:var(--text);font-weight:700;background:var(--bg);border-bottom-color:var(--bg);box-shadow:inset 0 3px 0 var(--accent);z-index:1}
+.navtab.dim,.navtab:disabled{opacity:.45;cursor:not-allowed}
+.navtab:focus-visible{outline-offset:-3px}
+.top{border-bottom:1px solid var(--border-strong)}
+
+/* セクターのボタン(小さめ) */
+.secs .btn.sec{min-height:24px;height:24px;min-width:30px;padding:0 6px;font-size:10px;justify-content:center}
+.secs .btn.sec[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-on);font-weight:700}
+.no-sector{color:var(--muted)}
+.sync-grp{display:flex;flex-direction:column;gap:6px}
+.sync-grp[hidden]{display:none}
+.sync-status{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sync-status[hidden]{display:none}
+
+/* セクターの欄: 走行データとの間に境界線(動かせない) */
+.sec-block{border-top:1px solid var(--border-strong);padding-top:8px;display:flex;flex-direction:column;gap:6px}
+.sync-grp[hidden]{display:none}
+.sync-status[hidden]{display:none}
+.seg button:disabled{opacity:.5;cursor:not-allowed}
+.g-plot .speed-graph{position:absolute;left:0;top:0}
+.sec-block .seg{align-self:flex-start}
+.graph-bar .zoom-grp{margin-left:auto}
+
+/* 位置補正の画面: 左 = 地図 / 右 = 補正量の操作 */
+.work[hidden],.work>[hidden],.body[hidden]{display:none}
+.corr{display:flex;height:calc(100vh - var(--top-h) - var(--slots-h,92px));height:calc(100dvh - var(--top-h) - var(--slots-h,92px));min-height:420px;border-top:1px solid var(--border-strong)}
+.corr-map-wrap{flex:1;min-width:0;position:relative;background:var(--surface-2)}
+.corr-map-wrap .map.edit-drag{cursor:move}
+.corr-side{width:300px;flex:none;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:10px;
+  background:var(--sec-bg);border-left:1px solid var(--border-strong)}
+.corr-side .h{font-weight:700}
+.corr-fields{display:flex;flex-direction:column;gap:6px}
+.frow2{display:flex;align-items:center;gap:8px}
+.frow2>span:first-child{width:36px;color:var(--muted)}
+.frow2 input{width:110px;min-height:30px;padding:0 8px;color:var(--text);background:var(--surface-2);
+  border:1px solid var(--btn-border);border-radius:var(--r-s);font-variant-numeric:tabular-nums}
+.corr-pad{display:grid;grid-template-columns:repeat(4,28px);gap:6px}
+.corr-step{display:flex;align-items:center;gap:8px}
+.corr-laps{min-height:36px;padding:6px 8px;font-size:11px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-m)}
+.corr-actions{display:flex;flex-direction:column;gap:6px;margin-top:4px}
+.corr-actions .btn{min-height:34px;justify-content:center}
+
+.frow2.col{flex-direction:column;align-items:stretch;gap:2px}
+.frow2.col>span:first-child{width:auto;font-size:11px}
+.frow2.col input{width:100%}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap}
+
+/* サーキットの編集: ラインの一覧・つまみ・ヒント */
+.ce-draw{display:flex;gap:6px;flex-wrap:wrap}
+.ce-draw .btn{min-height:30px;font-size:11px;padding:0 10px}
+.ce-draw .btn.on{background:var(--accent);border-color:var(--accent);color:var(--accent-on);font-weight:700}
+.ce-list{display:flex;flex-direction:column;gap:4px}
+.ce-row{display:flex;align-items:center;gap:4px}
+.ce-row .ce-name{flex:1;min-height:26px;height:26px;justify-content:flex-start;font-size:11px}
+.ce-row.sel .ce-name{background:var(--accent);border-color:var(--accent);color:var(--accent-on);font-weight:700}
+.ce-gap{width:28px;flex:none}
+.ce-fine{display:flex;flex-direction:column;gap:6px}
+.ce-fine[hidden]{display:none}
+.ce-group .btn{min-height:30px;font-size:11px}
+/* 機能ごとのグループ: 枠で囲み、見出しは帯 + 左の線で目立たせる */
+.ce-group{display:flex;flex-direction:column;gap:8px;padding:0 10px 10px;background:var(--surface);
+  border:1px solid var(--border-strong);border-radius:var(--r-m);box-shadow:var(--sec-shadow)}
+.ce-group>h3{margin:0 -10px 2px;padding:5px 10px;font-size:12px;font-weight:700;letter-spacing:.04em;
+  background:var(--sec-head);border-bottom:1px solid var(--border-strong);border-left:4px solid var(--accent);
+  border-radius:calc(var(--r-m) - 1px) calc(var(--r-m) - 1px) 0 0}
+.ce-draft{display:flex;flex-direction:column;gap:6px;padding:8px;font-size:11px;
+  background:color-mix(in srgb,var(--accent) 12%,var(--surface));border:1px dashed var(--accent);border-radius:var(--r-m)}
+.map-hint{position:absolute;z-index:1100;left:50%;top:10px;transform:translateX(-50%);max-width:80%;padding:4px 12px;font-size:11px;font-weight:700;
+  color:var(--accent-on);background:var(--accent);border-radius:var(--r-s);box-shadow:var(--btn-shadow)}
+.map-hint[hidden]{display:none}
+.map.draw-mode{cursor:crosshair}
+.edit-handle{background:none;border:0}
+.edit-handle span{display:block;width:14px;height:14px;border-radius:50%;background:#00e5ff;border:2px solid #fff;box-shadow:0 0 2px rgba(0,0,0,.8);cursor:grab}
+.edit-handle.mid span{border-radius:2px;transform:rotate(45deg);width:12px;height:12px;margin:1px}
+
+/* hidden 属性は、他の display 指定より常に優先する(未確定の枠が出っぱなしになる不具合の対策) */
+[hidden]{display:none!important}
+
+/* 一覧の見出し(コマンドのボタンと区別する) */
+.ce-list-h{font-weight:700;font-size:12px;margin-top:4px}
+/* 走行ログ: マウスが乗っているラップの行を強調する */
+.row:not(.hd){transition:background-color .08s}
+.row:not(.hd):hover{background:color-mix(in srgb,var(--accent) 14%,var(--surface));box-shadow:inset 4px 0 0 var(--accent)}
+.row.as:not(.hd):hover{background:color-mix(in srgb,var(--accent) 22%,var(--row-assigned))}
+
+/* ファイルによる登録: 項目名の列を固定幅にして、入力欄・「ファイルを選択」の先頭をそろえる */
+.circ-form .frow{display:grid;grid-template-columns:220px minmax(0,1fr);align-items:center;gap:12px;text-align:left}
+.circ-form .frow>span:first-child{text-align:right}
+.circ-form .frow input[type=text]{width:100%;max-width:320px;box-sizing:border-box}
+
+/* 車から引き出す速度・タイム差(線の先に文字。文字は車の色、背景は半透明の黒で航空写真の上でも読める) */
+.car-lbl{background:none;border:0;overflow:visible}
+.car-lbl .lbl-line{position:absolute;overflow:visible;pointer-events:none}
+.car-lbl .lbl-line line{stroke-width:1.5;stroke-linecap:round}
+.car-lbl .lbl-txt{position:absolute;white-space:nowrap;font-size:11px;font-weight:700;line-height:1.3;padding:0 5px;border-radius:3px;background:rgba(0,0,0,.62);pointer-events:none}
+.car-lbl-a .lbl-line line{stroke:var(--a)}.car-lbl-a .lbl-txt{color:var(--a-lbl,#ff7b7b)}
+.car-lbl-b .lbl-line line{stroke:var(--b)}.car-lbl-b .lbl-txt{color:var(--b-lbl,#7fc0ff)}
+.car-lbl-c .lbl-line line{stroke:var(--c)}.car-lbl-c .lbl-txt{color:var(--c-lbl,#6fe08a)}
+.car-lbl-d .lbl-line line{stroke:var(--d)}.car-lbl-d .lbl-txt{color:var(--d-lbl,#ffc94d)}
+
+/* テーマの切り替えボタン(小さめ) */
+.seg.tiny button{min-height:22px;height:22px;padding:0 7px;font-size:10px}
+.seg.tiny button .ico{vertical-align:-2px;margin-right:4px}
+
+/* About ダイアログ */
+.modal.wide{width:min(560px,calc(100vw - 32px));max-height:calc(100vh - 48px)}
+.modal-body{overflow-y:auto;display:flex;flex-direction:column;gap:10px;color:var(--text);font-size:12.5px;line-height:1.6}
+.modal-body p{color:var(--text)}
+.modal-body h4{margin:6px 0 0;font-size:12.5px;padding-left:8px;border-left:3px solid var(--accent)}
+.modal-body ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:3px}
+.modal-body a{color:var(--accent);word-break:break-all}
+.about-head{display:flex;align-items:center;gap:14px}
+.about-ttl{font-size:18px;font-weight:700}
+.about-sub{color:var(--muted)}
+
+/* 使い方タブ(README の「使い方」「そのほかの操作」を表示する)。上部バーは残して、本文だけをスクロールする */
+#view-help{height:calc(100vh - var(--top-h));height:calc(100dvh - var(--top-h));overflow:auto}
+.help{max-width:980px;padding:8px 24px 48px;line-height:1.7;color:var(--text)}
+.help h2{font-size:20px;margin:28px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.help h3{font-size:16px;margin:24px 0 8px}
+.help h4{font-size:14px;margin:20px 0 6px}
+.help p{margin:0 0 12px}
+.help ul,.help ol{margin:0 0 12px;padding-left:24px}
+.help li{margin:2px 0}
+.help img{display:block;max-width:100%;height:auto;margin:4px 0 16px;border:1px solid var(--border);border-radius:var(--r-m)}
+.help blockquote{margin:0 0 12px;padding:8px 12px;border-left:4px solid var(--accent);background:var(--sec-bg);color:var(--muted)}
+.help blockquote p:last-child{margin-bottom:0}
+.help code{font-size:12px;padding:1px 5px;border-radius:var(--r-s);background:var(--surface-2);border:1px solid var(--cell-line)}
+.help table{border-collapse:collapse;margin:0 0 12px;background:var(--surface)}
+.help th,.help td{border:1px solid var(--cell-line);padding:4px 12px;text-align:left}
+.help th{background:var(--surface-2)}
+.help a{color:var(--accent)}
+
+/* 設定タブ */
+.settings{max-width:860px;padding:24px;display:flex;flex-direction:column;gap:16px}
+.settings .sub{margin:0}
+.set-group{display:flex;flex-direction:column;gap:0}
+.srow{display:grid;grid-template-columns:200px minmax(0,1fr) auto;align-items:center;column-gap:16px;row-gap:2px;padding:10px 12px;border-top:1px solid var(--border)}
+.set-group>h3+.srow{border-top:0}
+.sname{font-weight:600;text-align:right}
+.sctl{display:flex;align-items:center;gap:10px;min-width:0}
+.srem{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);white-space:nowrap}
+.shint{grid-column:2 / 4;font-size:10px;color:var(--muted)}
+.seg.slide button{min-height:30px;height:30px;font-size:11px;padding:0 12px}
+.swl{font-size:11px;min-width:5em}
+.slider{width:240px;max-width:100%;accent-color:var(--accent)}
+.switch{position:relative;width:46px;height:24px;border-radius:12px;border:1px solid var(--btn-border);background:var(--surface-2);cursor:pointer;padding:0;flex:none}
+.switch i{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:var(--muted);transition:left .12s,background-color .12s}
+.switch.on{background:var(--accent);border-color:var(--accent)}
+.switch.on i{left:24px;background:var(--accent-on)}
+.srow.remembered .sctl{opacity:.45}
+.switch:disabled,.slider:disabled,.seg.slide button:disabled{cursor:not-allowed}
+
+/* アプリ名(上)とサブタイトル(下) */
+.brand{display:flex;flex-direction:row;align-items:center;gap:10px;line-height:1.25}
+.brand-txt{display:flex;flex-direction:column;justify-content:center}
+.logo{flex:none;display:block}
+.logo-bd{fill:none;stroke:none}
+:root[data-theme="dark"] .logo-bd{stroke:rgba(255,255,255,.5);stroke-width:4}
+.brand .subttl{font-size:10px;color:var(--muted);font-weight:400}
+.top .brand{align-self:center}
+
+/* 比較セット 1〜5 */
+.slots{flex-direction:column;align-items:stretch;gap:8px}
+.slots-title{font-size:12px;color:var(--muted)}
+.slots-title b{color:var(--text);font-size:13px}
+.slots-row{display:flex;gap:12px;align-items:center}
+.sets-head{display:flex;flex-direction:column;gap:8px}
+.set-sec .badge{margin-left:4px}
+.set-radio{display:inline-flex;align-items:center;gap:6px;margin-left:16px;font-size:11px;font-weight:600;cursor:pointer;padding:2px 8px;border:1px solid var(--border);border-radius:var(--r-s);background:var(--surface)}
+.set-sec.set-active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.set-sec.set-active .set-radio{background:var(--accent);color:var(--accent-on);border-color:var(--accent)}
+.set-sec .toolbar.set-circuit{padding-bottom:0}
+
+.cmp-set{display:flex;align-items:center;gap:6px;font-size:11px}
+.cmp-set select{flex:1;min-width:0}
+
+/* 地図の住所検索(サーキット登録画面) */
+.geo{position:absolute;z-index:1100;left:10px;top:10px;width:260px;margin:0}
+.geo input{width:100%;box-sizing:border-box;padding:6px 10px;font:inherit;font-size:12px;color:var(--text);background:var(--surface);
+  border:1px solid var(--border-strong);border-radius:var(--r-s);box-shadow:var(--btn-shadow)}
+.geo-res{margin-top:4px;max-height:260px;overflow:auto;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r-s);box-shadow:var(--btn-shadow)}
+.geo-hit{display:block;width:100%;text-align:left;padding:7px 10px;font:inherit;font-size:12px;color:var(--text);background:none;border:0;border-bottom:1px solid var(--border);cursor:pointer}
+.geo-hit:last-child{border-bottom:0}
+.geo-hit:hover,.geo-hit:focus-visible{background:var(--surface-2)}
+.geo-note{padding:7px 10px;font-size:11px;color:var(--muted)}
+.offsets-note p{margin:0 0 4px}
+
+/* はじめかた(データ管理) */
+.guide-wrap{margin-bottom:12px}
+.guide{background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r-m);padding:10px 14px 12px;box-shadow:var(--btn-shadow)}
+.guide .gh{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.guide .gh .linkbtn{margin-left:auto}
+.gsteps{display:flex;gap:8px;flex-wrap:wrap}
+.gstep{flex:1 1 220px;display:flex;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r-s);background:var(--surface-2)}
+.gstep .gn{flex:none;width:22px;height:22px;border-radius:50%;background:var(--border-strong);color:var(--surface);font-weight:700;display:flex;align-items:center;justify-content:center}
+.gstep h4{margin:0 0 2px;font-size:12px}
+.gstep p{margin:0 0 4px;font-size:11px;line-height:1.45;color:var(--muted)}
+.gstep.done .gn{background:var(--c)}
+.gstep.cur{background:var(--surface);border:2px solid var(--accent)}
+.gstep.cur .gn{background:var(--accent);color:var(--accent-on)}
+.gstep .btn{margin:2px 6px 2px 0}
+.gtag{margin-left:6px;padding:0 7px;border-radius:9px;background:var(--accent);color:var(--accent-on);font-size:10.5px;font-weight:600}
+.linkbtn{background:none;border:0;padding:2px 4px;font:inherit;font-size:12px;color:var(--accent);cursor:pointer;text-decoration:underline}
+.guide-wrap > .linkbtn{margin-bottom:2px}
+
+/* .vbo のドロップ枠(比較セットの枠ごと) */
+.dropbox{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;margin:8px 0;padding:22px 12px;text-align:center;
+  border:2px dashed var(--border-strong);border-radius:var(--r-m);color:var(--muted);cursor:pointer}
+.dropbox small{font-size:11px}
+.dropbox.compact{flex-direction:row;padding:8px 12px;font-size:12px}
+.dropbox:hover,.dropbox:focus-visible,.dropbox.over{border-color:var(--accent);background:var(--surface-2);color:var(--text)}
+.dropbox.over{border-style:solid;background:color-mix(in srgb,var(--accent) 12%,var(--surface))}
+.set-hint{display:flex;align-items:center;gap:10px;margin:6px 0;font-size:12px;color:var(--muted)}
+.empty .btn-row{margin-top:6px}
+.sec-h-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.guide .btn.sm,.set-hint .btn.sm,.empty .btn.sm{min-height:28px;padding:0 12px}
+
+/* データ管理: 上部(ヘッダー・A〜D のカード・はじめかた)は動かさず、その下だけをスクロールする */
+#view-import{display:flex;flex-direction:column;height:calc(100vh - var(--top-h));height:calc(100dvh - var(--top-h));overflow:hidden}
+#view-import>.slots,#view-import>.guide-wrap,#view-import>.work{flex:none}
+#view-import>.body{flex:1 1 0;min-height:0;overflow:auto;max-width:none}
+#view-import>.body>*{max-width:1392px;width:100%;box-sizing:border-box}
+.guide-wrap{margin:0;padding:10px 24px;background:var(--bg);border-bottom:1px solid var(--border);max-height:42vh;overflow:auto}
+
+/* 上部のタブは、すべて「データ管理」の幅にそろえる */
+.navtabs{display:grid;grid-auto-flow:column;grid-auto-columns:1fr}
+.navtab{justify-content:center}
+#ce-msg{min-height:0}
+#ce-msg:empty{display:none}
+.corr-actions.ce-top{flex-direction:row;margin:0}
+.corr-actions.ce-top .btn{flex:1}
+
+/* 「計測ラインを引く」「セクターを追加」は同じ大きさ(押した状態で文字が太くなっても変わらない) */
+.ce-draw .btn{flex:1 1 0;min-height:30px;height:30px;padding:0 6px;white-space:nowrap;justify-content:center;box-sizing:border-box}
+
+/* セットの別名(見出しの「表示セット」の右) */
+.set-alias{display:inline-flex;align-items:center;gap:6px;margin-left:8px;font-size:11px}
+.set-alias .btn.xs{min-height:24px;height:24px}
+.alias-input{width:15em;max-width:30vw;height:24px;font:inherit;font-size:11px;padding:0 6px;border:1px solid var(--border-strong);border-radius:var(--r-s);background:var(--surface);color:var(--text)}
+.alias-name b{font-weight:700}
+/* 比較画面の「表示中」: 薄い文字をやめて、通常の太字にする */
+.cmp-set{color:var(--text);font-weight:700}
+.cmp-set select{font-weight:700;color:var(--text)}
+.cmp-set select option{font-weight:700}
+
+/* カード名(A〜D の別名) */
+.slot-main{flex:1;min-width:0}
+.slot-pen{min-height:24px;height:24px;min-width:24px;padding:0 6px;flex:none}
+.slot-edit{display:flex;align-items:center;gap:6px}
+.slot-edit .alias-input{width:9em;max-width:100%}
+.card-run{font-size:10px;font-weight:400;color:var(--muted)}
+
+/* 「アプリを初期状態に戻す」(設定タブの一番下。「すべて初期値に戻す」とは離して、警告色にする) */
+.reset-row{justify-content:space-between}
+.wipe-btn{margin-left:auto}
+.btn.danger{color:var(--warn);border-color:var(--warn)}
