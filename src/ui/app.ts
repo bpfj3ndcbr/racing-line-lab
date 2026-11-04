@@ -45,10 +45,11 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
   const topRight = root.querySelector<HTMLElement>('#top-right')!;
   let current: ViewName = 'import';
   let compare: CompareView | null = null;
-  let importApi: { closeWork(): void; editCircuit(id: string): void; isEditing(): boolean } | null = null;
+  let importApi: { closeWork(): void; editCircuit(id: string): void; isEditing(): boolean; openActiveSet(): void } | null = null;
 
   function navigate(v: ViewName) {
     if (v !== current && importApi?.isEditing()) return;     // サーキットの登録・編集中は、保存かキャンセルするまで移れない
+    if (v === 'import' && current !== 'import') importApi?.openActiveSet();     // ほかのタブから戻ったら、表示セットだけを開く
     current = v;
     if (v === 'help' && !helpEl.firstChild) mountHelpView(helpEl);     // 開いたときに 1 回だけ作る
     helpEl.hidden = v !== 'help';

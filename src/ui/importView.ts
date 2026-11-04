@@ -48,7 +48,7 @@ function setHtml(i: number): string {
       </details>`;
 }
 
-export function mountImportView(root: HTMLElement, session: Session, opts: ImportViewOpts = {}): { closeWork(): void; editCircuit(id: string): void; isEditing(): boolean } {
+export function mountImportView(root: HTMLElement, session: Session, opts: ImportViewOpts = {}): { closeWork(): void; editCircuit(id: string): void; isEditing(): boolean; openActiveSet(): void } {
   const hint = '<span class="sec-hint"><span class="h-open">クリックで閉じる</span><span class="h-closed">クリックで開く</span></span>';
   root.innerHTML = `
     <div id="slots" class="slots" aria-label="A〜D の割り当て"></div>
@@ -694,6 +694,8 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
   return {
     closeWork,
     isEditing: editingCircuit,
+    /** 「データ管理」タブに移ったとき: 表示セットの比較セットだけを開き、ほかは閉じる(何も無ければ比較セット1) */
+    openActiveSet() { setEls.forEach((el, i) => { el.open = i === session.activeIndex; }); },
     /** 比較画面から: サーキットを編集する(終わったら比較に戻る) */
     editCircuit(id: string) { openWork('circuit', id, undefined, undefined, true); backToCompare = work === 'circuit'; },
   };
