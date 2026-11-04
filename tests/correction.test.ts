@@ -257,6 +257,6 @@ describe.skipIf(!existsSync(bigPath))('長いログ(13 ラップ)', () => {
     vi.advanceTimersByTime(300);
     expect($('#cor-laps').textContent).toMatch(/^この補正量では 1\d ラップ ・ ベスト \d:\d\d\.\d$/);
     expect(mapOf().tracks).toHaveLength(3);
-    expect($('#cor-shown').textContent).toMatch(/^表示中: ベスト 3 ラップ(LAP \d+・\d+・\d+)$/);
+    expect($('#cor-shown').textContent).toMatch(/^表示中: ベスト 3 ラップ\(LAP \d+・\d+・\d+\)$/);
   });
 });
