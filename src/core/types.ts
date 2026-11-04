@@ -17,6 +17,11 @@ export interface TrackLog {
   height?: Float64Array;
   longAcc?: Float64Array;
   latAcc?: Float64Array;
+  /**
+   * 1 周分だけのログ(輪)を、読み込み時に「元のログ + 同じ 1 周をもう一度」へつないだときの情報(closeLoop)。
+   * 0〜n-1 番が元のログ、n 番以降がつないだ部分。period は 1 周の時間(秒)
+   */
+  loop?: { n: number; period: number };
 }
 
 export interface Lap {

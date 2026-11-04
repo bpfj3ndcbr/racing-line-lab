@@ -5,7 +5,7 @@ import { parseVbo } from '../src/core';
 import { MemoryStore } from '../src/io/storage';
 import { Session } from '../src/store/session';
 import { mountApp } from '../src/ui/app';
-import { FakeMap } from './helpers';
+import { FakeMap, headOf } from './helpers';
 import { ThemeController } from '../src/ui/theme';
 
 const fx = (n: string) => `fixtures/${n}`;
@@ -42,8 +42,19 @@ describe('読み込み画面', () => {
     expect(session.registerCircuit('オートポリス', cln, sci).ok).toBe(true);
     expect(root.textContent).toContain('オートポリス(自動判定)');
     expect(root.textContent).toContain('Run 1');
-    expect(root.textContent).toContain('終端未通過のため参考値');
+    expect(root.textContent).toContain('2:22.9');                                // 1 周分のログ(輪)なので、1 周分の完了ラップ
+    expect(root.textContent).not.toContain('終端未通過のため参考値');
     expect(rows()).toHaveLength(1);
+    const note = rows()[0].querySelector<HTMLElement>('.sub')!;                    // 計測線付近を調整したことが分かる
+    expect(note.textContent).toBe('計測線付近の修正あり');
+    expect(note.title).toContain('ファイルの計測線とアプリの計測線が異なるため');
+  });
+
+  it('完了ラップが取れないログは、終端未通過の参考値として出る', () => {
+    session.addLog(headOf(utc(), 0.8), 'h');                                     // 1 周の途中までのログ(輪ではない)
+    session.registerCircuit('オートポリス', cln, sci);
+    expect(root.textContent).toContain('終端未通過のため参考値');
+    expect(root.textContent).not.toContain('計測線付近の修正あり');
   });
 
   it('A〜D ボタン: 割り当て → 上部に表示 → 再度押すと解除', () => {

@@ -1,6 +1,6 @@
 import {
   type Assignment, type Circuit, type GeoLine, type Lap, type LapRef, type MapView, type Offset, type Slot, type TrackLog,
-  SLOTS, clearLog, detectLaps, emptyAssignment, matchCircuit, nameExists, parseCln, parseSci, parseVbo, roundLine, toggleAssign,
+  SLOTS, clearLog, closeLoop, detectLaps, emptyAssignment, matchCircuit, nameExists, parseCln, parseSci, parseVbo, roundLine, toggleAssign,
 } from '../core';
 import type { KeyValueStore } from '../io/storage';
 
@@ -293,9 +293,10 @@ export class Session {
   }
 
   private addEntry(w: WorkSet, log: TrackLog, id: string) {
+    // 1 周分だけのログ(輪)は、つないだログにしておく(closeLoop)。別のセットに読み込み済みなら、その中身を共有する
     if (w.logs.some((l) => l.id === id)) return;
     const entry: LoadedLog = {
-      id, no: w.nextNo++, log, offset: this.offsets[id] ?? { east: 0, north: 0 },
+      id, no: w.nextNo++, log: this.knownLog(id) ?? closeLoop(log), offset: this.offsets[id] ?? { east: 0, north: 0 },
       circuit: null, auto: true, laps: [],
     };
     this.resolve(entry, w);

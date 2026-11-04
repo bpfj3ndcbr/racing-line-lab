@@ -1,5 +1,5 @@
 import {
-  SLOTS, type Slot, bestPerColumn, formatJst, formatLapTime, isBest, sectorSplits,
+  SLOTS, type Lap, type Slot, bestPerColumn, formatJst, formatLapTime, isBest, sectorSplits,
 } from '../core';
 import { ALIAS_MAX, SET_COUNT, SLOT_ALIAS_MAX, type LoadedLog, type Session, type WorkSet, bestDuration } from '../store/session';
 import { mountCircuitEditor, type CircuitEditor } from './circuitEditor';
@@ -13,6 +13,9 @@ const esc = (s: string) =>
 
 const NEW_CIRCUIT = '__new-circuit__';
 const fmtDelta = (d: number) => (d < 60 ? `+${d.toFixed(1)}` : `+${formatLapTime(d)}`);
+/** 1 周分だけのログ(輪)の始点と終点をつないで作ったラップか(closeLoop / detectLaps) */
+const joined = (l: LoadedLog, lap: Lap) => !!l.log.loop && lap.endIndex >= l.log.loop.n - 1;
+const JOINED_TITLE = 'ファイルの計測線とアプリの計測線が異なるため、計測線付近のデータを調整して、1 周分のラップにしています';
 const dateOf = (l: LoadedLog) => (l.log.startEpochMs ? formatJst(l.log.startEpochMs) : '日時不明');
 
 /** 読み込み画面。session の状態を描画し、操作を session に渡す。 */
@@ -301,7 +304,7 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
           <div class="num${d === 0 ? ' best' : ''}">${formatLapTime(lap.duration)}</div>
           <div class="num${d === 0 ? ' best' : ''}">${d === 0 ? 'ベスト' : fmtDelta(d)}</div>
           ${secCells}
-          <div class="sub">${lap.complete ? '' : '終端未通過のため参考値'}</div>
+          <div class="sub"${joined(l, lap) ? ` title="${JOINED_TITLE}"` : ''}>${!lap.complete ? '終端未通過のため参考値' : joined(l, lap) ? '計測線付近の修正あり' : ''}</div>
           <div class="pk">${btns}</div></div>`;
       }).join('');
     }

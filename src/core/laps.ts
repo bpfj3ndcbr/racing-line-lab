@@ -66,16 +66,29 @@ export function detectLaps(
   sectors: GeoLine[] = [],
   opts: LapOptions = {},
 ): Lap[] {
-  const cross = findCrossings(log, control, opts);
-  const end = log.t[log.t.length - 1];
+  const all = findCrossings(log, control, opts);
+  // 輪をつないだログ(closeLoop)では、0〜n-1 番が元のログ。ふだんは元のログの中だけでラップを作る(今までと同じ結果)
+  const n = log.loop?.n ?? log.t.length;
+  const cross = all.filter((c) => c.index < n - 1);
+  const end = log.t[n - 1];
   const laps: Lap[] = [];
 
-  for (let i = 0; i + 1 < cross.length; i++) {
-    laps.push(makeLap(log, i + 1, cross[i].time, cross[i + 1].time, true));
-  }
-  if (laps.length === 0 && (opts.partial ?? 'auto') === 'auto') {
-    const start = cross.length ? cross[cross.length - 1].time : 0;
-    if (end - start > 1) laps.push(makeLap(log, 1, start, end, false));
+  // 元のログでは完了ラップが取れない(通過が 1 回以下)とき、始点から 1 周分(終わりは含まない)の中の通過が 1 回なら、
+  // そこから 1 周後の通過までを 1 周分のラップにする。終わりを含めないのは、計測ラインが始点に重なっているとき、
+  // 先頭の通過と 1 周後の同じ通過を 2 回数えないため
+  const loopEnd = log.loop ? log.t[0] + log.loop.period : 0;
+  const inPeriod = log.loop && cross.length <= 1 ? all.filter((c) => c.time < loopEnd) : [];
+  if (inPeriod.length === 1) {
+    const next = all.find((c) => c.index > inPeriod[0].index);
+    if (next) laps.push(makeLap(log, 1, inPeriod[0].time, next.time, true));
+  } else {
+    for (let i = 0; i + 1 < cross.length; i++) {
+      laps.push(makeLap(log, i + 1, cross[i].time, cross[i + 1].time, true));
+    }
+    if (laps.length === 0 && (opts.partial ?? 'auto') === 'auto') {
+      const start = cross.length ? cross[cross.length - 1].time : 0;
+      if (end - start > 1) laps.push(makeLap(log, 1, start, end, false));
+    }
   }
 
   const sectorCross = sectors.map((s) => findCrossings(log, s, opts));

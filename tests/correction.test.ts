@@ -6,7 +6,7 @@ import { MemoryStore } from '../src/io/storage';
 import { Session } from '../src/store/session';
 import { mountApp } from '../src/ui/app';
 import { ThemeController } from '../src/ui/theme';
-import { FakeMap } from './helpers';
+import { FakeMap, headOf } from './helpers';
 
 const fx = (n: string) => `fixtures/${n}`;
 const cln = readFileSync(fx('cl_autopolis.cln'), 'utf8');
@@ -112,14 +112,21 @@ describe('データ管理画面から位置補正の画面へ', () => {
     expect($('#cor-title').textContent).toBe('Run 1 の位置補正');
     expect($('#cor-file').textContent).toBe('u.vbo');
     const m = mapOf();
-    expect(m.tracks.length).toBeGreaterThan(0);                                     // 完了ラップが無いログなので、走行中の区間
+    expect(m.tracks.length).toBeGreaterThan(0);                                     // 1 周分のログ(輪)なので、1 周分の完了ラップを描く
     expect(m.tracks[0].points.length).toBeGreaterThan(100);
-    expect($('#cor-shown').textContent).toContain('ラップが無いため');
+    expect($('#cor-shown').textContent).toBe('表示中: ベスト 1 ラップ(LAP 1)');
     expect(m.lines.map((l) => l.label)).toContain('計測ライン');
     expect(m.fitted).toBeGreaterThan(0);
     expect($('.navtab[data-view="import"]').getAttribute('aria-current')).toBe('page');   // 「データ管理」にいると分かる
     expect(east().value).toBe('0');
     expect(north().value).toBe('0');
+  });
+
+  it('完了ラップが無いログは、走行中の区間を描く', () => {
+    session.addLog(headOf(utc(), 0.8), 'h');                                        // 1 周の途中までのログ(輪ではない)
+    $<HTMLButtonElement>('[data-act="correct"][data-log="h"]').click();
+    expect(mapOf().tracks.length).toBeGreaterThan(0);
+    expect($('#cor-shown').textContent).toContain('ラップが無いため');
   });
 
   it('キャンセルで元のデータ管理の表示へ戻り、何も変わらない', () => {
@@ -210,11 +217,22 @@ describe('ラインを動かす', () => {
     key('ArrowUp');
     expect($('#cor-laps').textContent).toBe('周回を確認中…');
     vi.advanceTimersByTime(300);
-    expect($('#cor-laps').textContent).toContain('完了したラップはありません(参考値 1 件)');     // このログは 1 周ぶんの途中まで
+    expect($('#cor-laps').textContent).toBe('この補正量では 1 ラップ ・ ベスト 2:22.9');          // 1 周分のログ(輪)なので、1 周分の完了ラップ
     east().value = '1000'; east().dispatchEvent(new Event('input', { bubbles: true }));     // 東へ 1 km(欄に直接入力)
     north().value = '1000'; north().dispatchEvent(new Event('input', { bubbles: true }));
     vi.advanceTimersByTime(300);
     expect($('#cor-laps').textContent).toBe('この補正量では、コントロールラインを通過しません。');
+  });
+});
+
+describe('完了ラップが無いログの補正量の見込み', () => {
+  it('参考値の件数を表示する', () => {
+    session.addLog(headOf(utc(), 0.8), 'h');                                        // 1 周の途中までのログ(輪ではない)
+    vi.useFakeTimers();
+    $<HTMLButtonElement>('[data-act="correct"][data-log="h"]').click();
+    key('ArrowUp');
+    vi.advanceTimersByTime(300);
+    expect($('#cor-laps').textContent).toContain('完了したラップはありません(参考値 1 件)');
   });
 });
 

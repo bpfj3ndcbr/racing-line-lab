@@ -1,4 +1,18 @@
+import type { TrackLog } from '../src/core';
 import type { MapCar, MapLine, MapTrack, TrackMap } from '../src/ui/mapTypes';
+
+/**
+ * ログの先頭から ratio の割合だけを取り出す。始点と終点が離れるので、1 周分のログ(輪)としては扱われない。
+ * 1 周分のテスト用のログ(20260913140139_UTC.vbo)で、「完了ラップが無いログ」の動作を確かめるのに使う
+ */
+export function headOf(log: TrackLog, ratio: number): TrackLog {
+  const n = Math.floor(log.t.length * ratio);
+  const cut = (a: Float64Array | undefined) => a?.slice(0, n);
+  return {
+    ...log, t: log.t.slice(0, n), lat: log.lat.slice(0, n), lon: log.lon.slice(0, n), speed: log.speed.slice(0, n),
+    heading: cut(log.heading), height: cut(log.height), longAcc: cut(log.longAcc), latAcc: cut(log.latAcc),
+  };
+}
 
 /** 地図の代わりに、呼ばれた内容を覚えておくだけの偽物(Leaflet を使わずに画面を試験する) */
 export class FakeMap implements TrackMap {
