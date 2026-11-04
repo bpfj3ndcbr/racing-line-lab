@@ -15,6 +15,32 @@ const NEW_CIRCUIT = '__new-circuit__';
 const fmtDelta = (d: number) => (d < 60 ? `+${d.toFixed(1)}` : `+${formatLapTime(d)}`);
 /** 1 周分だけのログ(輪)の始点と終点をつないで作ったラップか(closeLoop / detectLaps) */
 const joined = (l: LoadedLog, lap: Lap) => !!l.log.loop && lap.endIndex >= l.log.loop.n - 1;
+/** 「終端の調整」を出すラップ: ベストのこの倍率を超える長さ(調整前)のもの */
+const ADJUST_RATIO = 1.6;
+/** 秒 → "3:10" */
+const mmss = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, '0')}`;
+const endLabel = (lap: Lap) => `終端: ${mmss(lap.duration)}${lap.complete ? '' : '(参考値)'}`;
+/**
+ * 「終端の調整」のスライドバーの段階(1〜)と、終端(ラップ開始からの秒)の対応。
+ * 上限が 10 分以下なら、端から端まで 10 秒刻み。10 分を超える長いラップでは、左半分(30 段階)を 0〜5 分の 10 秒刻み、
+ * 右半分(30 段階)を 5 分〜上限に割り当てる(最初の数分を切り出しやすくするため)。右端は上限
+ */
+const FINE_SEC = 300;
+const HALF_STEPS = 30;
+const isLong = (max: number) => max > 2 * FINE_SEC;
+export function endSteps(max: number): number { return isLong(max) ? 2 * HALF_STEPS : Math.max(1, Math.ceil(max / 10)); }
+export function endFromStep(k: number, max: number): number {
+  const n = endSteps(max);
+  if (k >= n) return max;
+  if (!isLong(max) || k <= HALF_STEPS) return 10 * Math.max(1, k);
+  return FINE_SEC + Math.round(((max - FINE_SEC) * (k - HALF_STEPS)) / HALF_STEPS / 10) * 10;
+}
+export function stepFromEnd(sec: number, max: number): number {
+  const n = endSteps(max);
+  if (sec >= max - 0.5) return n;
+  if (!isLong(max) || sec <= FINE_SEC) return Math.min(n - 1, Math.max(1, Math.round(sec / 10)));
+  return Math.min(n - 1, Math.max(HALF_STEPS + 1, HALF_STEPS + Math.round(((sec - FINE_SEC) / (max - FINE_SEC)) * HALF_STEPS)));
+}
 const JOINED_TITLE = 'ファイルの計測線とアプリの計測線が異なるため、計測線付近のデータを調整して、1 周分のラップにしています';
 const dateOf = (l: LoadedLog) => (l.log.startEpochMs ? formatJst(l.log.startEpochMs) : '日時不明');
 
@@ -224,7 +250,7 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
 
     el.querySelector('.foot')!.innerHTML = `<span>グレーの行はベストの120%超(割り当ては可能です)</span>
       ${w.showSectors ? '<span class="legend"><i class="bsec-dot"></i>紫の数字はそのデータ内での各セクター最速(グレーの行は除く)</span>' : ''}
-      <span>ラップ番号は RaceChrono と同じ番号です</span><span>割り当て済みのボタンを押し直すと解除します</span>`;
+      <span>ラップ番号は計測ラインの最初の通過から数えます(RaceChrono の番号と異なる場合があります)</span><span>割り当て済みのボタンを押し直すと解除します</span>`;
   }
 
   function renderCircuits() {
@@ -250,6 +276,24 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
       tab.tabIndex = sel ? 0 : -1;
       $('panel-' + t).hidden = !sel;
     }
+  }
+
+  /** ラップ一覧の注記の欄: 参考値・輪の注記と、「終端の調整」(セクタータイムを隠しているときだけ操作できる) */
+  function noteOf(l: LoadedLog, lap: Lap, i: number, best: number, showSec: boolean): string {
+    const end = session.lapEnd(l.id, lap.number);
+    const text = end === null && !lap.complete ? '終端未通過のため参考値' : joined(l, lap) ? '計測線付近の修正あり' : '';
+    const can = end !== null || !lap.complete || (!Number.isNaN(best) && lap.baseDuration > best * ADJUST_RATIO);
+    if (!can) return text;
+    if (showSec) return end === null ? text : esc(endLabel(lap));
+    const fk = `s${i}-end-${esc(l.id)}-${lap.number}`;
+    const data = `data-set="${i}" data-log="${esc(l.id)}" data-lap="${lap.number}"`;
+    const box = `<label class="lap-end-chk"><input type="checkbox" data-act="lap-end" ${data} data-fk="${fk}-c"${end !== null ? ' checked' : ''}>終端の調整</label>`;
+    if (end === null) return `<span class="lap-end">${text ? `<span>${text}</span>` : ''}${box}</span>`;
+    // 右端は上限(完了ラップなら本来の終点)
+    const max = lap.maxDuration;
+    return `<span class="lap-end">${box}<input type="range" class="lap-end-range" ${data} data-fk="${fk}-r" min="1" max="${endSteps(max)}" step="1"
+      value="${stepFromEnd(lap.duration, max)}" data-max="${max}" aria-valuetext="${esc(endLabel(lap))}"
+      aria-label="Run ${l.no} LAP${lap.number} の終端"><span class="num lap-end-val">${esc(endLabel(lap))}</span></span>`;
   }
 
   function renderFile(l: LoadedLog, i: number, w: WorkSet): string {
@@ -286,7 +330,10 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
     } else if (!laps.length) {
       rows = '<div class="empty">ラップを検出できませんでした(コントロールラインを通過していません)。</div>';
     } else {
-      rows = laps.map((lap) => {
+      const head = l.hasHead
+        ? `<div class="row ex head" style="grid-template-columns:${cols}"><div class="num">—</div><div></div><div></div>${showSec ? '<div></div>'.repeat(ns) : ''}<div class="sub">始点が無いので非表示</div><div></div></div>`
+        : '';
+      rows = head + laps.map((lap) => {
         const d = lap.duration - best;
         const assigned = SLOTS.some((s) => w.assignment[s]?.logId === l.id && w.assignment[s]?.lap === lap.number);
         const ex = lap.duration > best * 1.2;
@@ -304,7 +351,7 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
           <div class="num${d === 0 ? ' best' : ''}">${formatLapTime(lap.duration)}</div>
           <div class="num${d === 0 ? ' best' : ''}">${d === 0 ? 'ベスト' : fmtDelta(d)}</div>
           ${secCells}
-          <div class="sub"${joined(l, lap) ? ` title="${JOINED_TITLE}"` : ''}>${!lap.complete ? '終端未通過のため参考値' : joined(l, lap) ? '計測線付近の修正あり' : ''}</div>
+          <div class="sub lap-note"${joined(l, lap) ? ` title="${JOINED_TITLE}"` : ''}>${noteOf(l, lap, i, best, showSec)}</div>
           <div class="pk">${btns}</div></div>`;
       }).join('');
     }
@@ -554,6 +601,14 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
     openWork('circuit', null, undefined, pos);
   }
 
+  // 「終端の調整」のスライドバー: 動かしている間は値の表示だけを変える(一覧を作り直すと、つかめなくなるため)。手を離したら change で反映
+  root.addEventListener('input', (e) => {
+    const t = e.target as HTMLInputElement;
+    if (!t.classList.contains('lap-end-range')) return;
+    const val = t.parentElement?.querySelector('.lap-end-val');
+    if (val) val.textContent = `終端: ${mmss(endFromStep(Number(t.value), Number(t.dataset.max)))}`;
+  });
+
   root.addEventListener('change', async (e) => {
     const t = e.target as HTMLElement;
     if (t.classList.contains('circuit-select')) {
@@ -564,6 +619,14 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
       } else session.setCircuit(sel.value || null, i);
     }
     if (t.dataset.activeSet !== undefined && (t as HTMLInputElement).checked) session.setActive(Number(t.dataset.activeSet));
+    if (t.dataset.act === 'lap-end') {                    // 「終端の調整」のチェック: 入れたときは今の終端のまま、スライドバーを出す
+      const id = t.dataset.log!, n = Number(t.dataset.lap);
+      const lap = session.sets[Number(t.dataset.set)]?.logs.find((x) => x.id === id)?.laps.find((x) => x.number === n);
+      if (lap) session.setLapEnd(id, n, (t as HTMLInputElement).checked ? (lap.complete ? lap.maxDuration : lap.duration) : null);
+    }
+    if (t.classList.contains('lap-end-range')) {
+      session.setLapEnd(t.dataset.log!, Number(t.dataset.lap), endFromStep(Number((t as HTMLInputElement).value), Number(t.dataset.max)));
+    }
     if (t.id === 'reload-input') {
       const f = reloadInput.files?.[0];
       const target = reloadTarget;

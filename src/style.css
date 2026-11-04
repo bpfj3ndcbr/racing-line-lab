@@ -161,6 +161,12 @@ select{min-height:44px;padding:0 10px;background:var(--surface);border:1px solid
 .row>div:last-child{border-right:0}
 .row.hd{min-height:36px;font-size:11px;color:var(--muted);background:var(--surface-2)}
 .row.ex{color:var(--dim)}
+/* ラップ一覧の「終端の調整」(セクタータイムを隠しているときの注記の欄) */
+.lap-end{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.lap-end-chk{display:inline-flex;align-items:center;gap:3px;cursor:pointer;color:var(--muted)}
+.lap-end-chk input{margin:0;accent-color:var(--accent)}
+.lap-end-range{width:110px;max-width:100%;accent-color:var(--accent)}
+.lap-end-val{color:var(--text);white-space:nowrap}
 .row.as{background:var(--row-assigned)}
 .hbtn{background:none;border:0;padding:0;min-height:36px;color:var(--text);font-size:11px;text-decoration:underline dotted;cursor:pointer}
 .best{color:var(--good);font-weight:700}

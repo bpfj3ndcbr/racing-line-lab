@@ -1,6 +1,6 @@
 import {
   type Assignment, type Circuit, type GeoLine, type Lap, type LapRef, type MapView, type Offset, type Slot, type TrackLog,
-  SLOTS, clearLog, closeLoop, detectLaps, emptyAssignment, matchCircuit, nameExists, parseCln, parseSci, parseVbo, roundLine, toggleAssign,
+  SLOTS, clearLog, closeLoop, detectLapRun, emptyAssignment, matchCircuit, nameExists, parseCln, parseSci, parseVbo, roundLine, toggleAssign,
 } from '../core';
 import type { KeyValueStore } from '../io/storage';
 
@@ -15,6 +15,8 @@ export interface LoadedLog {
   /** true ならコントロールライン通過による自動判定 */
   auto: boolean;
   laps: Lap[];
+  /** 最初の通過より前に走行がある(一覧に「始点が無いので非表示」と出す) */
+  hasHead: boolean;
 }
 
 export interface CircuitResult {
@@ -84,11 +86,14 @@ export class Session {
   private paths = new Map<string, string>();
   private restoring = false;
   private offsets: Record<string, Offset>;
+  /** 「終端の調整」の値(ファイル → ラップ番号 → ラップ開始からの秒) */
+  private lapEnds: Record<string, Record<string, number>>;
   private listeners = new Set<() => void>();
 
   constructor(private store: KeyValueStore) {
     this.circuits = readJson<Circuit[]>(store, 'circuits', []);
     this.offsets = readJson<Record<string, Offset>>(store, 'offsets', {});
+    this.lapEnds = readJson<Record<string, Record<string, number>>>(store, 'lapEnds', {});
   }
 
   /** アプリを初期状態に戻す: 保存したものをすべて消す(画面は呼び出し側で読み直す) */
@@ -297,7 +302,7 @@ export class Session {
     if (w.logs.some((l) => l.id === id)) return;
     const entry: LoadedLog = {
       id, no: w.nextNo++, log: this.knownLog(id) ?? closeLoop(log), offset: this.offsets[id] ?? { east: 0, north: 0 },
-      circuit: null, auto: true, laps: [],
+      circuit: null, auto: true, laps: [], hasHead: false,
     };
     this.resolve(entry, w);
     w.logs.push(entry);
@@ -329,6 +334,29 @@ export class Session {
       w.assignment = clearLog(w.assignment, id);
     }
   }
+  /**
+   * 「終端の調整」: ラップ番号 lap の終端を、ラップ開始から sec 秒にする(null で調整をやめる)。
+   * 同じファイルを入れたすべてのセットに反映する。割り当ては解除しない
+   */
+  setLapEnd(id: string, lap: number, sec: number | null): void {
+    const cur = { ...(this.lapEnds[id] ?? {}) };
+    if (sec === null) delete cur[lap]; else cur[lap] = Math.round(sec);
+    if (Object.keys(cur).length) this.lapEnds[id] = cur; else delete this.lapEnds[id];
+    this.saveLapEnds();
+    for (const w of this.sets) { const l = w.logs.find((x) => x.id === id); if (l) this.resolve(l, w); }
+    this.emit();
+  }
+  /** ラップ番号 lap の「終端の調整」の値(調整していなければ null) */
+  lapEnd(id: string, lap: number): number | null { return this.lapEnds[id]?.[lap] ?? null; }
+  /** ラップ番号の意味が変わったとき(計測ライン・サーキットの判定が変わったとき)、そのファイルの調整をやめる */
+  private clearLapEnds(id: string): boolean {
+    if (!this.lapEnds[id]) return false;
+    delete this.lapEnds[id];
+    this.saveLapEnds();
+    return true;
+  }
+  private saveLapEnds() { this.store.set('lapEnds', JSON.stringify(this.lapEnds)); }
+
   /** 位置補正の値を持っているファイルの数 */
   offsetCount(): number { return Object.keys(this.offsets).length; }
 
@@ -453,7 +481,10 @@ export class Session {
         const after = l.circuit?.id ?? null;
         // コントロールラインが変わる(ラップ番号が変わる)か、サーキットの判定が変わったときだけ解除する。
         // セクターだけの変更ではラップは同じなので、A〜D の割り当てはそのまま残す
-        if (before !== after || ((before === id || after === id) && patch.control)) w.assignment = clearLog(w.assignment, l.id);
+        if (before !== after || ((before === id || after === id) && patch.control)) {
+          w.assignment = clearLog(w.assignment, l.id);
+          if (this.clearLapEnds(l.id)) this.resolve(l, w);
+        }
       }
     }
     this.emit();
@@ -475,7 +506,10 @@ export class Session {
       for (const l of w.logs) {
         const before = l.circuit?.id ?? null;
         this.resolve(l, w);
-        if ((l.circuit?.id ?? null) !== before) w.assignment = clearLog(w.assignment, l.id);
+        if ((l.circuit?.id ?? null) !== before) {
+          w.assignment = clearLog(w.assignment, l.id);
+          if (this.clearLapEnds(l.id)) this.resolve(l, w);
+        }
       }
     }
   }
@@ -487,7 +521,12 @@ export class Session {
       l.circuit = matchCircuit(l.log, this.circuits, l.offset)?.circuit ?? null;
       l.auto = true;
     }
-    l.laps = l.circuit ? detectLaps(l.log, l.circuit.control, l.circuit.sectors, { offset: l.offset }) : [];
+    const ends = this.lapEnds[l.id];
+    const run = l.circuit
+      ? detectLapRun(l.log, l.circuit.control, l.circuit.sectors, { offset: l.offset, ends: ends && Object.fromEntries(Object.entries(ends).map(([k, v]) => [Number(k), v])) })
+      : null;
+    l.laps = run?.laps ?? [];
+    l.hasHead = run?.hasHead ?? false;
   }
 
   // ---- 表示・割り当て(set を省くと、表示セット) ----

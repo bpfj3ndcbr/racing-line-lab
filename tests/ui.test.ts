@@ -25,7 +25,7 @@ beforeEach(() => {
   mountApp(root, session, theme, () => fakeMap);
 });
 
-const rows = () => Array.from(root.querySelectorAll('.file .row:not(.hd)'));
+const rows = () => Array.from(root.querySelectorAll('.file .row:not(.hd):not(.head)'));      // ラップの行(「始点が無いので非表示」の行は除く)
 const slotsText = () => root.querySelector('#slots')!.textContent!.replace(/\s+/g, ' ');
 const btn = (lap: number, slot: string) =>
   root.querySelector<HTMLButtonElement>(`[data-act="assign"][data-lap="${lap}"][data-slot="${slot}"]`)!;
@@ -102,6 +102,7 @@ describe('読み込み画面', () => {
     session.addLog(parseVbo(readFileSync(bigPath, 'utf8'), 'big.vbo'), 'big');
     const lapNums = () => rows().map((r) => r.firstElementChild!.textContent!.trim());
     expect(lapNums()).toEqual(['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13']);
+    expect(root.querySelector('.file .row.head')!.textContent).toContain('始点が無いので非表示');   // アウトラップ(最初の通過より前)
     root.querySelector<HTMLButtonElement>('[data-act="sort"][data-key="time"]')!.click();
     expect(lapNums().slice(0, 2)).toEqual(['2', '7']);             // 2:26.5, 2:27.2
     root.querySelector<HTMLButtonElement>('[data-act="sort"][data-key="time"]')!.click();

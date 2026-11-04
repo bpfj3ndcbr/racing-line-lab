@@ -3,7 +3,7 @@ import { bestPerColumn, isBest, sectorSplits } from '../src/core';
 import type { Lap } from '../src/core';
 
 const lap = (sectorTimes: (number | null)[], duration: number): Lap => ({
-  number: 1, startTime: 0, endTime: duration, duration, complete: true, startIndex: 0, endIndex: 0, sectorTimes,
+  number: 1, startTime: 0, endTime: duration, duration, complete: true, startIndex: 0, endIndex: 0, sectorTimes, baseDuration: duration, maxDuration: duration,
 });
 
 describe('区間タイム', () => {

@@ -18,7 +18,7 @@ function speedLog(speed: number[]): TrackLog {
   };
 }
 const lap = (number: number, duration: number, startIndex: number, endIndex: number, complete = true): Lap =>
-  ({ number, startTime: startIndex / 10, endTime: startIndex / 10 + duration, duration, complete, startIndex, endIndex, sectorTimes: [] });
+  ({ number, startTime: startIndex / 10, endTime: startIndex / 10 + duration, duration, complete, startIndex, endIndex, sectorTimes: [], baseDuration: duration, maxDuration: duration });
 
 describe('位置補正の地図に描く区間(pickPreviewRanges)', () => {
   const log = speedLog(Array(1000).fill(100));

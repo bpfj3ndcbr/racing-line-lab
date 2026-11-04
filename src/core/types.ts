@@ -25,7 +25,7 @@ export interface TrackLog {
 }
 
 export interface Lap {
-  /** RaceChrono と同じ番号(最初のコントロールライン通過から 1) */
+  /** 最初のコントロールライン通過から 1(計測ラインの位置によっては、RaceChrono の番号と異なる) */
   number: number;
   startTime: number;
   endTime: number;
@@ -37,4 +37,8 @@ export interface Lap {
   endIndex: number;
   /** 各セクターラインの通過時刻(ラップ開始からの秒)。通過が無ければ null */
   sectorTimes: (number | null)[];
+  /** 終端を調整する前の長さ(秒) */
+  baseDuration: number;
+  /** 終端を調整できる上限の長さ(秒)。完了ラップはその長さ、終点無しのラップは記録の終わりまで(最大 30 分) */
+  maxDuration: number;
 }

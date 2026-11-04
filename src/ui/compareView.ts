@@ -263,7 +263,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   function signature(): string {
     return session.activeIndex + '/' + SLOTS.map((s) => {
       const r = session.resolveRef(session.assignment[s]);
-      return r ? `${s}:${r.log.id}#${r.lap.number}@${r.log.offset.east},${r.log.offset.north}:${r.log.circuit?.id ?? ''}:${JSON.stringify(r.log.circuit?.sectors ?? [])}:${r.lap.sectorTimes.length}` : '-';
+      return r ? `${s}:${r.log.id}#${r.lap.number}~${r.lap.endTime}@${r.log.offset.east},${r.log.offset.north}:${r.log.circuit?.id ?? ''}:${JSON.stringify(r.log.circuit?.sectors ?? [])}:${r.lap.sectorTimes.length}` : '-';
     }).join('|');
   }
 
