@@ -4,6 +4,16 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+    # アプリに含まれない文書だけの変更では、公開し直さない。
+    # README.md は「使い方」タブに表示する(src/ui/helpView.ts)ので、ここに入れない
+    paths-ignore:
+      - 'ABOUT.md'
+      - 'AGENTS.md'
+      - 'CLAUDE.md'
+      - 'DEVELOPMENT.md'
+      - 'TODO.md'
+      - 'docs/images/README.md'
+      - 'fixtures/README.md'
   workflow_dispatch:
 
 permissions:
