@@ -201,7 +201,7 @@ export function mountCircuitEditor(root: HTMLElement, session: Session, deps: Ci
     hint.hidden = !drawing && !draft;
     hint.textContent = drawing
       ? `地図の上で、${drawing === 'control' ? '計測ライン' : `S${sectors.length + 1}`} の始点から終点までドラッグしてください(拡大して引くと正確です)`
-      : draft ? '仮のラインです。直したら、左下の「確定」を押してください(Enter でも確定)' : '';
+      : draft ? '仮のラインです。直したら、右の欄の「確定」を押してください(Enter でも確定)' : '';
   }
   function refresh(fit = false) {
     renderList(); renderInfo(); pushLines(fit); pushHandles();
