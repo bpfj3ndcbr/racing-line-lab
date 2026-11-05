@@ -1,3 +1,11 @@
+import type { LatLon } from './geo';
+
+/**
+ * 走行ログのヘッダにある計測ライン(RaceChrono の [laptiming] の 1 行)。
+ * p1 = 計測位置(線の中心)、p2 = p1 よりコース上で手前の点。p2 → p1 が進む向きで、計測ラインは p1 を通り、この向きに直交する
+ */
+export interface TimingLine { kind: 'start' | 'split'; p1: LatLon; p2: LatLon; name: string }
+
 /** 読み込んだ走行ログ(.vbo)。時刻は先頭サンプルを 0 とした秒。 */
 export interface TrackLog {
   fileName: string;
@@ -7,6 +15,10 @@ export interface TrackLog {
   startEpochMs: number | null;
   columns: string[];
   comments: string[];
+  /** [session data] の name(RaceChrono ではコース名)。無ければ undefined */
+  sessionName?: string;
+  /** [laptiming] の計測ライン(Start / Split)。無ければ undefined */
+  laptiming?: TimingLine[];
   /** 秒(先頭=0、単調増加。日跨ぎは補正済み) */
   t: Float64Array;
   lat: Float64Array;
@@ -18,7 +30,7 @@ export interface TrackLog {
   longAcc?: Float64Array;
   latAcc?: Float64Array;
   /**
-   * 1 周分だけのログ(輪)を、読み込み時に「元のログ + 同じ 1 周をもう一度」へつないだときの情報(closeLoop)。
+   * 1 周分だけのログ(輪)を、読み込み時に「元のログ + 同じ 1 周を 2 回」へつないだときの情報(closeLoop)。
    * 0〜n-1 番が元のログ、n 番以降がつないだ部分。period は 1 周の時間(秒)
    */
   loop?: { n: number; period: number };

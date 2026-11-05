@@ -121,6 +121,16 @@ export function promptDialog(
   }, null, host);
 }
 
+/**
+ * 中身を自分で組み立てるダイアログ(読み込みの確認など)。build で box に中身を入れ、最初にフォーカスする要素を返す。
+ * close(値) で閉じる。Esc は cancelValue で閉じる
+ */
+export function customDialog<T>(
+  build: (box: HTMLElement, close: (v: T) => void) => HTMLElement, cancelValue: T, host: HTMLElement = document.body,
+): Promise<T> {
+  return open<T>((box, close) => ({ focus: build(box, close) }), cancelValue, host);
+}
+
 /** 中身を HTML で渡す、読むだけのダイアログ(About など)。HTML は呼び出し側が用意した固定の文字列だけを渡すこと。 */
 export function contentDialog(o: { title: string; html: string; ok?: string; wide?: boolean }, host: HTMLElement = document.body): Promise<void> {
   return open<void>((box, close) => {

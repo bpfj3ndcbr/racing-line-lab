@@ -57,7 +57,7 @@ describe('大きな画面: 登録', () => {
     expect($('#guide').hidden).toBe(true);
     expect($('.navtab[data-view="import"]').getAttribute('aria-current')).toBe('page');
     expect($('#ce-title').textContent).toBe('サーキットの登録');
-    expect($('#ce-save').textContent).toBe('登録');
+    expect($('#ce-save').textContent).toBe('登録完了');
     expect($('#ce-lines').textContent).toBe('計測ライン: 未設定');
   });
 
@@ -132,7 +132,8 @@ describe('大きな画面: 編集', () => {
 
   it('登録済みの一覧の「編集(地図)…」で開く。ラインと保存した表示位置で地図が出る', () => {
     edit();
-    expect($('#ce-title').textContent).toBe('サーキットの編集: オートポリス');
+    expect($('#ce-title').textContent).toBe('サーキットの編集');
+    expect($<HTMLInputElement>('#ce-name').value).toBe('オートポリス');
     expect($('#ce-save').textContent).toBe('保存');
     expect($<HTMLInputElement>('#ce-name').value).toBe('オートポリス');
     expect(mapOf().lines).toHaveLength(8);

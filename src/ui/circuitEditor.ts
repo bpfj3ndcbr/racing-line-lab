@@ -34,8 +34,14 @@ const LONG_LINE_M = 60;
  */
 export function mountCircuitEditor(root: HTMLElement, session: Session, deps: CircuitEditorDeps): CircuitEditor {
   root.innerHTML = `
-    <div class="corr">
+    <div class="corr ce">
       <div class="corr-map-wrap">
+        <div class="ce-head">
+          <span class="ce-head-t" id="ce-title">サーキットの登録</span><span class="ce-head-s">計測ライン・セクターの設定</span><span class="grow"></span>
+          <label class="ce-head-name"><span>サーキット名:</span><input id="ce-name" type="text" placeholder="例: オートポリス" aria-label="サーキット名"></label>
+          <button class="btn pri" id="ce-save" data-act="ce-save">登録完了</button>
+          <button class="btn" id="ce-cancel" data-act="ce-cancel">キャンセル</button>
+        </div>
         <div class="map" id="ce-map"></div>
         <form class="geo" id="ce-geo" role="search" autocomplete="off">
           <input id="ce-geo-q" type="search" placeholder="住所で検索..." aria-label="住所で検索" enterkeyhint="search">
@@ -44,13 +50,7 @@ export function mountCircuitEditor(root: HTMLElement, session: Session, deps: Ci
         <div class="map-hint" id="ce-hint" hidden></div>
       </div>
       <aside class="corr-side" aria-label="サーキットの登録・編集">
-        <div class="h" id="ce-title">サーキットの登録</div>
-        <div class="corr-actions ce-top">
-          <button class="btn pri" id="ce-save" data-act="ce-save">登録</button>
-          <button class="btn" id="ce-cancel" data-act="ce-cancel">キャンセル</button>
-        </div>
         <div class="msg" id="ce-msg" role="status"></div>
-        <label class="frow2 col"><span>名前</span><input id="ce-name" type="text" placeholder="例: オートポリス" aria-label="サーキット名"></label>
         <section class="ce-group" aria-labelledby="ce-g1">
           <h3 id="ce-g1">ラインの追加・削除</h3>
           <div class="ce-draw">
@@ -416,8 +416,8 @@ export function mountCircuitEditor(root: HTMLElement, session: Session, deps: Ci
       control = c?.control ?? null;
       sectors = [...(c?.sectors ?? [])];
       selected = null; drawing = null; draft = null; part = 'm';
-      $('ce-title').textContent = c ? `サーキットの編集: ${c.name}` : 'サーキットの登録';
-      $('ce-save').textContent = c ? '保存' : '登録';
+      $('ce-title').textContent = c ? 'サーキットの編集' : 'サーキットの登録';
+      $('ce-save').textContent = c ? '保存' : '登録完了';
       $<HTMLInputElement>('ce-name').value = c?.name ?? '';
       $<HTMLInputElement>('ce-cln').value = '';
       $<HTMLInputElement>('ce-sci').value = '';

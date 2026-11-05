@@ -6,7 +6,7 @@ import { metersPerDegree } from './geo';
  *
  * 1 周ずつ切り分けて書き出されたログ(他のツールで変換した .vbo など)は、計測ラインがファイルの途中にあると、
  * 通過が 1 回だけになり、完了ラップが取れない。そこで、輪と判断できるログは、読み込み時に
- * 「元のログ + 同じ 1 周をもう一度」をつないだログにしておく(TrackLog.loop)。
+ * 「元のログ + 同じ 1 周を 2 回」をつないだログにしておく(TrackLog.loop)。
  * ラップの検出(detectLaps)は、元のログの中で通過が 1 回以下のときだけ、つないだ部分まで使って 1 周分のラップを作る。
  * Lap は今までどおり「ログの時刻・サンプル番号の区間」なので、あとの処理(グラフ・再生・セクター)はそのまま使える。
  */
@@ -61,7 +61,9 @@ export function checkLoop(log: TrackLog): LoopCheck | null {
 }
 
 /**
- * 輪と判断できるログなら、元のログのあとに同じ 1 周(2 点目から)をつないだログを返す。そうでなければそのまま返す。
+ * 輪と判断できるログなら、元のログのあとに同じ 1 周(2 点目から)を 2 回つないだログを返す。そうでなければそのまま返す。
+ * 2 回つなぐのは、計測ラインがつなぎ目(元のログの終点と始点のあいだ)にあるとき(1 周分のログの始点と終点から
+ * 計算した計測ラインなど)、1 回目のつなぎ目の通過から 2 回目のつなぎ目の通過までを 1 周にするため。
  * つなぎ目の時間は、終点から始点までの距離を、その速度で進む時間とする(1 周のタイム = 記録時間 + その時間)。
  */
 export function closeLoop(log: TrackLog): TrackLog {
@@ -73,11 +75,11 @@ export function closeLoop(log: TrackLog): TrackLog {
   // つなぎ目: 終点 → 始点(=1 周後の 0 点目)にかかる時間。時刻が戻らないよう、下限を設ける
   const seam = Math.max(c.alongM / v, -(log.t[1] - log.t[0]) / 2);
   const period = log.t[n - 1] - log.t[0] + seam;
-  const len = 2 * n - 1;
+  const len = 3 * n - 2;
   const ext = (a: Float64Array, shift = 0): Float64Array => {
     const out = new Float64Array(len);
     out.set(a);
-    for (let i = 1; i < n; i++) out[n - 1 + i] = a[i] + shift;
+    for (let k = 1; k <= 2; k++) for (let i = 1; i < n; i++) out[k * (n - 1) + i] = a[i] + k * shift;
     return out;
   };
   const opt = (a: Float64Array | undefined) => (a ? ext(a) : undefined);

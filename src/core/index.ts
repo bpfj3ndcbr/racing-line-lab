@@ -4,6 +4,7 @@ export * from './vbo';
 export * from './lines';
 export * from './laps';
 export * from './loop';
+export * from './candidate';
 export * from './circuits';
 export * from './assign';
 export * from './sectors';

@@ -1,11 +1,29 @@
-import type { TrackLog } from './types';
+import type { TimingLine, TrackLog } from './types';
 
 /**
  * .vbo(VBOX 形式)パーサ。RaceChrono 出力と DigiSpice 変換出力の両方を想定。
  * - 緯度経度は「分」単位(度×60)、経度は符号反転(負が東経)
  * - 時刻は hhmmss.ss (UTC)。日跨ぎは連続した秒に直す
  * - 列は [column names] から引く(無い列は undefined)
+ * - [session data] の name と、[laptiming] の計測ライン(RaceChrono)も読む
  */
+
+const NUM = '([-+]?\\d+(?:\\.\\d+)?)';
+/** [laptiming] の 1 行: 「種別 経度1 緯度1 経度2 緯度2 ¬ 名前」(座標は「分」、経度は西経が正) */
+const TIMING_RE = new RegExp(`^(start|split)\\s+${NUM}\\s+${NUM}\\s+${NUM}\\s+${NUM}(?:\\s+(?:\u00ac\\s*)?(.*))?$`, 'i');
+
+export function parseTimingLine(line: string): TimingLine | null {
+  const m = line.match(TIMING_RE);
+  if (!m) return null;
+  const v = m.slice(2, 6).map(Number);
+  if (v.some((x) => !Number.isFinite(x))) return null;
+  return {
+    kind: m[1].toLowerCase() === 'start' ? 'start' : 'split',
+    p1: { lat: v[1] / 60, lon: -v[0] / 60 },
+    p2: { lat: v[3] / 60, lon: -v[2] / 60 },
+    name: (m[6] ?? '').trim(),
+  };
+}
 
 const DEFAULT_COLUMNS = ['sats', 'time', 'lat', 'long', 'velocity', 'heading', 'height'];
 
@@ -47,6 +65,8 @@ export function parseVbo(text: string, fileName = ''): TrackLog {
   let createdUtc: TrackLog['createdUtc'] = null;
   let columns: string[] = [];
   const comments: string[] = [];
+  let sessionName: string | undefined;
+  const timing: TimingLine[] = [];
   let idx: ColumnIndex | null = null;
 
   const T: number[] = [], LAT: number[] = [], LON: number[] = [], SPD: number[] = [];
@@ -65,6 +85,8 @@ export function parseVbo(text: string, fileName = ''): TrackLog {
       continue;
     }
     if (section === '[comments]') { comments.push(line); continue; }
+    if (section === '[session data]') { const m = line.match(/^name\s+(.+)$/i); if (m) sessionName = m[1].trim(); continue; }
+    if (section === '[laptiming]') { const tl = parseTimingLine(line); if (tl) timing.push(tl); continue; }
     if (section === '[column names]') { columns = line.split(/\s+/); continue; }
     if (section !== '[data]') continue;
 
@@ -98,6 +120,8 @@ export function parseVbo(text: string, fileName = ''): TrackLog {
     fileName, createdUtc, startEpochMs, columns, comments,
     t, lat: Float64Array.from(LAT), lon: Float64Array.from(LON), speed: Float64Array.from(SPD),
   };
+  if (sessionName) log.sessionName = sessionName;
+  if (timing.length) log.laptiming = timing;
   if (HDG.length) log.heading = Float64Array.from(HDG);
   if (HGT.length) log.height = Float64Array.from(HGT);
   if (LACC.length) log.longAcc = Float64Array.from(LACC);

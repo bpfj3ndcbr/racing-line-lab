@@ -1,8 +1,9 @@
 import {
-  SLOTS, type Lap, type Slot, bestPerColumn, formatJst, formatLapTime, isBest, sectorSplits,
+  SLOTS, type Lap, type Slot, bestPerColumn, formatCln, formatJst, formatLapTime, formatSci, isBest, nameExists, sectorSplits,
 } from '../core';
 import { ALIAS_MAX, SET_COUNT, SLOT_ALIAS_MAX, type LoadedLog, type Session, type WorkSet, bestDuration } from '../store/session';
 import { mountCircuitEditor, type CircuitEditor } from './circuitEditor';
+import { candidateLabel, loadDialog, planLoad } from './loadDialog';
 import { mountCorrectView, type CorrectView } from './correctView';
 import { alertDialog, promptDialog } from './dialog';
 import type { MapFactory } from './mapTypes';
@@ -315,15 +316,20 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
     const offTag = l.offset.east !== 0 || l.offset.north !== 0 ? `東 ${l.offset.east.toFixed(2)} m / 北 ${l.offset.north.toFixed(2)} m` : '';
     const circuitTag = l.circuit
       ? `<span class="tag ok">${esc(l.circuit.name)}${l.auto ? '(自動判定)' : ''}</span>`
-      : '<span class="tag ng">サーキット未判定</span>';
+      : l.outside ? `<span class="tag ng">${esc(l.outside.name)} を通らない</span>` : '<span class="tag ng">サーキット未判定</span>';
     const arrow = (k: string) => (key === k ? (dir === 1 ? '▲' : '▼') : '');
     const sortAttr = (k: string) => (key === k ? (dir === 1 ? 'ascending' : 'descending') : 'none');
 
     let rows: string;
-    if (!l.circuit) {
+    const cand = !l.circuit && !l.outside ? session.candidateFor(l) : null;
+    if (l.outside) {
+      rows = `<div class="empty">このログは、この比較セットのサーキット(${esc(l.outside.name)})の計測ラインを通らないため、ラップがありません。
+        ほかのサーキットのログは、別の比較セットに入れてください(「使用するサーキット」でサーキットを切り替えることもできます)。</div>`;
+    } else if (!l.circuit) {
       rows = `<div class="empty">このログが通るサーキットが見つかりません。サーキットを登録するか、上の「使用するサーキット」で指定してください。
         <div class="btn-row">
-          <button class="btn sm pri" data-act="circ-map" data-set="${i}" data-log="${esc(l.id)}" data-fk="s${i}-cm-${esc(l.id)}">地図で登録…</button>
+          ${cand ? `<button class="btn sm pri" data-act="circ-cand" data-set="${i}" data-log="${esc(l.id)}" data-fk="s${i}-cc-${esc(l.id)}" title="${esc(candidateLabel(cand.candidate))}">ログの計測ラインで登録…</button>` : ''}
+          <button class="btn sm${cand ? '' : ' pri'}" data-act="circ-map" data-set="${i}" data-log="${esc(l.id)}" data-fk="s${i}-cm-${esc(l.id)}">地図で登録…</button>
           <button class="btn sm" data-act="circ-file" data-fk="s${i}-cf-${esc(l.id)}">.cln / .sci ファイルで登録…</button>
           ${session.circuits.length ? `<button class="btn sm" data-act="circ-pick" data-set="${i}" data-fk="s${i}-cp-${esc(l.id)}">登録済みから選ぶ</button>` : ''}
         </div></div>`;
@@ -394,7 +400,7 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
   function guideStep(w: WorkSet): number {
     if (!w.logs.length) return 0;
     if (SLOTS.some((s) => w.assignment[s])) return 3;
-    if (w.logs.some((l) => !l.circuit)) return 1;
+    if (w.logs.some((l) => !l.circuit && !l.outside)) return 1;            // サーキットを通らないログ(ラップ無し)は対象外
     return 2;
   }
   function renderGuide() {
@@ -407,12 +413,14 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
     const cur = guideStep(w);
     const firstWithLaps = w.logs.find((l) => l.circuit && l.laps.length);
     const free = SLOTS.find((s) => !w.assignment[s]);
-    const btn = (act: string, label: string, extra = '') => `<button class="btn sm${act === 'guide-add' || act === 'guide-map' || act === 'guide-auto' || act === 'guide-compare' ? ' pri' : ''}" data-act="${act}" data-fk="${act}"${extra}>${label}</button>`;
+    const candLog = w.logs.find((l) => !l.circuit && !l.outside && session.candidateFor(l));
+    const pri = (act: string) => act === 'guide-add' || act === 'guide-cand' || (act === 'guide-map' && !candLog) || act === 'guide-auto' || act === 'guide-compare';
+    const btn = (act: string, label: string, extra = '') => `<button class="btn sm${pri(act) ? ' pri' : ''}" data-act="${act}" data-fk="${act}"${extra}>${label}</button>`;
     const steps = [
       { t: 'ログを追加', d: 'RaceChrono などの .vbo ファイルを、比較セットの枠のドロップ欄にドラッグ&ドロップします。',
         b: btn('guide-add', '走行ログ(.vbo)を追加…') },
-      { t: 'サーキットを用意', d: '地図の上で計測ライン(ゴールライン)を引いて登録します(1 回だけ)。.cln / .sci ファイルがあれば、それでも登録できます。',
-        b: btn('guide-map', '地図で登録…') + btn('guide-file', '.cln / .sci ファイルで登録…')
+      { t: 'サーキットを用意', d: '計測ライン(ゴールライン)を決めて、サーキットを登録します(1 回だけ)。走行ログに計測ラインの情報があれば、それを使えます。無ければ地図の上で引くか、.cln / .sci ファイルで登録します。',
+        b: (candLog ? btn('guide-cand', 'ログの計測ラインで登録…') : '') + btn('guide-map', '地図で登録…') + btn('guide-file', '.cln / .sci ファイルで登録…')
           + (session.circuits.length ? btn('guide-pick', '登録済みから選ぶ') : '') },
       { t: 'ラップを割り当て', d: '比べたいラップを A〜D に割り当てます(最大 4 つ)。速いものから自動で入れるか、自分で選ぶかを選べます。',
         b: firstWithLaps ? (free ? btn('guide-auto', `速いものから ${free} に自動で割り当て`) : '') + btn('guide-manual', '手動で割り当て') : '' },
@@ -504,6 +512,8 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
       case 'drop-pick': addTarget = Number(d.set ?? 0); vboInput.click(); break;
       case 'auto-assign': autoAssign(Number(d.set ?? 0)); break;
       case 'circ-map': openMapRegister(Number(d.set ?? 0), d.log); break;
+      case 'circ-cand': void openLoadCheck(Number(d.set ?? 0), d.log!); break;
+      case 'guide-cand': { const l = session.active.logs.find((x) => !x.circuit && !x.outside && session.candidateFor(x)); if (l) void openLoadCheck(session.activeIndex, l.id); break; }
       case 'circ-file': openCircuitSection('reg'); break;
       case 'circ-pick': focusCircuitSelect(Number(d.set ?? 0)); break;
       case 'guide-close': session.setGuideClosed(true); break;
@@ -565,8 +575,46 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
   async function addFiles(files: File[], set: number) {
     const vbo = files.filter((f) => /\.vbo$/i.test(f.name));
     const skipped = files.length - vbo.length;
+    const before = new Set((session.sets[set]?.logs ?? []).map((l) => l.id));
     if (vbo.length) await session.addVboFiles(vbo.map((file) => ({ file, path: window.rllNative?.getPathForFile(file) || undefined })), set);
     if (skipped) session.say(`${skipped} 件は .vbo ではないため追加しませんでした。`);
+    const added = (session.sets[set]?.logs ?? []).filter((l) => !before.has(l.id)).map((l) => l.id);
+    if (added.length) await checkLoaded(set, added, before.size === 0);
+  }
+
+  // ---------- 読み込みの確認(案件 3) ----------
+  /** 確認ダイアログから開いた登録画面: 登録したら、そのサーキットを比較セットのサーキットにする */
+  let pending: { set: number; circuits: number } | null = null;
+  async function checkLoaded(set: number, ids: string[], wasEmpty: boolean, prefer?: string) {
+    const plan = planLoad(session, set, ids, wasEmpty);
+    if (!plan) return;
+    if (prefer && plan.options.some((o) => o.key === prefer)) plan.initial = prefer;
+    const { option: o, name } = await loadDialog(plan, { mapFactory: opts.mapFactory, nameTaken: (n) => nameExists(session.circuits, n) });
+    if (o.kind === 'circuit') { session.setCircuit(o.circuit.id, set); scrollToSet(set); }
+    if (o.kind === 'cand') {
+      // ファイルの計測ラインは、そのまま登録して、ラップの割り当てに進む(位置は、あとから編集で直せる)
+      const c = o.candidate;
+      const r = session.registerCircuit(name, formatCln([c.control]), formatSci(c.sectors));   // 表示位置は決めない(走行ラインに合わせて表示)
+      if (!r.ok) { session.say(r.message); return; }
+      session.message = r.message;
+      session.setCircuit(session.circuits[session.circuits.length - 1].id, set);
+      scrollToSet(set);
+    }
+    if (o.kind === 'map') { pending = { set, circuits: session.circuits.length }; openMapRegister(set, o.log.id); }
+  }
+  /** ログの枠・はじめかたの「ログの計測ラインで登録…」: そのセットのログで確認ダイアログを開く(そのログの候補を選んだ状態) */
+  async function openLoadCheck(set: number, logId: string) {
+    const w = session.sets[set];
+    const l = w?.logs.find((x) => x.id === logId);
+    if (!w || !l) return;
+    const ref = session.candidateFor(l);
+    await checkLoaded(set, w.logs.map((x) => x.id), !session.setCircuitOf(set), ref ? `cand:${ref.from.id}` : undefined);
+  }
+  /** 登録画面を閉じたとき: 確認ダイアログから開いて登録したなら、そのサーキットを比較セットのサーキットにする */
+  function afterRegister() {
+    const p = pending;
+    pending = null;
+    if (p && session.circuits.length > p.circuits) session.setCircuit(session.circuits[session.circuits.length - 1].id, p.set);
   }
 
   /** 比較セットが、スクロールする領域の一番上に来るようにする(上の固定部分の下) */
@@ -723,6 +771,7 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
     backToCompare = false;
     if (!work) return;
     work = null;
+    root.classList.remove('view-ce');
     correct?.hide(); editor?.hide();
     renderSlots(); opts.onWorkChange?.();
     workEl.hidden = true;
@@ -737,11 +786,12 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
       correct = mountCorrectView(cEl, session, { mapFactory: opts.mapFactory, theme: opts.theme, onDone: closeWork });
       editor = mountCircuitEditor(eEl, session, {
         mapFactory: opts.mapFactory, theme: opts.theme, zoom: opts.zoom,
-        onDone: () => { const back = backToCompare; closeWork(); if (back) opts.onCompare?.(); },
+        onDone: () => { const back = backToCompare; closeWork(); if (back) opts.onCompare?.(); else afterRegister(); },
       });
     }
     work = kind;
-    root.style.setProperty('--slots-h', `${slotsEl.offsetHeight || 92}px`);
+    root.classList.toggle('view-ce', kind === 'circuit');                 // 登録・編集の画面では A〜D のカードを隠す
+    root.style.setProperty('--slots-h', kind === 'circuit' ? '0px' : `${slotsEl.offsetHeight || 92}px`);
     bodyEl.hidden = true;
     $('guide').hidden = true;
     workEl.hidden = false;

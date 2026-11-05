@@ -1,6 +1,7 @@
 import {
-  type Assignment, type Circuit, type GeoLine, type Lap, type LapRef, type MapView, type Offset, type Slot, type TrackLog,
-  SLOTS, clearLog, closeLoop, detectLapRun, emptyAssignment, matchCircuit, nameExists, parseCln, parseSci, parseVbo, roundLine, toggleAssign,
+  type Assignment, type Circuit, type GeoLine, type Lap, type LapRef, type LineCandidate, type MapView, type Offset, type Slot, type TrackLog,
+  SLOTS, clearLog, closeLoop, detectLapRun, emptyAssignment, findCrossings, lineCandidate, matchCircuit, nameExists, parseCln, parseSci, parseVbo,
+  roundLine, toggleAssign,
 } from '../core';
 import type { KeyValueStore } from '../io/storage';
 
@@ -17,7 +18,17 @@ export interface LoadedLog {
   laps: Lap[];
   /** 最初の通過より前に走行がある(一覧に「始点が無いので非表示」と出す) */
   hasHead: boolean;
+  /**
+   * 比較セットのサーキットが決まっていて、このログがその計測ラインを通らないとき、そのサーキット(ラップ無しのログ)。
+   * このとき circuit は null。比較セットのサーキットは 1 つ(案件 3)
+   */
+  outside: Circuit | null;
+  /** ログの内容から作った計測ラインの候補(RaceChrono の [laptiming] / 1 周分のログ)。作れなければ null */
+  candidate: LineCandidate | null;
 }
+
+/** 候補と、その候補を作ったログ(ほかのログの候補を使うときは、そのログ) */
+export interface CandidateRef { candidate: LineCandidate; from: LoadedLog }
 
 export interface CircuitResult {
   ok: boolean;
@@ -300,12 +311,34 @@ export class Session {
   private addEntry(w: WorkSet, log: TrackLog, id: string) {
     // 1 周分だけのログ(輪)は、つないだログにしておく(closeLoop)。別のセットに読み込み済みなら、その中身を共有する
     if (w.logs.some((l) => l.id === id)) return;
+    const known = this.knownEntry(id);
+    const full = known?.log ?? closeLoop(log);
     const entry: LoadedLog = {
-      id, no: w.nextNo++, log: this.knownLog(id) ?? closeLoop(log), offset: this.offsets[id] ?? { east: 0, north: 0 },
-      circuit: null, auto: true, laps: [], hasHead: false,
+      id, no: w.nextNo++, log: full, offset: this.offsets[id] ?? { east: 0, north: 0 },
+      circuit: null, auto: true, laps: [], hasHead: false, outside: null,
+      candidate: known ? known.candidate : lineCandidate(full),
     };
-    this.resolve(entry, w);
     w.logs.push(entry);
+    this.resolveSet(w, undefined, id);
+  }
+  /**
+   * ログ l に使える計測ラインの候補。自分の候補があればそれ。無ければ、読み込み済みのほかのログ(どのセットでも)の候補のうち、
+   * l の走行がその計測ラインを通るもの(RaceChrono の [laptiming] から作ったものを先に)。無ければ null
+   */
+  candidateFor(l: LoadedLog): CandidateRef | null {
+    if (l.candidate) return { candidate: l.candidate, from: l };
+    const seen = new Set<string>();
+    const pool: LoadedLog[] = [];
+    for (const w of this.sets) for (const x of w.logs) if (x.candidate && !seen.has(x.id)) { seen.add(x.id); pool.push(x); }
+    pool.sort((p, q) => Number(q.candidate!.source === 'laptiming') - Number(p.candidate!.source === 'laptiming'));
+    const hit = pool.find((x) => findCrossings(l.log, x.candidate!.control, { offset: l.offset }).length > 0);
+    return hit ? { candidate: hit.candidate!, from: hit } : null;
+  }
+
+  /** どこかのセットに読み込み済みのファイルなら、そのログ */
+  private knownEntry(id: string): LoadedLog | null {
+    for (const w of this.sets) { const l = w.logs.find((x) => x.id === id); if (l) return l; }
+    return null;
   }
 
   removeLog(id: string, set?: number): void {
@@ -313,6 +346,7 @@ export class Session {
     w.logs = w.logs.filter((l) => l.id !== id);
     w.assignment = clearLog(w.assignment, id);
     if (!this.sets.some((x) => x.logs.some((l) => l.id === id))) this.paths.delete(id);
+    this.resolveSet(w);                                           // 比較セットのサーキットが変わることがある
     this.emit();
   }
 
@@ -330,8 +364,8 @@ export class Session {
       const l = w.logs.find((x) => x.id === id);
       if (!l) continue;
       l.offset = offset;
-      this.resolve(l, w);
       w.assignment = clearLog(w.assignment, id);
+      this.resolveSet(w);
     }
   }
   /**
@@ -343,7 +377,7 @@ export class Session {
     if (sec === null) delete cur[lap]; else cur[lap] = Math.round(sec);
     if (Object.keys(cur).length) this.lapEnds[id] = cur; else delete this.lapEnds[id];
     this.saveLapEnds();
-    for (const w of this.sets) { const l = w.logs.find((x) => x.id === id); if (l) this.resolve(l, w); }
+    for (const w of this.sets) { const l = w.logs.find((x) => x.id === id); if (l) this.computeLaps(l); }
     this.emit();
   }
   /** ラップ番号 lap の「終端の調整」の値(調整していなければ null) */
@@ -473,20 +507,10 @@ export class Session {
   private updateCircuit(id: string, patch: Partial<Pick<Circuit, 'control' | 'sectors'>>) {
     this.circuits = this.circuits.map((c) => (c.id === id ? { ...c, ...patch } : c));
     this.saveCircuits();
-    // このサーキットのラップは変わるので、関係するログの割り当てを解除して計算し直す
-    for (const w of this.sets) {
-      for (const l of w.logs) {
-        const before = l.circuit?.id ?? null;
-        this.resolve(l, w);
-        const after = l.circuit?.id ?? null;
-        // コントロールラインが変わる(ラップ番号が変わる)か、サーキットの判定が変わったときだけ解除する。
-        // セクターだけの変更ではラップは同じなので、A〜D の割り当てはそのまま残す
-        if (before !== after || ((before === id || after === id) && patch.control)) {
-          w.assignment = clearLog(w.assignment, l.id);
-          if (this.clearLapEnds(l.id)) this.resolve(l, w);
-        }
-      }
-    }
+    // このサーキットのラップは変わるので、関係するログの割り当てを解除して計算し直す。
+    // コントロールラインが変わる(ラップ番号が変わる)か、サーキットの判定が変わったときだけ解除する。
+    // セクターだけの変更ではラップは同じなので、A〜D の割り当てはそのまま残す
+    for (const w of this.sets) this.resolveSet(w, patch.control ? id : undefined);
     this.emit();
   }
 
@@ -501,26 +525,51 @@ export class Session {
   private saveCircuits() { this.store.set('circuits', JSON.stringify(this.circuits)); }
 
   /** 全セットの全ログのラップを計算し直す。サーキットが変わったログの割り当ては解除する。 */
-  private resolveAll() {
-    for (const w of this.sets) {
+  private resolveAll() { for (const w of this.sets) this.resolveSet(w); }
+
+  /**
+   * 比較セットのサーキット: 「使用するサーキット」で選んでいればそれ。自動判定なら、セットの中で最初に
+   * 判定できたログのサーキット。無ければ null(未判定)
+   */
+  setCircuitOf(set?: number): Circuit | null {
+    const w = this.ws(set);
+    return this.chosenOf(w) ?? w.logs.find((l) => l.circuit && l.auto)?.circuit ?? null;
+  }
+  private chosenOf(w: WorkSet): Circuit | null {
+    return (w.selectedCircuitId ? this.circuits.find((c) => c.id === w.selectedCircuitId) : undefined) ?? null;
+  }
+
+  /**
+   * セットの全ログのサーキットとラップを決め直す(比較セットのサーキットは 1 つ)。
+   * サーキットが変わったログ(と、controlChangedId のサーキットのログ)は、割り当てと終端の調整を解除する。
+   * added は、いま追加したログ(保存してある終端の調整を使うので、解除しない)
+   */
+  private resolveSet(w: WorkSet, controlChangedId?: string, added?: string) {
+    const before = new Map(w.logs.map((l) => [l.id, l.circuit?.id ?? null]));
+    const chosen = this.chosenOf(w);
+    let setCircuit = chosen;
+    if (!setCircuit) {
       for (const l of w.logs) {
-        const before = l.circuit?.id ?? null;
-        this.resolve(l, w);
-        if ((l.circuit?.id ?? null) !== before) {
-          w.assignment = clearLog(w.assignment, l.id);
-          if (this.clearLapEnds(l.id)) this.resolve(l, w);
-        }
+        const m = matchCircuit(l.log, this.circuits, l.offset)?.circuit ?? null;
+        if (m) { setCircuit = m; break; }
       }
+    }
+    for (const l of w.logs) {
+      l.auto = !chosen;
+      const crosses = setCircuit ? findCrossings(l.log, setCircuit.control, { offset: l.offset }).length > 0 : false;
+      l.circuit = crosses ? setCircuit : null;
+      l.outside = setCircuit && !crosses ? setCircuit : null;
+      const b = before.get(l.id) ?? null, a = l.circuit?.id ?? null;
+      if (l.id !== added && (b !== a || (controlChangedId && (b === controlChangedId || a === controlChangedId)))) {
+        w.assignment = clearLog(w.assignment, l.id);
+        this.clearLapEnds(l.id);
+      }
+      this.computeLaps(l);
     }
   }
 
-  private resolve(l: LoadedLog, w: WorkSet) {
-    const chosen = w.selectedCircuitId ? this.circuits.find((c) => c.id === w.selectedCircuitId) : undefined;
-    if (chosen) { l.circuit = chosen; l.auto = false; }
-    else {
-      l.circuit = matchCircuit(l.log, this.circuits, l.offset)?.circuit ?? null;
-      l.auto = true;
-    }
+  /** ログ l の、決まったサーキットでのラップ */
+  private computeLaps(l: LoadedLog) {
     const ends = this.lapEnds[l.id];
     const run = l.circuit
       ? detectLapRun(l.log, l.circuit.control, l.circuit.sectors, { offset: l.offset, ends: ends && Object.fromEntries(Object.entries(ends).map(([k, v]) => [Number(k), v])) })

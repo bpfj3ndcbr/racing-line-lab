@@ -162,14 +162,16 @@ describe('セットは独立している(位置補正だけが共通)', () => {
     expect(session.sets[0].assignment.C).toBeNull();
   });
 
-  it('使用するサーキットはセットごと。片方を変えても、もう片方の判定・ラップは変わらない', () => {
+  it('使用するサーキットはセットごと。片方を変えても、もう片方の判定・ラップは変わらない(通らないサーキットを選ぶと、ラップ無し)', () => {
     const other = session.circuits.find((c) => c.name === '別のサーキット')!;
     const sel = $<HTMLSelectElement>('#sec-set-1 .circuit-select');
     sel.value = other.id;
     sel.dispatchEvent(new Event('change', { bubbles: true }));
     expect(session.sets[1].selectedCircuitId).toBe(other.id);
     expect(session.sets[0].selectedCircuitId).toBeNull();
-    expect(session.sets[1].logs[0].circuit?.name).toBe('別のサーキット');
+    expect(session.sets[1].logs[0].circuit).toBeNull();
+    expect(session.sets[1].logs[0].outside?.name).toBe('別のサーキット');
+    expect(session.sets[1].logs[0].laps).toEqual([]);
     expect(session.sets[0].logs[0].circuit?.name).toBe('オートポリス');
     expect(session.sets[0].logs[0].laps.length).toBeGreaterThan(0);
   });
