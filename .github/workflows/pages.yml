@@ -9,6 +9,7 @@ on:
     paths-ignore:
       - 'ABOUT.md'
       - 'AGENTS.md'
+      - 'CHANGELOG.md'
       - 'CLAUDE.md'
       - 'DEVELOPMENT.md'
       - 'TODO.md'
