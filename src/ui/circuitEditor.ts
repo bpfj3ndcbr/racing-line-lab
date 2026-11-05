@@ -1,5 +1,5 @@
 import { gsiGeocode, type GeoHit, type Geocoder } from '../io/geocode';
-import { type GeoLine, distanceM, formatCln, formatSci, metersPerDegree, parseCln, parseSci, roundLine } from '../core';
+import { type GeoLine, LINE_DIGITS, distanceM, formatCln, formatSci, metersPerDegree, parseCln, parseSci, roundLine } from '../core';
 import type { Session } from '../store/session';
 import { alertDialog } from './dialog';
 import { downloadText } from './download';
@@ -341,7 +341,7 @@ export function mountCircuitEditor(root: HTMLElement, session: Session, deps: Ci
     if (draft) { msg('引いたラインを「確定」するか「破棄」してください。'); return; }
     if (!control) { msg('計測ラインを引くか、.cln ファイルを読み込んでください。'); return; }
     if (!editId) {
-      const r = session.registerCircuit(name, formatCln([control]), formatSci(sectors), view);
+      const r = session.registerCircuit(name, formatCln([control], LINE_DIGITS), formatSci(sectors, 1, LINE_DIGITS), view);
       if (!r.ok && r.reason === 'duplicate') { msg(''); await dupWarn(name); return; }
       if (!r.ok) { msg(r.message); return; }
       session.message = r.message;

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { distanceM, formatCln, formatSci, metersPerDegree, parseCln, parseSci, parseVbo, roundLine } from '../src/core';
+import { LINE_DIGITS, distanceM, formatCln, formatSci, metersPerDegree, parseCln, parseSci, parseVbo, roundLine } from '../src/core';
 import { MemoryStore } from '../src/io/storage';
 import { Session } from '../src/store/session';
 import { mountApp } from '../src/ui/app';
@@ -27,6 +27,13 @@ describe('.cln / .sci の書き出し(読み込みと同じ形式)', () => {
     expect(parseSci(formatSci(lines)).map((x) => x.line)).toEqual(lines);
     expect(parseCln(formatCln(lines.slice(0, 1)))).toEqual(lines.slice(0, 1));
     expect(formatSci([])).toBe('');
+  });
+  it('ファイルへの書き出しは 6 桁。アプリ内の登録(LINE_DIGITS)は 7 桁のまま残る', () => {
+    const l = roundLine({ a: { lat: 33.03904567891, lon: 130.97347412345 }, b: { lat: 33.0384871, lon: 130.9730201 } });
+    expect(formatCln([l]).split('\r\n')[1]).toBe('33.039046');
+    expect(formatSci([l]).split('\r\n')[0]).toBe('33.039046,130.973474,33.038487,130.973020,1');
+    expect(parseCln(formatCln([l], LINE_DIGITS))).toEqual([l]);
+    expect(parseSci(formatSci([l], 1, LINE_DIGITS)).map((x) => x.line)).toEqual([l]);
   });
 });
 
@@ -190,11 +197,11 @@ describe('ラインを引く → 直す → 確定', () => {
     expect(mapOf().lines[0].line.a.lat).toBeCloseTo(33.05, 6);
   });
 
-  it('引いたラインは 6 桁に丸められる(ファイルに書いたときと同じ値)', () => {
+  it('引いたラインは、アプリ内の桁(7 桁)に丸められる', () => {
     openNew();
     click('#ce-draw-control');
     mapOf().drawLine({ lat: 33.03904567891, lon: 130.97347412345 }, B);
-    expect(mapOf().lines[0].line.a).toEqual({ lat: 33.039046, lon: 130.973474 });
+    expect(mapOf().lines[0].line.a).toEqual({ lat: 33.0390457, lon: 130.9734741 });
   });
 });
 

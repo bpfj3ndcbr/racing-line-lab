@@ -204,7 +204,9 @@ describe('はじめかた', () => {
     const labels = Array.from(root.querySelectorAll('#sec-set-1 .empty button')).map((b) => b.textContent);
     expect(labels).toEqual(['ログの計測ラインで登録…', '地図で登録…', '.cln / .sci ファイルで登録…']);
     expect(root.querySelector('#sec-set-1 .empty [data-act="circ-cand"]')!.classList.contains('pri')).toBe(true);
-    // 候補が無いログ(輪でない)では、地図で登録が青
+    // 候補が無いログ(輪でない)では、地図で登録が青。ほかのログの候補を借りないように、先のログは外しておく
+    // (先頭 8 割のログは、輪のログから計算した計測ラインの位置から始まるので、借りられるかどうかが丸めの桁で変わる)
+    session.removeLog('u', 1);
     session.addLog(headOf(parseOne(), 0.8), 'h', 2);
     const set2 = Array.from(root.querySelectorAll('#sec-set-2 .empty button')).map((b) => b.textContent);
     expect(set2).toEqual(['地図で登録…', '.cln / .sci ファイルで登録…']);

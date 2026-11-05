@@ -1,4 +1,7 @@
-import { type Circuit, type GeoLine, type LineCandidate, detectLaps, findCrossings, formatJst, formatLapTime, matchCircuit, metersPerDegree } from '../core';
+import {
+  type Circuit, type GeoLine, type LineCandidate, bearingDiff, detectLaps, findCrossings, formatJst, formatLapTime, lineBearing, lineMid,
+  lineMoveM, lineMovedTo, lineWithBearing, matchCircuit, metersPerDegree, rotateToward, shiftLine,
+} from '../core';
 import type { LoadedLog, Session } from '../store/session';
 import { customDialog } from './dialog';
 import type { MapFactory, MapLine, MapTrack, TrackMap } from './mapTypes';
@@ -13,7 +16,28 @@ import type { MapFactory, MapLine, MapTrack, TrackMap } from './mapTypes';
  * - 「地図で登録」の行 / 「あとで」の行
  * 各ファイルの行のステータスには、選んだ計測ラインでそのファイルがどうなるか(選択中 / 通る / 通らない)を出す。
  * 右上に、選んだ計測ラインの地図のプレビューを出す。候補はこの画面で名前を決めてそのまま登録する(登録画面は開かない)。
+ *
+ * 候補の計測ラインは、登録する前に「計測ラインを修正」で直せる(案件 15)。ダイアログの中身が修正の画面に切り替わり、
+ * 大きな地図で回転(角度の指定・両端のつまみ)と移動(中央のつまみ・矢印キー)ができる。「この位置にする」で元の画面に戻り、
+ * 直した線がプレビュー・各ファイルのステータス・登録に使われる。
  */
+
+/** 修正の画面: スライダーで回せる範囲(補正前からの差、度) */
+export const FIX_RANGE_DEG = 15;
+/** 修正の画面: 矢印キー 1 回の移動量(m。Shift で 10 倍) */
+export const FIX_STEP_M = 0.1;
+
+/** 角度の表示(0.1° 単位) */
+const fmtDeg = (d: number) => `${(Math.round(d * 10) / 10).toFixed(1)}°`;
+/** 角度の差の表示(+1.2° / −0.3° / 0.0°) */
+function fmtDiff(d: number): string {
+  const r = Math.round(d * 10) / 10;
+  return r === 0 ? '0.0°' : `${r > 0 ? '+' : '−'}${Math.abs(r).toFixed(1)}°`;
+}
+/** 補正の内容(「角度 +1.2°・移動 0.6 m」) */
+export function fixSummary(before: GeoLine, after: GeoLine): string {
+  return `角度 ${fmtDiff(bearingDiff(lineBearing(before), lineBearing(after)))}・移動 ${lineMoveM(before, after).toFixed(1)} m`;
+}
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
@@ -85,9 +109,8 @@ export function planLoad(session: Session, set: number, ids: string[], wasEmpty:
 }
 
 /** ファイルの行のステータス: 選んだもの(o)で、そのファイルがどうなるか */
-function statusOf(l: LoadedLog, o: LoadOption): { cls: 'ok' | 'ng' | 'cur' | ''; text: string } {
+function statusOf(l: LoadedLog, o: LoadOption, line: GeoLine | null): { cls: 'ok' | 'ng' | 'cur' | ''; text: string } {
   if (o.kind === 'cand' && o.log.id === l.id) return { cls: 'cur', text: '選択中' };
-  const line = lineOf(o);
   if (line) return crosses(l, line) ? { cls: 'ok', text: '通ります(ラップあり)' } : { cls: 'ng', text: '選択中の計測ラインを通りません(ラップ無し)' };
   if (o.kind === 'map') return o.log.id === l.id ? { cls: 'cur', text: '選択中(地図の場所)' } : { cls: '', text: '登録後に判定します' };
   if (l.circuit) return { cls: 'ok', text: `${l.circuit.name}(自動判定)` };
@@ -96,7 +119,7 @@ function statusOf(l: LoadedLog, o: LoadOption): { cls: 'ok' | 'ng' | 'cur' | '';
 }
 
 /** 一番上の枠: いま選んでいるもの */
-function currentHtml(o: LoadOption, name: string): string {
+function currentHtml(o: LoadOption, name: string, fixed: GeoLine | undefined): string {
   const line = (k: string, v: string) => `<div class="ld-cur-l"><span>${esc(k)}:</span> ${esc(v)}</div>`;
   let body: string;
   if (o.kind === 'cand') {
@@ -105,7 +128,9 @@ function currentHtml(o: LoadOption, name: string): string {
         ? '<div class="ld-cur-l">計算した計測ライン(1 周分のログの始点と終点から計算)</div>'
         : line('ファイル内のサーキット名', `${o.candidate.name || '(名前なし)'}(セクター ${o.candidate.sectors.length} 本)`))
       + `<label class="ld-cur-l ld-name"><span>登録するサーキット名:</span><input id="ld-name" type="text" value="${esc(name)}" placeholder="例: オートポリス" aria-label="登録するサーキット名"></label>
-        <div class="ld-cur-l ld-name-msg" id="ld-name-msg" role="status"></div>`;
+        <div class="ld-cur-l ld-name-msg" id="ld-name-msg" role="status"></div>`
+      + line('計測ライン', fixed ? `修正あり(${fixSummary(o.candidate.control, fixed)})`
+        : o.candidate.source === 'loop' ? '計算したまま(修正なし)' : 'ファイルのまま(修正なし)');
   } else if (o.kind === 'circuit') body = line('登録済みのサーキット', o.circuit.name);
   else if (o.kind === 'map') body = `<div class="ld-cur-l">地図で計測ラインを引いて登録(${esc(o.log.log.fileName)} の場所の地図が開きます)</div>`;
   else body = '<div class="ld-cur-l">あとで(未判定のまま)</div>';
@@ -115,9 +140,9 @@ function currentHtml(o: LoadOption, name: string): string {
 const radio = (o: LoadOption, cur: string, html: string) =>
   `<label class="ld-opt"><input type="radio" name="ld-opt" value="${esc(o.key)}"${o.key === cur ? ' checked' : ''}><span>${html}</span></label>`;
 
-function listHtml(plan: LoadPlan, cur: LoadOption): string {
+function listHtml(plan: LoadPlan, cur: LoadOption, line: GeoLine | null): string {
   const files = plan.logs.map((l) => {
-    const st = statusOf(l, cur);
+    const st = statusOf(l, cur, line);
     const len = l.log.t[(l.log.loop?.n ?? l.log.t.length) - 1] - l.log.t[0];
     const meta = `${l.log.startEpochMs ? formatJst(l.log.startEpochMs) : '日時不明'} ・ 長さ ${formatLapTime(len)}`;
     const own = plan.options.find((o) => o.kind === 'cand' && o.log.id === l.id);
@@ -175,13 +200,18 @@ export interface LoadDialogDeps {
   /** 同じ名前のサーキットが既にあるか */
   nameTaken?: (name: string) => boolean;
 }
-/** ダイアログの結果: 選んだもの(Esc なら「あとで」)と、候補を登録するときのサーキット名 */
-export interface LoadResult { option: LoadOption; name: string }
+/**
+ * ダイアログの結果: 選んだもの(Esc なら「あとで」)と、候補を登録するときのサーキット名。
+ * control は、候補の計測ラインを修正したときの、直した線(修正していなければ無し)
+ */
+export interface LoadResult { option: LoadOption; name: string; control?: GeoLine }
 
 /** 読み込みの確認ダイアログ */
 export function loadDialog(plan: LoadPlan, deps: LoadDialogDeps = {}, host: HTMLElement = document.body): Promise<LoadResult> {
   const later = plan.options.find((o) => o.kind === 'later')!;
   let map: TrackMap | null = null;
+  /** 修正の画面の地図 */
+  let fixMap: TrackMap | null = null;
   return customDialog<LoadResult>((box, close) => {
     box.classList.add('wide', 'ld');
     let cur = plan.options.find((o) => o.key === plan.initial) ?? later;
@@ -189,16 +219,26 @@ export function loadDialog(plan: LoadPlan, deps: LoadDialogDeps = {}, host: HTML
     const names = new Map<string, string>();
     const nameOf = (o: LoadOption) => o.kind !== 'cand' ? '' : names.get(o.key)
       ?? (o.candidate.name || o.log.log.fileName.replace(/\.vbo$/i, ''));
+    /** 候補ごとの、直した計測ライン(「この位置にする」で決めたもの。直していなければ無し) */
+    const fixes = new Map<string, GeoLine>();
+    /** 選んだものの計測ライン(直していれば、直した線) */
+    const lineFor = (o: LoadOption) => fixes.get(o.key) ?? lineOf(o);
     box.innerHTML = `<h3 id="ld-t">読み込んだ走行ログの確認</h3>
+      <div class="ld-main">
       <p>この比較セットで使う計測ライン(サーキット)を 1 つ選んでください。ほかのサーキットのログは、ラップの無いログとして入ります。</p>
-      <div class="ld-top"><div class="ld-cur" role="status"></div>${deps.mapFactory ? '<div class="ld-prev" aria-label="計測ラインのプレビュー"><div class="map"></div><div class="ld-prev-none" hidden></div><span class="seg sm ld-prev-mode" role="group" aria-label="プレビューの範囲"><button type="button" data-zoom="near" class="on" aria-pressed="true">計測ライン付近</button><button type="button" data-zoom="all" aria-pressed="false">セクター</button></span></div>' : ''}</div>
+      <div class="ld-top"><div class="ld-cur" role="status"></div>${deps.mapFactory ? '<div class="ld-prev" aria-label="計測ラインのプレビュー"><div class="map"></div><div class="ld-prev-none" hidden></div><button type="button" class="btn ld-prev-fix" data-fix="open" hidden>計測ラインを修正</button><span class="seg sm ld-prev-mode" role="group" aria-label="プレビューの範囲"><button type="button" data-zoom="near" class="on" aria-pressed="true">計測ライン付近</button><button type="button" data-zoom="all" aria-pressed="false">セクター</button></span></div>' : ''}</div>
       <div class="ld-list" role="radiogroup" aria-label="計測ライン(サーキット)の選択"></div>
-      <p class="ld-note">選んだ計測ラインを通るログは、まとめて判定されます。ファイルの計測ラインは、この画面でそのまま登録します(位置は、あとから「登録済みサーキット」の編集で直せます)。</p>
-      <div class="modal-actions"><button type="button" class="btn pri" data-dialog="ok"></button></div>`;
+      <p class="ld-note">選んだ計測ラインを通るログは、まとめて判定されます。ファイルの計測ラインは、この画面で登録します(向きや位置は、登録の前に「計測ラインを修正」で直せます)。</p>
+      </div>
+      <div class="ld-fix" hidden></div>
+      <div class="modal-actions"><button type="button" class="btn" data-fix="cancel" hidden disabled>キャンセル</button><button type="button" class="btn pri" data-fix="apply" hidden disabled>この位置にする</button><button type="button" class="btn pri" data-dialog="ok"></button></div>`;
     box.setAttribute('aria-labelledby', 'ld-t');
     const list = box.querySelector<HTMLElement>('.ld-list')!, head = box.querySelector<HTMLElement>('.ld-cur')!;
     const ok = box.querySelector<HTMLButtonElement>('[data-dialog="ok"]')!;
     const prevMap = box.querySelector<HTMLElement>('.ld-prev .map'), prevNone = box.querySelector<HTMLElement>('.ld-prev-none');
+    const fixBtn = box.querySelector<HTMLButtonElement>('.ld-prev-fix');
+    const main = box.querySelector<HTMLElement>('.ld-main')!, fixEl = box.querySelector<HTMLElement>('.ld-fix')!;
+    const fixCancel = box.querySelector<HTMLButtonElement>('[data-fix="cancel"]')!, fixApply = box.querySelector<HTMLButtonElement>('[data-fix="apply"]')!;
 
     /** プレビューの範囲: near = 計測ラインの付近、all = 「セクター」(1 周分の走行ラインとセクターが入る範囲) */
     let zoom: 'near' | 'all' = 'near';
@@ -213,22 +253,28 @@ export function loadDialog(plan: LoadPlan, deps: LoadDialogDeps = {}, host: HTML
       });
       preview();
     });
+    const accent = () => getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#1f6fd1';
     function preview() {
       if (!prevMap || !prevNone) return;
-      const line = lineOf(cur);
+      const line = lineFor(cur);
       prevNone.hidden = !!line;
       if (modeEl) modeEl.hidden = !line;
+      if (fixBtn) {
+        // 直せるのは計測ラインだけなので、「計測ライン付近」のときだけ押せる
+        fixBtn.hidden = cur.kind !== 'cand';
+        fixBtn.disabled = zoom !== 'near';
+        fixBtn.title = zoom === 'near' ? '' : '「計測ライン付近」に切り替えると、計測ラインを修正できます';
+      }
       prevNone.textContent = cur.kind === 'map' ? '計測ラインは、次の画面で地図に引きます' : 'プレビューはありません';
       if (!line) return;
       if (!map) { map = deps.mapFactory!(prevMap); }
       const sectors = cur.kind === 'cand' ? cur.candidate.sectors : cur.kind === 'circuit' ? cur.circuit.sectors : [];
       const lines: MapLine[] = [{ label: '計測ライン', line, kind: 'control' }, ...sectors.map((s, i) => ({ label: `S${i + 1}`, line: s, kind: 'sector' as const }))];
       map.setLines(lines);
-      const c = { lat: (line.a.lat + line.b.lat) / 2, lon: (line.a.lon + line.b.lon) / 2 };
+      const c = lineMid(line);
       const src = cur.kind === 'cand' ? cur.log : plan.logs.find((l) => crosses(l, line));
-      const color = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#1f6fd1';
       const runs = !src ? [] : zoom === 'all' ? [lapTrack(src, line)] : trackNear(src, c);
-      const tracks: MapTrack[] = runs.map((points) => ({ slot: 'A', points, color }));
+      const tracks: MapTrack[] = runs.map((points) => ({ slot: 'A', points, color: accent() }));
       map.setTracks(tracks);
       map.invalidate();
       if (zoom === 'all') {
@@ -248,13 +294,139 @@ export function loadDialog(plan: LoadPlan, deps: LoadDialogDeps = {}, host: HTML
     }
     /** 文字の部分(上の枠・一覧・ボタン)。地図のプレビューは preview() */
     const renderText = () => {
-      head.innerHTML = currentHtml(cur, nameOf(cur));
-      list.innerHTML = listHtml(plan, cur);
+      head.innerHTML = currentHtml(cur, nameOf(cur), fixes.get(cur.key));
+      list.innerHTML = listHtml(plan, cur, lineFor(cur));
       ok.textContent = cur.kind === 'later' ? '閉じる' : cur.kind === 'circuit' ? 'このサーキットを使う'
         : cur.kind === 'cand' ? 'この計測ラインで登録' : '次へ(地図で登録)';
       checkName();
     };
     const render = () => { renderText(); preview(); };
+
+    // ---------- 計測ラインの修正(案件 15) ----------
+    /** 修正中の候補: before = 候補の線(補正前)、line = いまの線 */
+    let fixing: { o: Extract<LoadOption, { kind: 'cand' }>; before: GeoLine; line: GeoLine } | null = null;
+    const $f = <T extends HTMLElement>(sel: string) => fixEl.querySelector<T>(sel)!;
+    function openFix() {
+      if (cur.kind !== 'cand' || zoom !== 'near') return;
+      const before = cur.candidate.control;
+      fixing = { o: cur, before, line: fixes.get(cur.key) ?? before };
+      const src = cur.candidate.source === 'loop' ? '計算した計測ライン' : `ファイル内の計測ライン${cur.candidate.name ? `「${esc(cur.candidate.name)}」` : ''}`;
+      fixEl.innerHTML = `<div class="ld-fix-h">計測ラインの修正<span>${src}(${esc(cur.log.log.fileName)})・登録前</span></div>
+        <div class="ld-fix-body">
+          <div class="ld-fix-map"><div class="map"></div></div>
+          <div class="ld-fix-side">
+            <div class="ld-fix-g"><div class="ld-fix-gh">角度</div><div class="sub">北から時計回り(0.1° 刻み)</div>
+              <input type="range" class="slider ld-fix-range" min="${-FIX_RANGE_DEG}" max="${FIX_RANGE_DEG}" step="0.1" aria-label="角度(補正前からの差)">
+              <div class="ld-fix-ang"><input type="number" class="ld-fix-deg" step="0.1" min="0" max="359.9" aria-label="角度(度)"><span>°</span>
+                <button type="button" class="ib" data-fix="dec" aria-label="角度を 0.1° 小さく" title="−0.1°">−</button><button type="button" class="ib" data-fix="inc" aria-label="角度を 0.1° 大きく" title="+0.1°">+</button></div>
+              <dl class="ld-fix-tbl"><dt>補正前</dt><dd class="ld-fix-b0"></dd><dt>補正後</dt><dd class="ld-fix-b1"></dd><dt>差</dt><dd class="ld-fix-d"></dd></dl></div>
+            <div class="ld-fix-g"><div class="ld-fix-gh">移動</div><div class="sub">中央のつまみをドラッグするか、矢印キーで動かします(Shift で 10 倍)</div>
+              <dl class="ld-fix-tbl"><dt>補正前から</dt><dd class="ld-fix-mv"></dd></dl></div>
+            <div class="sub">両端のつまみをドラッグしても回せます(長さは変わりません)</div>
+            <button type="button" class="btn ld-fix-reset" data-fix="reset">補正前に戻す</button>
+          </div>
+        </div>
+        <div class="ld-fix-leg"><span><i class="after"></i>補正後</span><span><i class="before"></i>補正前</span></div>`;
+      // 元の画面の入力欄は消しておく(隠れた入力欄にフォーカスが移らないように。戻るときに作り直す)
+      head.innerHTML = ''; list.innerHTML = '';
+      main.hidden = true; fixEl.hidden = false;
+      ok.hidden = true; ok.disabled = true;
+      for (const b of [fixCancel, fixApply]) { b.hidden = false; b.disabled = false; }
+      if (deps.mapFactory) {
+        fixMap = deps.mapFactory($f('.ld-fix-map .map'));
+        const c = lineMid(fixing.line);
+        fixMap.setTracks(trackNear(cur.log, lineMid(before)).map((points) => ({ slot: 'A', points, color: accent() })));
+        fixMap.invalidate();
+        fixMap.setView(c.lat, c.lon, 19);
+      }
+      drawFix(true);
+      $f<HTMLInputElement>('.ld-fix-deg').focus();
+    }
+    /** 修正の画面を閉じて、元の画面に戻る。apply = 「この位置にする」 */
+    function closeFix(apply: boolean) {
+      if (!fixing) return;
+      if (apply) {
+        const same = lineMoveM(fixing.before, fixing.line) < 0.005 && Math.abs(bearingDiff(lineBearing(fixing.before), lineBearing(fixing.line))) < 0.005;
+        if (same) fixes.delete(fixing.o.key); else fixes.set(fixing.o.key, fixing.line);
+      }
+      fixing = null;
+      fixMap?.destroy(); fixMap = null;
+      fixEl.innerHTML = ''; fixEl.hidden = true; main.hidden = false;
+      for (const b of [fixCancel, fixApply]) { b.hidden = true; b.disabled = true; }
+      ok.hidden = false;
+      render();
+      fixBtn?.focus();
+    }
+    /** 修正の画面の地図と数字。handles = つまみも置き直す(ドラッグ中は置き直さない)。src = いま操作している入力欄(値を書き換えない) */
+    function drawFix(handles: boolean, src?: HTMLElement) {
+      if (!fixing) return;
+      const { before, line } = fixing;
+      fixMap?.setLines([
+        { label: '補正前', line: before, kind: 'control', before: true },
+        { label: '計測ライン', line, kind: 'control', selected: true },
+      ]);
+      if (handles && fixMap) {
+        const m = lineMid(line);
+        fixMap.setHandles([
+          { id: 'a', lat: line.a.lat, lon: line.a.lon }, { id: 'b', lat: line.b.lat, lon: line.b.lon }, { id: 'm', lat: m.lat, lon: m.lon, mid: true },
+        ], onFixHandle);
+      }
+      const b0 = lineBearing(before), b1 = lineBearing(line), d = bearingDiff(b0, b1);
+      $f('.ld-fix-b0').textContent = fmtDeg(b0);
+      $f('.ld-fix-b1').textContent = fmtDeg(b1);
+      $f('.ld-fix-d').textContent = fmtDiff(d);
+      $f('.ld-fix-mv').textContent = `${lineMoveM(before, line).toFixed(1)} m`;
+      const deg = $f<HTMLInputElement>('.ld-fix-deg');
+      if (src !== deg) deg.value = (Math.round(b1 * 10) / 10 % 360).toFixed(1);
+      const range = $f<HTMLInputElement>('.ld-fix-range');
+      if (src !== range) range.value = String(Math.max(-FIX_RANGE_DEG, Math.min(FIX_RANGE_DEG, Math.round(d * 10) / 10)));
+    }
+    function setFixLine(line: GeoLine, handles = true, src?: HTMLElement) {
+      if (!fixing) return;
+      fixing.line = line;
+      drawFix(handles, src);
+    }
+    function onFixHandle(id: string, lat: number, lon: number, final: boolean) {
+      if (!fixing) return;
+      const p = { lat, lon };
+      setFixLine(id === 'm' ? lineMovedTo(fixing.line, p) : rotateToward(fixing.line, id === 'a' ? 'a' : 'b', p), final);
+    }
+    const setBearing = (deg: number, src?: HTMLElement) => {
+      if (fixing && Number.isFinite(deg)) setFixLine(lineWithBearing(fixing.line, deg), true, src);
+    };
+    // スライダーは動かしている間も回す(スライダー自身の値は書き換えない)。数値入力は確定(Enter・フォーカスを外す)で回す
+    fixEl.addEventListener('input', (e) => {
+      const t = e.target as HTMLInputElement;
+      if (fixing && t.classList.contains('ld-fix-range')) setBearing(lineBearing(fixing.before) + Number(t.value), t);
+    });
+    fixEl.addEventListener('change', (e) => {
+      const t = e.target as HTMLInputElement;
+      if (fixing && t.classList.contains('ld-fix-deg')) setBearing(Number(t.value));
+    });
+    box.addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLElement>('[data-fix]');
+      if (!b) return;
+      const act = b.dataset.fix;
+      if (act === 'open') openFix();
+      else if (act === 'cancel') closeFix(false);
+      else if (act === 'apply') closeFix(true);
+      else if (!fixing) return;
+      else if (act === 'reset') setFixLine(fixing.before);
+      else if (act === 'dec' || act === 'inc') setBearing(lineBearing(fixing.line) + (act === 'inc' ? 0.1 : -0.1));
+    });
+    box.addEventListener('keydown', (e) => {
+      if (!fixing) return;
+      // 修正の画面の Esc は、修正をやめて元の画面に戻る(ダイアログは閉じない)
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeFix(false); return; }
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if ((e.target as HTMLElement).tagName === 'INPUT') return;               // スライダー・数値入力の矢印キーは、そちらで使う
+      const k = (e.shiftKey ? 10 : 1) * FIX_STEP_M;
+      const d = ({ ArrowUp: [0, k], ArrowDown: [0, -k], ArrowRight: [k, 0], ArrowLeft: [-k, 0] } as Record<string, [number, number]>)[e.key];
+      if (!d) return;
+      e.preventDefault();
+      setFixLine(shiftLine(fixing.line, d[0], d[1]));
+    });
+
     box.addEventListener('input', (e) => {
       const t = e.target as HTMLInputElement;
       if (t.id !== 'ld-name' || cur.kind !== 'cand') return;
@@ -268,11 +440,14 @@ export function loadDialog(plan: LoadPlan, deps: LoadDialogDeps = {}, host: HTML
       render();
       box.querySelector<HTMLInputElement>(`input[name="ld-opt"][value="${cur.key.replace(/["\\]/g, '\\$&')}"]`)?.focus();
     });
-    const finish = (o: LoadOption) => { map?.destroy(); map = null; close({ option: o, name: nameOf(o).trim() }); };
+    const finish = (o: LoadOption) => {
+      map?.destroy(); map = null;
+      close({ option: o, name: nameOf(o).trim(), ...(fixes.has(o.key) ? { control: fixes.get(o.key) } : {}) });
+    };
     ok.addEventListener('click', () => { if (!ok.disabled) finish(cur); });
     // 地図は、ダイアログが画面に入ってから作る(大きさが決まってから)
     renderText();
     setTimeout(preview, 0);
     return ok;
-  }, { option: later, name: '' }, host).finally(() => { map?.destroy(); map = null; });
+  }, { option: later, name: '' }, host).finally(() => { map?.destroy(); map = null; fixMap?.destroy(); fixMap = null; });
 }

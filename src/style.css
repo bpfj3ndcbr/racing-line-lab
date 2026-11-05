@@ -609,6 +609,30 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .ld-prev-none{position:absolute;inset:0;z-index:1200;display:flex;align-items:center;justify-content:center;padding:12px;text-align:center;
   color:var(--muted);background:var(--sec-bg)}
 .ld-prev-none[hidden]{display:none}
+.ld-prev-fix{position:absolute;z-index:1100;top:6px;left:6px;min-height:28px;height:28px;padding:0 9px;font-size:11px}
+/* 計測ラインの修正(案件 15): 確認ダイアログの中身を切り替える */
+.ld-fix-h{font-weight:700;margin:2px 0 8px}
+.ld-fix-h span{font-weight:400;color:var(--muted);margin-left:8px}
+.ld-fix-body{display:flex;gap:12px;align-items:stretch}
+.ld-fix-map{position:relative;flex:1;min-width:0;height:420px;max-height:calc(100vh - 260px);min-height:240px;overflow:hidden;
+  border:1px solid var(--border-strong);border-radius:var(--r-l);background:var(--surface-2)}
+.ld-fix-map .map{position:absolute;inset:0}
+.ld-fix-side{flex:none;width:250px;display:flex;flex-direction:column;gap:10px}
+.ld-fix-g{padding:8px 10px;border:1px solid var(--border);border-radius:var(--r-l);background:var(--sec-bg)}
+.ld-fix-gh{font-weight:700;margin-bottom:2px}
+.ld-fix-side .sub{color:var(--muted);font-size:12px}
+.ld-fix-range{width:100%;margin-top:6px}
+.ld-fix-ang{display:flex;align-items:center;gap:6px;margin-top:4px}
+.ld-fix-ang .ib{min-height:28px;height:28px}
+.ld-fix-deg{width:80px;min-height:28px;padding:0 6px;color:var(--text);background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r-m);
+  font-variant-numeric:tabular-nums}
+.ld-fix-tbl{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;margin:6px 0 0}
+.ld-fix-tbl dt{color:var(--muted)}
+.ld-fix-tbl dd{margin:0;font-weight:700;font-variant-numeric:tabular-nums}
+.ld-fix-reset{align-self:flex-start}
+.ld-fix-leg{display:flex;gap:16px;margin-top:6px;font-size:12px;color:var(--muted)}
+.ld-fix-leg i{display:inline-block;width:24px;height:0;vertical-align:middle;margin-right:5px;border-top:3px solid #00e5ff}
+.ld-fix-leg i.before{border-top:3px dashed #9a9a9a}
 .ld-name{display:flex;align-items:center;gap:8px;margin-top:6px}
 .ld-name input{flex:1;min-width:0;max-width:280px;min-height:30px;padding:0 8px;color:var(--text);background:var(--surface);
   border:1px solid var(--border-strong);border-radius:var(--r-m)}

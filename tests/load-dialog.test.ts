@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest';
-import { formatCln, metersPerDegree } from '../src/core';
+import { distanceM, formatCln, lineBearing, lineMid, metersPerDegree } from '../src/core';
 import { MemoryStore } from '../src/io/storage';
 import { Session } from '../src/store/session';
 import { mountApp } from '../src/ui/app';
@@ -213,5 +213,146 @@ describe('読み込みの確認ダイアログ', () => {
     const b = session.sets[0].logs[1];
     expect(b.outside?.name).toBe('サーキットA');
     expect(root.querySelector('#sec-set-0')!.textContent).toContain('この比較セットのサーキット(サーキットA)の計測ラインを通らない');
+  });
+});
+
+describe('計測ラインの修正(案件 15)', () => {
+  const fixEl = () => $('.modal.ld .ld-fix');
+  const val = (cls: string) => $(`.ld-fix .${cls}`).textContent;
+  const setNum = (deg: number) => {
+    const n = $<HTMLInputElement>('.ld-fix-deg');
+    n.value = String(deg);
+    n.dispatchEvent(new Event('change', { bubbles: true }));
+  };
+  const key = (k: string, shiftKey = false) =>
+    fixEl().dispatchEvent(new KeyboardEvent('keydown', { key: k, shiftKey, bubbles: true, cancelable: true }));
+  async function openFix() {
+    drop(0, [file('rc.vbo', vboText(A, true)), file('plain.vbo', vboText(A, false))]);
+    await flush(); await flush();
+    $<HTMLButtonElement>('.ld-prev-fix').click();
+    return maps.at(-1)!;
+  }
+
+  it('「計測ラインを修正」は候補を選んだときだけ。押すと、ダイアログの中身が修正の画面に切り替わる', async () => {
+    drop(0, [file('rc.vbo', vboText(A, true))]);
+    await flush(); await flush();
+    expect($('.ld-prev-fix').hidden).toBe(false);
+    expect($('.ld-cur').textContent).toContain('計測ライン: ファイルのまま(修正なし)');
+    // 「セクター」のときは押せない(直せるのは計測ラインだけ)
+    $<HTMLButtonElement>('.ld-prev-mode [data-zoom="all"]').click();
+    expect($<HTMLButtonElement>('.ld-prev-fix').disabled).toBe(true);
+    expect($('.ld-prev-fix').title).toContain('「計測ライン付近」に切り替えると');
+    $<HTMLButtonElement>('.ld-prev-mode [data-zoom="near"]').click();
+    expect($<HTMLButtonElement>('.ld-prev-fix').disabled).toBe(false);
+    pick('map');
+    expect($('.ld-prev-fix').hidden).toBe(true);
+    pick('later');
+    expect($('.ld-prev-fix').hidden).toBe(true);
+    pick(document.querySelector<HTMLInputElement>('.modal.ld input[value^="cand:"]')!.value);
+    const n = maps.length;
+    $<HTMLButtonElement>('.ld-prev-fix').click();
+    expect($('.modal.ld .ld-main').hidden).toBe(true);
+    expect(fixEl().hidden).toBe(false);
+    expect(fixEl().textContent).toContain('計測ラインの修正');
+    expect(ok().hidden).toBe(true);
+    expect($<HTMLButtonElement>('[data-fix="apply"]').hidden).toBe(false);
+    expect(document.querySelector('.modal.ld input[name="ld-opt"]')).toBeNull();         // 元の画面の入力欄は残さない
+    // 大きな地図: 補正前(灰色の破線)と補正後の線、つまみ 3 つ、拡大率 Z19
+    expect(maps).toHaveLength(n + 1);
+    const fm = maps.at(-1)!;
+    expect(fm.lines.map((l) => [l.label, !!l.before, !!l.selected])).toEqual([['補正前', true, false], ['計測ライン', false, true]]);
+    expect(fm.handles.map((h) => h.id)).toEqual(['a', 'b', 'm']);
+    expect(fm.view.zoom).toBe(19);
+    expect(fm.tracks.length).toBeGreaterThan(0);
+    expect(val('ld-fix-b0')).toBe('0.0°');                                                 // 人工のログの線は北向き
+    expect(val('ld-fix-d')).toBe('0.0°');
+    expect(val('ld-fix-mv')).toBe('0.0 m');
+  });
+
+  it('角度は、数値入力・スライダー・[−][+] で変えられ、補正前・補正後・差を出す(北から時計回り)', async () => {
+    const fm = await openFix();
+    setNum(2.5);
+    expect(val('ld-fix-b1')).toBe('2.5°');
+    expect(val('ld-fix-d')).toBe('+2.5°');
+    expect($<HTMLInputElement>('.ld-fix-range').value).toBe('2.5');
+    expect(lineBearing(fm.lines[1].line)).toBeCloseTo(2.5, 6);
+    $<HTMLButtonElement>('[data-fix="inc"]').click();
+    expect(val('ld-fix-b1')).toBe('2.6°');
+    $<HTMLButtonElement>('[data-fix="dec"]').click();
+    $<HTMLButtonElement>('[data-fix="dec"]').click();
+    expect(val('ld-fix-b1')).toBe('2.4°');
+    const r = $<HTMLInputElement>('.ld-fix-range');
+    r.value = '-3';
+    r.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(val('ld-fix-b1')).toBe('357.0°');
+    expect(val('ld-fix-d')).toBe('−3.0°');
+    expect($<HTMLInputElement>('.ld-fix-deg').value).toBe('357.0');
+    // 長さと中心は変わらない
+    expect(distanceM(fm.lines[1].line.a, fm.lines[1].line.b)).toBeCloseTo(distanceM(fm.lines[0].line.a, fm.lines[0].line.b), 3);
+    expect(val('ld-fix-mv')).toBe('0.0 m');
+  });
+
+  it('つまみ: 両端で回し(長さはそのまま)、中央で動かす。矢印キーでも動かせる(Shift で 10 倍)', async () => {
+    const fm = await openFix();
+    const before = fm.lines[0].line, c = lineMid(before), m = metersPerDegree(c.lat);
+    fm.moveHandle('b', c.lat, c.lon + 30 / m.lon);                                       // 中心の東へ
+    expect(val('ld-fix-b1')).toBe('90.0°');
+    expect(distanceM(fm.lines[1].line.a, fm.lines[1].line.b)).toBeCloseTo(distanceM(before.a, before.b), 3);
+    expect(fm.handles.find((h) => h.id === 'b')!.lon).toBeCloseTo(c.lon + distanceM(before.a, before.b) / 2 / m.lon, 7);   // つまみは線の端に置き直す
+    fm.moveHandle('m', c.lat + 2 / m.lat, c.lon);
+    expect(val('ld-fix-mv')).toBe('2.0 m');
+    expect(val('ld-fix-b1')).toBe('90.0°');
+    key('ArrowDown');
+    expect(val('ld-fix-mv')).toBe('1.9 m');
+    key('ArrowDown', true);
+    expect(val('ld-fix-mv')).toBe('0.9 m');
+  });
+
+  it('「この位置にする」で元の画面に戻り、直した線でプレビュー・登録する', async () => {
+    await openFix();
+    setNum(4);
+    $<HTMLButtonElement>('[data-fix="apply"]').click();
+    expect(fixEl().hidden).toBe(true);
+    expect($('.modal.ld .ld-main').hidden).toBe(false);
+    expect(ok().hidden).toBe(false);
+    expect(ok().disabled).toBe(false);
+    expect($('.ld-cur').textContent).toContain('計測ライン: 修正あり(角度 +4.0°・移動 0.0 m)');
+    expect(statusOf('plain.vbo')).toBe('通ります(ラップあり)');
+    await flush();
+    const prev = maps[0];
+    expect(lineBearing(prev.lines[0].line)).toBeCloseTo(4, 6);
+    // もう一度開くと、直した線から続けられる(補正前は候補の線のまま)
+    $<HTMLButtonElement>('.ld-prev-fix').click();
+    expect(val('ld-fix-b0')).toBe('0.0°');
+    expect(val('ld-fix-b1')).toBe('4.0°');
+    $<HTMLButtonElement>('[data-fix="apply"]').click();
+    ok().click();
+    await flush();
+    expect(dialog()).toBeNull();
+    expect(lineBearing(session.circuits[0].control!)).toBeCloseTo(4, 1);                 // 保存の丸め(7 桁)で、ずれは 0.02° ほど
+    expect(session.sets[0].logs.map((l) => l.circuit?.name)).toEqual(['テストサーキット', 'テストサーキット']);
+  });
+
+  it('「キャンセル」と Esc は修正をやめて元の画面に戻る(ダイアログは閉じない)。「補正前に戻す」で戻した線は、修正なし', async () => {
+    await openFix();
+    setNum(10);
+    $<HTMLButtonElement>('[data-fix="cancel"]').click();
+    expect(fixEl().hidden).toBe(true);
+    expect($('.ld-cur').textContent).toContain('ファイルのまま(修正なし)');
+    $<HTMLButtonElement>('.ld-prev-fix').click();
+    expect(val('ld-fix-b1')).toBe('0.0°');
+    setNum(10);
+    key('Escape');
+    expect(dialog()).not.toBeNull();
+    expect(fixEl().hidden).toBe(true);
+    expect($('.ld-cur').textContent).toContain('ファイルのまま(修正なし)');
+    $<HTMLButtonElement>('.ld-prev-fix').click();
+    setNum(10);
+    key('ArrowUp');
+    $<HTMLButtonElement>('[data-fix="reset"]').click();
+    expect(val('ld-fix-d')).toBe('0.0°');
+    expect(val('ld-fix-mv')).toBe('0.0 m');
+    $<HTMLButtonElement>('[data-fix="apply"]').click();
+    expect($('.ld-cur').textContent).toContain('ファイルのまま(修正なし)');
   });
 });

@@ -1,7 +1,7 @@
 import type { GeoLine } from './geo';
 
 /**
- * (書き出しは formatCln / formatSci。読み込みと同じ形式で、小数 6 桁・CRLF 改行)
+ * (書き出しは formatCln / formatSci。読み込みと同じ形式で、CRLF 改行。ファイルは小数 6 桁、アプリ内の登録は 7 桁)
  * デジスパイスの .cln(コントロールライン)/ .sci(セクターライン)パーサ。
  *
  * .cln : 1行目=ライン本数、続けて 緯度1,経度1,緯度2,経度2 を1行ずつ(推測。サンプルは本数1)
@@ -40,22 +40,28 @@ export function parseSci(text: string): SectorLine[] {
   return out;
 }
 
-const f6 = (v: number) => v.toFixed(6);
+/** 書き出すファイル(.cln / .sci)の、緯度・経度の小数の桁(約 10 cm) */
+export const FILE_DIGITS = 6;
+/**
+ * アプリ内で保存するラインの、緯度・経度の小数の桁(約 1 cm)。長さ 36.8 m の線を 0.1° 刻みで回せるように、
+ * ファイルより 1 桁多くしている(6 桁では、丸めで角度が最大 0.2° ほど変わるため。案件 15)
+ */
+export const LINE_DIGITS = 7;
 const CRLF = '\r\n';
-const row = (l: GeoLine) => [f6(l.a.lat), f6(l.a.lon), f6(l.b.lat), f6(l.b.lon)];
+const row = (l: GeoLine, d: number) => [l.a.lat, l.a.lon, l.b.lat, l.b.lon].map((v) => v.toFixed(d));
 
-/** .cln の中身: 1行目 = 本数、続けて 緯度1・経度1・緯度2・経度2 を 1 行ずつ(parseCln と同じ形式) */
-export function formatCln(lines: GeoLine[]): string {
-  return [String(lines.length), ...lines.flatMap(row)].join(CRLF) + CRLF;
+/** .cln の中身: 1行目 = 本数、続けて 緯度1・経度1・緯度2・経度2 を 1 行ずつ(parseCln と同じ形式)。digits = 小数の桁 */
+export function formatCln(lines: GeoLine[], digits = FILE_DIGITS): string {
+  return [String(lines.length), ...lines.flatMap((l) => row(l, digits))].join(CRLF) + CRLF;
 }
 
-/** .sci の中身: 1 行 1 ライン「緯度1,経度1,緯度2,経度2,フラグ」(parseSci と同じ形式) */
-export function formatSci(lines: GeoLine[], flag = 1): string {
-  return lines.map((l) => [...row(l), String(flag)].join(',')).join(CRLF) + (lines.length ? CRLF : '');
+/** .sci の中身: 1 行 1 ライン「緯度1,経度1,緯度2,経度2,フラグ」(parseSci と同じ形式)。digits = 小数の桁 */
+export function formatSci(lines: GeoLine[], flag = 1, digits = FILE_DIGITS): string {
+  return lines.map((l) => [...row(l, digits), String(flag)].join(',')).join(CRLF) + (lines.length ? CRLF : '');
 }
 
-/** ファイルに書いたときと同じ桁(6 桁)に丸める。保存するラインはこの値にそろえる */
+/** アプリ内で保存するときの桁(LINE_DIGITS)に丸める。保存するラインはこの値にそろえる */
 export const roundLine = (l: GeoLine): GeoLine => {
-  const r = (v: number) => Number(f6(v));
+  const r = (v: number) => Number(v.toFixed(LINE_DIGITS));
   return { a: { lat: r(l.a.lat), lon: r(l.a.lon) }, b: { lat: r(l.b.lat), lon: r(l.b.lon) } };
 };
