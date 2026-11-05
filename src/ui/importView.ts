@@ -65,8 +65,7 @@ function setHtml(i: number): string {
         <summary class="sec-h"><span class="chev" aria-hidden="true"></span><h2>比較セット${i + 1}</h2><span class="badge set-badge"></span>
           <label class="set-radio"><input type="radio" name="active-set" data-active-set="${i}"> 表示セット</label><span class="set-alias" data-set="${i}"></span><span class="grow"></span>${hint}</summary>
         <div class="sec-body">
-          <div class="toolbar set-circuit"></div>
-          <div class="toolbar set-bar"></div>
+          <div class="set-tools"><div class="toolbar set-circuit"></div><div class="toolbar set-bar"></div></div>
           <div class="set-hint" hidden></div>
           <div class="set-drop"></div>
           <div class="files"></div>

@@ -528,6 +528,12 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .set-sec.set-active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
 .set-sec.set-active .set-radio{background:var(--accent);color:var(--accent-on);border-color:var(--accent)}
 .set-sec .toolbar.set-circuit{padding-bottom:0}
+/* 比較セットの「使用するサーキット」とボタン: 小さめにして、幅があれば 1 列に並べる */
+.set-tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
+.set-tools .toolbar{gap:8px}
+.set-tools .btn,.set-tools select,.set-tools .seg button{min-height:30px;height:30px;font-size:12px}
+.set-tools .btn,.set-tools .seg button{padding:0 10px}
+.set-tools select{max-width:260px}
 
 .cmp-set{display:flex;align-items:center;gap:6px;font-size:11px}
 .cmp-set select{flex:1;min-width:0}
