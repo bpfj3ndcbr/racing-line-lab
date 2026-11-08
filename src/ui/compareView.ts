@@ -26,7 +26,7 @@ export interface CompareDeps {
 export interface CompareView {
   show(): void; hide(): void; readonly engine: PlaybackEngine;
   /** 設定タブで初期値が変わったとき、その項目を比較画面にも反映する(「記憶する」項目は何もしない) */
-  applyPref(key: PrefKey | 'yMin' | 'startPos' | 'autoLoad'): void;
+  applyPref(key: PrefKey | 'yRange' | 'startPos' | 'autoLoad'): void;
 }
 
 const RATES = RATE_CHOICES;
@@ -779,14 +779,14 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   setPressed('[data-act="xkind"]', (b) => b.dataset.kind === xKind);
   engine.setRate(prefs.initial('rate'));
   setPressed('[data-act="rate"]', (b) => Number(b.dataset.rate) === engine.rate);
-  graph.setYMin(prefs.yMin);
+  graph.setYRange(prefs.yMin, prefs.yMax);
   syncFollowButtons();
   syncLabelBtn();
   renderLegend();
   syncModeUi();
 
-  function applyPref(key: PrefKey | 'yMin' | 'startPos' | 'autoLoad') {
-    if (key === 'yMin') { graph.setYMin(prefs.yMin); return; }
+  function applyPref(key: PrefKey | 'yRange' | 'startPos' | 'autoLoad') {
+    if (key === 'yRange') { graph.setYRange(prefs.yMin, prefs.yMax); return; }
     if (key === 'startPos') { if (visible && cars.length) applyInitialView(); return; }
     if (key === 'autoLoad') return;
     if (prefs.get(key).remember) return;                       // 「記憶する」の項目は、前回の状態のまま

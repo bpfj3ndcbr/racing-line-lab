@@ -1,10 +1,15 @@
-import { Prefs, RATE_CHOICES, YMIN_CHOICES, ZOOM_CHOICES, type PrefKey, type PrefValues } from '../store/prefs';
+import { Prefs, RATE_CHOICES, SPEED_RANGE, ZOOM_CHOICES, type PrefKey, type PrefValues } from '../store/prefs';
 
 const ZOOM_STOPS = [0, ...ZOOM_CHOICES];   // スライダーの位置 → 倍率(0 = サーキット全体)
 const zoomText = (z: number) => (z === 0 ? 'サーキット全体' : `Z${z}`);
+/** 速度レンジの最高速度のつまみの文字(右端は「自動」) */
+const hiText = (v: number) => (v >= SPEED_RANGE.max ? '自動' : `${v} km/h`);
+const rangeText = (lo: number, hi: number) => (hi >= SPEED_RANGE.max ? `${lo} km/h 〜 自動` : `${lo} 〜 ${hi} km/h`);
+/** バーの上の位置(0〜1) */
+const rangePos = (v: number) => (v - SPEED_RANGE.min) / (SPEED_RANGE.max - SPEED_RANGE.min);
 
 type Opt = { v: string; label: string };
-type Plain = { name: string; kind: 'ymin' | 'startpos' | 'autoload' | 'analytics'; hint?: string };
+type Plain = { name: string; kind: 'yrange' | 'startpos' | 'autoload' | 'analytics'; hint?: string };
 type Row =
   | { key: PrefKey; name: string; kind: 'seg'; opts: Opt[]; hint?: string }
   | { key: PrefKey; name: string; kind: 'switch'; on: string; off: string; hint?: string }
@@ -23,7 +28,7 @@ const GROUPS: { title: string; rows: (Row | Plain)[] }[] = [
       hint: '割り当ての無い枠を選んだときは「固定」になります。' },
   ] },
   { title: '速度グラフ', rows: [
-    { name: '最低速度', kind: 'ymin', hint: '縦軸の下限です。最高速度は走行データに合わせて自動で決まります。' },
+    { name: '速度レンジ', kind: 'yrange', hint: '縦軸の範囲です。左のつまみで最低速度、右のつまみで最高速度を決めます。最高速度を右端にすると「自動」(走行データに合わせて決まります)。' },
     { key: 'xKind', name: '横軸', kind: 'seg', opts: [{ v: 'dist', label: '距離' }, { v: 'time', label: '時間' }],
       hint: '「距離」のときは、地図の再生も距離ベースになります(全車が、基準の車と同じ走行距離の位置に出て、速度だけを比べます)。「時間」のときは、全車が同じ経過時間の位置に出て、タイム差も出ます。' },
   ] },
@@ -45,7 +50,7 @@ const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
  * 設定タブ。各項目は「最初の状態」を選ぶ。「最後の状態を記憶する」にチェックすると、その項目は前回の状態で始まるので、
  * 選ぶ部分は押せなくなる。
  */
-export function mountSettingsView(root: HTMLElement, prefs: Prefs, onChange: (key: PrefKey | 'yMin' | 'startPos' | 'autoLoad' | 'analytics') => void, onFactoryReset: () => void = () => {}): { refresh(): void } {
+export function mountSettingsView(root: HTMLElement, prefs: Prefs, onChange: (key: PrefKey | 'yRange' | 'startPos' | 'autoLoad' | 'analytics') => void, onFactoryReset: () => void = () => {}): { refresh(): void } {
   let resetArmed = false;
   let wipeArmed = false;
 
@@ -85,10 +90,16 @@ export function mountSettingsView(root: HTMLElement, prefs: Prefs, onChange: (ke
           return `<div class="srow"><div class="sname">${r.name}</div><div class="sctl"><button type="button" role="switch" class="switch${on ? ' on' : ''}" data-analytics aria-checked="${on}" aria-label="${r.name}"${can ? '' : ' disabled'}><i></i></button>`
             + `<span class="swl">${on ? '送信する' : '送信しない'}${can ? '' : '(デスクトップ版では送りません)'}</span></div><div class="srem"></div>${r.hint ? `<div class="shint">${r.hint}</div>` : ''}</div>`;
         }
-        if (r.kind === 'ymin') {
+        if (r.kind === 'yrange') {
+          const { min, max, step } = SPEED_RANGE, lo = prefs.yMin, hi = prefs.yMax ?? max;
+          const input = (which: 'min' | 'max', v: number, label: string, text: string) =>
+            `<input type="range" data-yrange="${which}"${which === 'min' && rangePos(v) > 0.5 ? ' class="top"' : ''} min="${min}" max="${max}" step="${step}" value="${v}" aria-label="${label}" aria-valuetext="${text}">`;
+          const ticks = [0, 100, 200, 300, max].map((v) => `<span style="--at:${rangePos(v)}">${v >= max ? '自動' : v}</span>`).join('');
           return `<div class="srow"><div class="sname">${r.name}</div><div class="sctl">
-            <input type="range" class="slider" data-ymin min="${YMIN_CHOICES.min}" max="${YMIN_CHOICES.max}" step="${YMIN_CHOICES.step}" value="${prefs.yMin}" aria-label="最低速度" aria-valuetext="${prefs.yMin} km/h">
-            <span class="swl" data-ymin-text>${prefs.yMin} km/h</span></div><div class="srem"></div>${r.hint ? `<div class="shint">${r.hint}</div>` : ''}</div>`;
+            <div class="yrange"><div class="yrange-bar" style="--lo:${rangePos(lo)};--hi:${rangePos(hi)}"><div class="yrange-trk"></div><div class="yrange-fill"></div>
+              ${input('min', lo, '最低速度', `${lo} km/h`)}${input('max', hi, '最高速度', hiText(hi))}</div>
+              <div class="yrange-ticks" aria-hidden="true">${ticks}</div></div>
+            <span class="swl" data-yrange-text>${rangeText(lo, hi)}</span></div><div class="srem"></div>${r.hint ? `<div class="shint">${r.hint}</div>` : ''}</div>`;
         }
         if (!('key' in r)) return '';
         const it = prefs.get(r.key);
@@ -137,7 +148,7 @@ export function mountSettingsView(root: HTMLElement, prefs: Prefs, onChange: (ke
       resetArmed = false;
       prefs.reset();
       render();
-      (['theme', 'mapMode', 'labels', 'zoom', 'follow', 'xKind', 'sync', 'rate', 'yMin', 'startPos', 'autoLoad', 'analytics'] as const).forEach((k) => onChange(k));
+      (['theme', 'mapMode', 'labels', 'zoom', 'follow', 'xKind', 'sync', 'rate', 'yRange', 'startPos', 'autoLoad', 'analytics'] as const).forEach((k) => onChange(k));
     }
   });
 
@@ -159,12 +170,23 @@ export function mountSettingsView(root: HTMLElement, prefs: Prefs, onChange: (ke
       t.setAttribute('aria-valuetext', zoomText(z));
       root.querySelector('[data-zoom-text]')!.textContent = zoomText(z);
       onChange('zoom');
-    } else if (t.matches('[data-ymin]')) {
-      const v = Number(t.value);
-      prefs.setYMin(v);
-      t.setAttribute('aria-valuetext', `${v} km/h`);
-      root.querySelector('[data-ymin-text]')!.textContent = `${v} km/h`;
-      onChange('yMin');
+    } else if (t.matches('[data-yrange]')) {
+      // 2 つのつまみは、SPEED_RANGE.gap より近づけない(動かしたほうのつまみを止める)
+      const { max, gap } = SPEED_RANGE;
+      const loEl = root.querySelector<HTMLInputElement>('[data-yrange="min"]')!, hiEl = root.querySelector<HTMLInputElement>('[data-yrange="max"]')!;
+      let lo = Number(loEl.value), hi = Number(hiEl.value);
+      if (t === loEl && lo > hi - gap) { lo = hi - gap; loEl.value = String(lo); }
+      if (t === hiEl && hi < lo + gap) { hi = lo + gap; hiEl.value = String(hi); }
+      prefs.setSpeedRange(lo, hi >= max ? null : hi);
+      loEl.setAttribute('aria-valuetext', `${lo} km/h`);
+      hiEl.setAttribute('aria-valuetext', hiText(hi));
+      const bar = loEl.parentElement!;
+      bar.style.setProperty('--lo', String(rangePos(lo)));
+      bar.style.setProperty('--hi', String(rangePos(hi)));
+      // 重なったときに、右端に寄った最低速度のつまみもつかめるように、右半分では最低速度を上にする
+      loEl.classList.toggle('top', rangePos(lo) > 0.5);
+      root.querySelector('[data-yrange-text]')!.textContent = rangeText(lo, hi);
+      onChange('yRange');
     }
   });
 

@@ -61,6 +61,10 @@ export class SpeedGraph {
   private xMax = 1;
   private yMax = 200;
   private yMin = 0;
+  /** 設定の最高速度(null = 自動: 走行データに合わせる) */
+  private yMaxFixed: number | null = null;
+  /** 走行データの最高速度(km/h) */
+  private dataTop = 0;
   private zoomK = 1;
   private viewStart = 0;
   private cursorX: number | null = null;
@@ -161,8 +165,8 @@ export class SpeedGraph {
   setData(series: GraphSeries[], kind: XKind, marks: SectorMark[] = [], keepView = false): void {
     this.series = series; this.kind = kind; this.marks = marks;
     this.xMax = Math.max(1e-6, ...series.map((s) => (s.x.length ? s.x[s.x.length - 1] : 0)));
-    const top = Math.max(0, ...series.map((s) => s.y.reduce((m, v) => Math.max(m, v), 0)));
-    this.yMax = Math.max(50, Math.ceil(top / 50) * 50, this.yMin + 50);
+    this.dataTop = Math.max(0, ...series.map((s) => s.y.reduce((m, v) => Math.max(m, v), 0)));
+    this.yMax = this.autoYMax();
     if (keepView) {
       this.recenter();
     } else {
@@ -172,13 +176,21 @@ export class SpeedGraph {
     this.draw();
   }
 
-  /** 縦軸の下限(km/h)。設定タブの「最低速度」。上限は走行データに合わせて自動 */
-  setYMin(v: number): void {
-    const y = Math.max(0, Math.min(100, v));
-    if (y === this.yMin) return;
-    this.yMin = y;
-    this.yMax = Math.max(this.yMax, y + 50);
+  /**
+   * 縦軸の範囲(km/h)。設定タブの「速度レンジ」。max = null なら、上限は走行データに合わせて自動。
+   * 範囲の外の速度は、グラフの上下の端で切れる
+   */
+  setYRange(min: number, max: number | null): void {
+    const lo = Math.max(0, min);
+    const hi = max !== null && max > lo ? max : null;
+    if (lo === this.yMin && hi === this.yMaxFixed) return;
+    this.yMin = lo; this.yMaxFixed = hi;
+    this.yMax = this.autoYMax();
     this.draw();
+  }
+  /** 縦軸の上限: 設定の最高速度、自動なら走行データの最高速度を 50 km/h 単位で切り上げ(最低速度 + 50 以上) */
+  private autoYMax(): number {
+    return this.yMaxFixed ?? Math.max(50, Math.ceil(this.dataTop / 50) * 50, this.yMin + 50);
   }
 
   /** ズーム中なら、表示範囲を再生位置の中心へ移す(倍率はそのまま) */
@@ -291,7 +303,10 @@ export class SpeedGraph {
     s.appendChild(el('defs')).appendChild(clip);
 
     // 縦軸(速度)
-    const ystep = this.yMax <= 100 ? (this.plotH < 110 ? 50 : 25) : (this.plotH < 130 ? 100 : 50);
+    // 目盛りの間隔は、表示する範囲の幅で決める(狭い範囲でも目盛りが出るように)
+    const span = this.yMax - this.yMin;
+    const ystep = span > 100 ? (this.plotH < 130 ? 100 : 50) : span > 50 ? (this.plotH < 110 ? 50 : 25)
+      : span > 20 ? (this.plotH < 110 ? 25 : 10) : 5;
     for (let v = Math.ceil(this.yMin / ystep) * ystep; v <= this.yMax; v += ystep) {
       s.appendChild(el('line', { class: 'g-grid', x1: LEFT, x2: this.w - RIGHT, y1: this.sy(v), y2: this.sy(v) }));
       const t = el('text', { class: 'g-tick', x: LEFT - 3, y: this.sy(v) + 3, 'text-anchor': 'end' });
