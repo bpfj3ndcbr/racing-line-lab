@@ -209,7 +209,8 @@ describe('一覧の見出し・ラップ行のホバー', () => {
   it('一覧の上に太字の「登録済みライン」がある(コマンドのボタンとは別)', () => {
     openNew();
     const h = $('#ce-list-h');
-    expect(h.textContent).toBe('登録済みライン');
+    expect(h.querySelector('span')!.textContent).toBe('登録済みライン');
+    expect(h.querySelector('#ce-sort')!.textContent).toBe('セクター整列');            // 見出しの右に「セクター整列」(案件 21)
     expect(h.compareDocumentPosition($('#ce-list')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(readFileSync('src/style.css', 'utf8')).toMatch(/\.ce-list-h\{font-weight:700/);
   });
@@ -378,6 +379,64 @@ describe('セクターの並べ替えと削除', () => {
     expect(rows()).toEqual(['S1', 'S2']);
     expect(lats()).toEqual([33.01, 33.03]);
     expect($('#ce-lines').textContent).toBe('計測ライン: 未設定');
+  });
+});
+
+describe('セクター整列(案件 21)', () => {
+  // オートポリスのセクター 7 本を、順番を崩して読み込む(ファイルの 1 行目 = 本来の S1)
+  const sciLines = sci.trim().split(/\r?\n/);
+  const shuffled = [sciLines[3], sciLines[0], sciLines[6], sciLines[1], sciLines[5], sciLines[2], sciLines[4]].join('\r\n') + '\r\n';
+  const firstLat = (i: number) => Number(sciLines[i].split(',')[0]);
+  const sortBtn = () => $<HTMLButtonElement>('#ce-sort');
+  const secLats = () => mapOf().lines.filter((l) => l.kind === 'sector').map((l) => Number(l.line.a.lat.toFixed(6)));
+
+  it('読み込み済みの走行ログが通った順に並べ替え、使ったログの名前を出す。選んでいたラインは選んだまま', async () => {
+    session.addLog(utc(), 'u');
+    openNew();
+    await pick('#ce-cln', 'cl_autopolis.cln', cln);
+    await pick('#ce-sci', 'autopolis.sci', shuffled);
+    expect(secLats()).toEqual([3, 0, 6, 1, 5, 2, 4].map(firstLat));
+    expect(sortBtn().disabled).toBe(false);
+    click('[data-act="ce-select"][data-key="s0"]');                                    // 本来の S4 を選んでおく
+    click('#ce-sort');
+    expect(secLats()).toEqual([0, 1, 2, 3, 4, 5, 6].map(firstLat));
+    expect(rows()).toEqual(['計測ライン', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7']);
+    expect(mapOf().lines.find((l) => l.selected)!.label).toBe('S4');
+    expect($('#ce-msg').textContent).toBe('セクターを通った順に並べ替えました(走行ログ: u.vbo)。');
+    click('#ce-sort');
+    expect($('#ce-msg').textContent).toBe('すでに通った順です(走行ログ: u.vbo)。');
+  });
+
+  it('走行ログが通らないセクターは最後に回し、知らせる', async () => {
+    session.addLog(utc(), 'u');
+    openNew();
+    await pick('#ce-cln', 'cl_autopolis.cln', cln);
+    await pick('#ce-sci', 'autopolis.sci', [sciLines[2], sciLines[0], sciLines[1]].join('\r\n') + '\r\n');
+    click('#ce-draw-sector'); drawC({ lat: 33.01, lon: 130.97 }, { lat: 33.01, lon: 130.9703 });      // コースから離れた線
+    click('[data-act="ce-move"][data-key="s3"][data-d="-1"]');
+    click('[data-act="ce-move"][data-key="s2"][data-d="-1"]');                         // 通らない線を 2 番目に
+    click('#ce-sort');
+    expect(secLats()).toEqual([firstLat(0), firstLat(1), firstLat(2), 33.01]);
+    expect($('#ce-msg').textContent).toBe('セクターを通った順に並べ替えました(走行ログ: u.vbo)。 S4 は走行ログが通らないため、最後にしました。');
+  });
+
+  it('押せないとき: 計測ラインが無い・セクターが 2 本未満・仮のラインがある・通る走行ログが無い。理由はボタンの説明に出す', async () => {
+    openNew();
+    expect(sortBtn().disabled).toBe(true);
+    expect(sortBtn().title).toBe('計測ラインを引いてから使えます');
+    await pick('#ce-cln', 'cl_autopolis.cln', cln);
+    await pick('#ce-sci', 'autopolis.sci', sciLines[0] + '\r\n');
+    expect(sortBtn().title).toBe('セクターが 2 本以上あるときに使えます');
+    await pick('#ce-sci', 'autopolis.sci', shuffled);
+    expect(sortBtn().disabled).toBe(true);
+    expect(sortBtn().title).toContain('計測ラインを通る走行ログ');                       // ログを読み込んでいない
+    session.addLog(utc(), 'u');
+    click('#ce-draw-sector'); mapOf().drawLine({ lat: 33.01, lon: 130.97 }, { lat: 33.01, lon: 130.9703 });
+    expect(sortBtn().disabled).toBe(true);
+    expect(sortBtn().title).toBe('引いたラインを「確定」か「破棄」してから使えます');
+    click('#ce-discard');
+    expect(sortBtn().disabled).toBe(false);
+    expect(sortBtn().title).toBe('セクターを、読み込み済みの走行ログが通った順に並べ替えます');
   });
 });
 
