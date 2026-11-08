@@ -665,6 +665,8 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .ld-fix-tbl dt{color:var(--muted)}
 .ld-fix-tbl dd{margin:0;font-weight:700;font-variant-numeric:tabular-nums}
 .ld-fix-reset{align-self:flex-start}
+/* 「読み込みを取り消す」は、ボタンの並びの左端(案件 22) */
+.modal-actions .ld-undo{margin-right:auto}
 /* 修正の画面の線の一覧(案件 17) */
 .ld-fix-list{display:flex;flex-direction:column;gap:3px;max-height:170px;overflow:auto;margin:6px 0}
 .ld-fix-row{display:flex;align-items:center;gap:6px}

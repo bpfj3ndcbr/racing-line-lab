@@ -578,17 +578,24 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
     if (vbo.length) await session.addVboFiles(vbo.map((file) => ({ file, path: window.rllNative?.getPathForFile(file) || undefined })), set);
     if (skipped) session.say(`${skipped} 件は .vbo ではないため追加しませんでした。`);
     const added = (session.sets[set]?.logs ?? []).filter((l) => !before.has(l.id)).map((l) => l.id);
-    if (added.length) await checkLoaded(set, added, before.size === 0);
+    if (added.length) await checkLoaded(set, added, before.size === 0, undefined, true);
   }
 
   // ---------- 読み込みの確認(案件 3) ----------
   /** 確認ダイアログから開いた登録画面: 登録したら、そのサーキットを比較セットのサーキットにする */
   let pending: { set: number; circuits: number } | null = null;
-  async function checkLoaded(set: number, ids: string[], wasEmpty: boolean, prefer?: string) {
+  /** fresh = 読み込んだ直後(「読み込みを取り消す」を出す) */
+  async function checkLoaded(set: number, ids: string[], wasEmpty: boolean, prefer?: string, fresh = false) {
     const plan = planLoad(session, set, ids, wasEmpty);
     if (!plan) return;
     if (prefer && plan.options.some((o) => o.key === prefer)) plan.initial = prefer;
-    const { option: o, name, control, sectors } = await loadDialog(plan, { mapFactory: opts.mapFactory, nameTaken: (n) => nameExists(session.circuits, n) });
+    const { option: o, name, control, sectors, undo } = await loadDialog(plan, { mapFactory: opts.mapFactory, nameTaken: (n) => nameExists(session.circuits, n), canUndo: fresh });
+    if (undo) {
+      // 読み込みを取り消す: いま読み込んだログだけを外す(一緒に割り当てたラップも解除される。前からのログはそのまま)
+      for (const id of ids) session.removeLog(id, set);
+      session.say(`読み込みを取り消しました(${ids.length} 件)。`);
+      return;
+    }
     if (o.kind === 'circuit') { session.setCircuit(o.circuit.id, set); scrollToSet(set); }
     if (o.kind === 'cand') {
       // ファイルの計測ラインとセクターは、そのまま(ダイアログで直したなら、直した線で)登録して、ラップの割り当てに進む

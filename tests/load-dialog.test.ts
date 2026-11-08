@@ -530,3 +530,57 @@ describe('セクターの修正・追加(案件 17)', () => {
     expect(session.circuits[0].sectors).toHaveLength(1);
   });
 });
+
+describe('読み込みの取り消し(案件 22)', () => {
+  const undoBtn = () => document.querySelector<HTMLButtonElement>('.modal.ld [data-dialog="undo"]');
+  const esc = () => dialog()!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+
+  it('読み込んだ直後の確認画面に「読み込みを取り消す」が出て、押すと、いま読み込んだログを外して閉じる', async () => {
+    drop(0, [file('rc.vbo', vboText(A, true)), file('b.vbo', vboText(B, true, 'サーキットB'))]);
+    await flush(); await flush();
+    expect(dialog()).not.toBeNull();
+    expect(undoBtn()!.hidden).toBe(false);
+    expect(undoBtn()!.textContent).toBe('読み込みを取り消す');
+    undoBtn()!.click();
+    await flush();
+    expect(dialog()).toBeNull();
+    expect(session.sets[0].logs).toHaveLength(0);
+    expect(session.circuits).toHaveLength(0);
+    expect(session.message).toBe('読み込みを取り消しました(2 件)。');
+  });
+
+  it('前から入っていたログは残す。Esc は今までどおり「あとで」(読み込みは残る)', async () => {
+    drop(0, [file('rc.vbo', vboText(A, true))]);
+    await flush(); await flush();
+    esc();
+    await flush();
+    expect(dialog()).toBeNull();
+    expect(session.sets[0].logs.map((l) => l.log.fileName)).toEqual(['rc.vbo']);
+    drop(0, [file('b.vbo', vboText(B, true, 'サーキットB'))]);
+    await flush(); await flush();
+    undoBtn()!.click();
+    await flush();
+    expect(session.sets[0].logs.map((l) => l.log.fileName)).toEqual(['rc.vbo']);
+    expect(session.message).toBe('読み込みを取り消しました(1 件)。');
+  });
+
+  it('修正の画面を開いている間は出さない', async () => {
+    drop(0, [file('rc.vbo', vboText(A, true))]);
+    await flush(); await flush();
+    $<HTMLButtonElement>('.ld-prev-fix').click();
+    expect(undoBtn()!.hidden).toBe(true);
+    $<HTMLButtonElement>('[data-fix="cancel"]').click();
+    expect(undoBtn()!.hidden).toBe(false);
+  });
+
+  it('ログの枠の「ログの計測ラインで登録…」から開いたとき(前に読み込んだログ)は出さない', async () => {
+    drop(0, [file('rc.vbo', vboText(A, true))]);
+    await flush(); await flush();
+    esc();
+    await flush();
+    root.querySelector<HTMLButtonElement>('[data-act="circ-cand"]')!.click();
+    await flush(); await flush();
+    expect(dialog()).not.toBeNull();
+    expect(undoBtn()).toBeNull();
+  });
+});

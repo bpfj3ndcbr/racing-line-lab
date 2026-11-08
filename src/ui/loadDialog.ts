@@ -24,6 +24,8 @@ import type { MapFactory, MapLine, MapTrack, TrackMap } from './mapTypes';
  * 修正の画面では、セクターも直せる(案件 17)。プレビューの「セクター」の表示では「セクターを修正」になる。
  * 右の欄の線の一覧(計測ライン・S1・S2…)で選んだ線を直す。「セクターを追加」で地図に引いて足し、「×」で消す。
  * セクターの順番は、走行ログが通った順に自動で並べ直す。
+ *
+ * 読み込んだ直後に出したときは、「読み込みを取り消す」で、いま読み込んだログを外して閉じられる(案件 22。外すのは呼び出し側)。
  */
 
 /** 修正の画面: スライダーで回せる範囲(補正前からの差、度) */
@@ -222,13 +224,16 @@ export interface LoadDialogDeps {
   mapFactory?: MapFactory;
   /** 同じ名前のサーキットが既にあるか */
   nameTaken?: (name: string) => boolean;
+  /** 「読み込みを取り消す」を出す(読み込んだ直後に出したとき。前に読み込んだログの確認では出さない) */
+  canUndo?: boolean;
 }
 /**
  * ダイアログの結果: 選んだもの(Esc なら「あとで」)と、候補を登録するときのサーキット名。
  * control は、候補の計測ラインを修正したときの、直した線(修正していなければ無し)
  * sectors は、セクターを直した・足した・消したときの、セクター(通った順。直していなければ無し)
+ * undo は「読み込みを取り消す」を押したとき(option は「あとで」)
  */
-export interface LoadResult { option: LoadOption; name: string; control?: GeoLine; sectors?: GeoLine[] }
+export interface LoadResult { option: LoadOption; name: string; control?: GeoLine; sectors?: GeoLine[]; undo?: boolean }
 
 /** 読み込みの確認ダイアログ */
 export function loadDialog(plan: LoadPlan, deps: LoadDialogDeps = {}, host: HTMLElement = document.body): Promise<LoadResult> {
@@ -258,7 +263,7 @@ export function loadDialog(plan: LoadPlan, deps: LoadDialogDeps = {}, host: HTML
       <p class="ld-note">選んだ計測ラインを通るログは、まとめて判定されます。ファイルの計測ラインは、この画面で登録します(向きや位置は、登録の前に「計測ラインを修正」「セクターを修正」で直せます。セクターは足したり消したりもできます)。</p>
       </div>
       <div class="ld-fix" hidden></div>
-      <div class="modal-actions"><button type="button" class="btn" data-fix="cancel" hidden disabled>キャンセル</button><button type="button" class="btn pri" data-fix="apply" hidden disabled>この位置にする</button><button type="button" class="btn pri" data-dialog="ok"></button></div>`;
+      <div class="modal-actions">${deps.canUndo ? '<button type="button" class="btn ld-undo" data-dialog="undo" title="いま読み込んだ走行ログを比較セットから外して、読み込む前に戻します">読み込みを取り消す</button>' : ''}<button type="button" class="btn" data-fix="cancel" hidden disabled>キャンセル</button><button type="button" class="btn pri" data-fix="apply" hidden disabled>この位置にする</button><button type="button" class="btn pri" data-dialog="ok"></button></div>`;
     box.setAttribute('aria-labelledby', 'ld-t');
     const list = box.querySelector<HTMLElement>('.ld-list')!, head = box.querySelector<HTMLElement>('.ld-cur')!;
     const ok = box.querySelector<HTMLButtonElement>('[data-dialog="ok"]')!;
@@ -266,6 +271,7 @@ export function loadDialog(plan: LoadPlan, deps: LoadDialogDeps = {}, host: HTML
     const fixBtn = box.querySelector<HTMLButtonElement>('.ld-prev-fix');
     const main = box.querySelector<HTMLElement>('.ld-main')!, fixEl = box.querySelector<HTMLElement>('.ld-fix')!;
     const fixCancel = box.querySelector<HTMLButtonElement>('[data-fix="cancel"]')!, fixApply = box.querySelector<HTMLButtonElement>('[data-fix="apply"]')!;
+    const undo = box.querySelector<HTMLButtonElement>('[data-dialog="undo"]');
 
     /** プレビューの範囲: near = 計測ラインの付近、all = 「セクター」(1 周分の走行ラインとセクターが入る範囲) */
     let zoom: 'near' | 'all' = 'near';
@@ -370,6 +376,7 @@ export function loadDialog(plan: LoadPlan, deps: LoadDialogDeps = {}, host: HTML
       head.innerHTML = ''; list.innerHTML = '';
       main.hidden = true; fixEl.hidden = false;
       ok.hidden = true; ok.disabled = true;
+      if (undo) undo.hidden = true;                                           // 修正の画面では出さない
       for (const b of [fixCancel, fixApply]) { b.hidden = false; b.disabled = false; }
       if (deps.mapFactory) {
         fixMap = deps.mapFactory($f('.ld-fix-map .map'));
@@ -396,6 +403,7 @@ export function loadDialog(plan: LoadPlan, deps: LoadDialogDeps = {}, host: HTML
       fixEl.innerHTML = ''; fixEl.hidden = true; main.hidden = false;
       for (const b of [fixCancel, fixApply]) { b.hidden = true; b.disabled = true; }
       ok.hidden = false;
+      if (undo) undo.hidden = false;
       render();
       fixBtn?.focus();
     }
@@ -578,6 +586,7 @@ export function loadDialog(plan: LoadPlan, deps: LoadDialogDeps = {}, host: HTML
       });
     };
     ok.addEventListener('click', () => { if (!ok.disabled) finish(cur); });
+    undo?.addEventListener('click', () => { map?.destroy(); map = null; close({ option: later, name: '', undo: true }); });
     // 地図は、ダイアログが画面に入ってから作る(大きさが決まってから)
     renderText();
     setTimeout(preview, 0);
