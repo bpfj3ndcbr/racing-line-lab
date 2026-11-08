@@ -3,7 +3,7 @@ import {
   type GeoLine, LINE_DIGITS, distanceM, formatCln, formatSci, metersPerDegree, parseCln, parseSci, roundLine, sectorPassTimes, shiftLine,
 } from '../core';
 import type { LoadedLog, Session } from '../store/session';
-import { alertDialog } from './dialog';
+import { alertDialog, confirmDialog } from './dialog';
 import { downloadText } from './download';
 import type { MapFactory, TrackMap } from './mapTypes';
 import type { ThemeController } from './theme';
@@ -119,6 +119,22 @@ export function mountCircuitEditor(root: HTMLElement, session: Session, deps: Ci
   let part: Part = 'm';
   let step = 0.1;
   const msg = (t: string) => { $('ce-msg').textContent = t; };
+  /** 開いたときの内容(案件 23)。キャンセルのとき、これと違えば「保存されていません」と確かめる。地図の表示位置は含めない */
+  let opened = '';
+  const snapshot = () => JSON.stringify([$<HTMLInputElement>('ce-name').value.trim(), control, sectors]);
+  const dirty = () => !!draft || snapshot() !== opened;
+  /** キャンセル: 保存していない変更があれば確かめてから閉じる */
+  async function cancelEdit() {
+    if (dirty()) {
+      const discard = await confirmDialog({
+        title: '編集中の内容が保存されていません',
+        detail: '破棄して閉じると、計測ライン・セクター・サーキット名の変更は元に戻ります。',
+        ok: '破棄して閉じる', cancel: '編集を続ける',
+      });
+      if (!discard || !visible) return;
+    }
+    deps.onDone();
+  }
 
   const label = (k: Key) => (k === 'c' ? '計測ライン' : `S${Number(k.slice(1)) + 1}`);
   const lineOf = (k: Key | null): GeoLine | null => (k === null ? null : k === 'c' ? control : sectors[Number(k.slice(1))] ?? null);
@@ -417,7 +433,7 @@ export function mountCircuitEditor(root: HTMLElement, session: Session, deps: Ci
     const d = el.dataset;
     switch (d.act) {
       case 'ce-save': void save(); break;
-      case 'ce-cancel': deps.onDone(); break;
+      case 'ce-cancel': void cancelEdit(); break;
       case 'ce-draw': setDrawing(drawing === d.kind ? null : (d.kind as 'control' | 'sector')); break;
       case 'ce-select': selected = d.key as Key; setDrawing(null); break;
       case 'ce-confirm': confirmDraft(); break;
@@ -478,6 +494,7 @@ export function mountCircuitEditor(root: HTMLElement, session: Session, deps: Ci
       map ??= deps.mapFactory($('ce-map'));
       map.setDrawMode(null);
       refresh();
+      opened = snapshot();
       map.invalidate();
       const z = deps.zoom?.() ?? 0;
       if (z > 0) {                                   // 設定の倍率(数値)。中心は、登録した表示位置・ライン・走行ログの位置

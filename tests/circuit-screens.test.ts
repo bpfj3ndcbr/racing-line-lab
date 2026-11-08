@@ -118,6 +118,9 @@ describe('大きな画面: 登録', () => {
     openNew();
     await pick('#ce-cln', 'cl_autopolis.cln', cln);
     $<HTMLButtonElement>('#ce-cancel').click();
+    // 計測ラインを読み込んだあとなので、保存し忘れの確認が出る(案件 23)。「破棄して閉じる」で閉じる
+    document.querySelector<HTMLButtonElement>('.modal [data-dialog="ok"]')!.click();
+    await new Promise((r) => setTimeout(r, 0));
     expect(session.circuits).toHaveLength(0);
     expect(work().hidden).toBe(true);
   });

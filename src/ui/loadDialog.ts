@@ -3,7 +3,7 @@ import {
   lineMoveM, lineMovedTo, lineWithBearing, matchCircuit, metersPerDegree, orderSectors, rotateToward, roundLine, sectorPassTimes, shiftLine,
 } from '../core';
 import type { LoadedLog, Session } from '../store/session';
-import { customDialog } from './dialog';
+import { confirmDialog, customDialog } from './dialog';
 import type { MapFactory, MapLine, MapTrack, TrackMap } from './mapTypes';
 
 /**
@@ -341,6 +341,9 @@ export function loadDialog(plan: LoadPlan, deps: LoadDialogDeps = {}, host: HTML
      */
     let fixing: { o: Extract<LoadOption, { kind: 'cand' }>; lines: FixLine[]; removed: number; sel: number; drawing: boolean } | null = null;
     const $f = <T extends HTMLElement>(sel: string) => fixEl.querySelector<T>(sel)!;
+    /** 開いたときの線(案件 23)。キャンセル・Esc のとき、これと違えば「反映されていません」と確かめる */
+    let fixOpened = '';
+    const fixState = () => (fixing ? JSON.stringify([fixing.lines, fixing.removed]) : '');
     const nameAt = (i: number) => (i === 0 ? '計測ライン' : `S${i}`);
     const selLine = () => fixing!.lines[fixing!.sel];
     function openFix() {
@@ -388,7 +391,24 @@ export function loadDialog(plan: LoadPlan, deps: LoadDialogDeps = {}, host: HTML
       }
       renderFixList();
       drawFix(true);
+      fixOpened = fixState();
       $f<HTMLInputElement>(fromSectors ? '.ld-fix-list [aria-pressed="true"]' : '.ld-fix-deg').focus();
+    }
+    /** 「キャンセル」・Esc: 開いたときから線を変えていれば、確かめてから戻る(案件 23) */
+    let asking = false;
+    async function cancelFix() {
+      if (!fixing || asking) return;
+      if (fixState() !== fixOpened) {
+        asking = true;
+        const discard = await confirmDialog({
+          title: '修正した内容が反映されていません',
+          detail: '破棄して戻ると、この画面で直した計測ライン・セクターは元に戻ります。',
+          ok: '破棄して戻る', cancel: '修正を続ける',
+        });
+        asking = false;
+        if (!discard) return;
+      }
+      closeFix(false);
     }
     /** 修正の画面を閉じて、元の画面に戻る。apply = 「この位置にする」 */
     function closeFix(apply: boolean) {
@@ -528,7 +548,7 @@ export function loadDialog(plan: LoadPlan, deps: LoadDialogDeps = {}, host: HTML
       if (!b) return;
       const act = b.dataset.fix;
       if (act === 'open') openFix();
-      else if (act === 'cancel') closeFix(false);
+      else if (act === 'cancel') void cancelFix();
       else if (act === 'apply') closeFix(true);
       else if (!fixing) return;
       else if (act === 'sel') selectFix(Number(b.dataset.i));
@@ -550,7 +570,7 @@ export function loadDialog(plan: LoadPlan, deps: LoadDialogDeps = {}, host: HTML
       // 修正の画面の Esc は、線を引いている途中ならそれをやめ、そうでなければ修正をやめて元の画面に戻る(ダイアログは閉じない)
       if (e.key === 'Escape') {
         e.preventDefault(); e.stopPropagation();
-        if (fixing.drawing) setDrawing(false); else closeFix(false);
+        if (fixing.drawing) setDrawing(false); else void cancelFix();
         return;
       }
       if (e.ctrlKey || e.metaKey || e.altKey) return;

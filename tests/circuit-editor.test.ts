@@ -440,6 +440,73 @@ describe('セクター整列(案件 21)', () => {
   });
 });
 
+describe('保存し忘れの確認(案件 23)', () => {
+  const modal = () => document.querySelector<HTMLElement>('.modal');
+  const modalBtn = (k: 'ok' | 'cancel') => document.querySelector<HTMLButtonElement>(`.modal [data-dialog="${k}"]`)!;
+  const cancel = async () => { click('#ce-cancel'); await flush(); };
+
+  it('何も変えていなければ、確認なしで閉じる。地図を動かしただけでも同じ', async () => {
+    openNew();
+    mapOf().view = { lat: 33.1, lon: 131.0, zoom: 12 };
+    await cancel();
+    expect(modal()).toBeNull();
+    expect($('#work').hidden).toBe(true);
+  });
+
+  it('変えたまま「キャンセル」すると確かめる。「編集を続ける」と Esc は戻り、「破棄して閉じる」で閉じる', async () => {
+    openNew();
+    click('#ce-draw-control'); drawC(A, B);
+    await cancel();
+    expect(modal()).not.toBeNull();
+    expect(modal()!.textContent).toContain('編集中の内容が保存されていません');
+    expect(modalBtn('ok').textContent).toBe('破棄して閉じる');
+    expect(modalBtn('cancel').textContent).toBe('編集を続ける');
+    expect(document.activeElement).toBe(modalBtn('cancel'));                     // 初めは「編集を続ける」
+    modalBtn('cancel').click(); await flush();
+    expect(modal()).toBeNull();
+    expect($('#work').hidden).toBe(false);
+    expect(rows()).toEqual(['計測ライン']);                                       // 編集の内容はそのまま
+    await cancel();
+    modal()!.parentElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    await flush();
+    expect(modal()).toBeNull();
+    expect($('#work').hidden).toBe(false);
+    await cancel();
+    modalBtn('ok').click(); await flush();
+    expect($('#work').hidden).toBe(true);
+    expect(session.circuits).toHaveLength(0);
+  });
+
+  it('名前だけ変えたとき・確定していない仮のラインがあるときも確かめる', async () => {
+    openNew();
+    $<HTMLInputElement>('#ce-name').value = '自作コース';
+    await cancel();
+    expect(modal()).not.toBeNull();
+    modalBtn('cancel').click(); await flush();
+    $<HTMLInputElement>('#ce-name').value = '';
+    click('#ce-draw-control'); mapOf().drawLine(A, B);                          // 確定していない
+    await cancel();
+    expect(modal()).not.toBeNull();
+    modalBtn('ok').click(); await flush();
+    expect($('#work').hidden).toBe(true);
+  });
+
+  it('既存のサーキット: 開いたときのままなら確認なし。セクターの順番を変えただけでも確かめる', async () => {
+    session.registerCircuit('オートポリス', cln, sci);
+    click('#tab-list');
+    click('[data-act="edit-circuit"]');
+    await cancel();
+    expect(modal()).toBeNull();
+    expect($('#work').hidden).toBe(true);
+    click('[data-act="edit-circuit"]');
+    click('[data-act="ce-move"][data-key="s1"][data-d="-1"]');
+    await cancel();
+    expect(modal()).not.toBeNull();
+    modalBtn('ok').click(); await flush();
+    expect(session.circuits[0].sectors).toEqual(parseSci(sci).map((x) => roundLine(x.line)));      // 保存されていない
+  });
+});
+
 describe('登録・保存', () => {
   it('引いたラインで新規登録できる(.cln / .sci ファイルは不要)。表示位置も保存される', async () => {
     openNew();

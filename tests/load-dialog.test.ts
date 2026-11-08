@@ -234,6 +234,13 @@ describe('読み込みの確認ダイアログ', () => {
   });
 });
 
+/** 修正の画面の「キャンセル」・Esc で出る確認(案件 23)で、「破棄して戻る」を押す */
+async function discard() {
+  await flush();
+  document.querySelector<HTMLButtonElement>('.modal:not(.ld) [data-dialog="ok"]')!.click();
+  await flush();
+}
+
 describe('計測ラインの修正(案件 15)', () => {
   const fixEl = () => $('.modal.ld .ld-fix');
   const val = (cls: string) => $(`.ld-fix .${cls}`).textContent;
@@ -356,12 +363,14 @@ describe('計測ラインの修正(案件 15)', () => {
     await openFix();
     setNum(10);
     $<HTMLButtonElement>('[data-fix="cancel"]').click();
+    await discard();                                                                      // 線を変えたので確認が出る(案件 23)
     expect(fixEl().hidden).toBe(true);
     expect($('.ld-cur').textContent).toContain('ファイルのまま(修正なし)');
     $<HTMLButtonElement>('.ld-prev-fix').click();
     expect(val('ld-fix-b1')).toBe('0.0°');
     setNum(10);
     key('Escape');
+    await discard();
     expect(dialog()).not.toBeNull();
     expect(fixEl().hidden).toBe(true);
     expect($('.ld-cur').textContent).toContain('ファイルのまま(修正なし)');
@@ -505,6 +514,7 @@ describe('セクターの修正・追加(案件 17)', () => {
     await openSectors();
     rowBtn('S1', 'del').click();
     btn('[data-fix="cancel"]').click();
+    await discard();
     expect($('.ld-cur').textContent).toContain('セクター: ファイルのまま(2 本)');
     btn('.ld-prev-fix').click();
     expect(names()).toEqual(['計測ライン', 'S1', 'S2']);
@@ -582,5 +592,76 @@ describe('読み込みの取り消し(案件 22)', () => {
     await flush(); await flush();
     expect(dialog()).not.toBeNull();
     expect(undoBtn()).toBeNull();
+  });
+});
+
+describe('修正の画面の、反映し忘れの確認(案件 23)', () => {
+  const fixEl = () => $('.modal.ld .ld-fix');
+  const confirmBox = () => document.querySelector<HTMLElement>('.modal:not(.ld)');
+  const confirmBtn = (k: 'ok' | 'cancel') => document.querySelector<HTMLButtonElement>(`.modal:not(.ld) [data-dialog="${k}"]`)!;
+  const escFix = () => fixEl().dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+  async function open() {
+    drop(0, [file('rc.vbo', vboText(A, true, 'テストサーキット', [180]))]);
+    await flush(); await flush();
+    $<HTMLButtonElement>('.ld-prev-fix').click();
+  }
+
+  it('何も変えていなければ、「キャンセル」も Esc も確認なしで戻る', async () => {
+    await open();
+    $<HTMLButtonElement>('[data-fix="cancel"]').click();
+    await flush();
+    expect(confirmBox()).toBeNull();
+    expect(fixEl().hidden).toBe(true);
+    $<HTMLButtonElement>('.ld-prev-fix').click();
+    escFix();
+    await flush();
+    expect(confirmBox()).toBeNull();
+    expect(fixEl().hidden).toBe(true);
+  });
+
+  it('線を変えたまま「キャンセル」・Esc を押すと確かめる。「修正を続ける」と Esc は修正の画面のまま、「破棄して戻る」で戻る', async () => {
+    await open();
+    $<HTMLButtonElement>('[data-fix="inc"]').click();
+    $<HTMLButtonElement>('[data-fix="cancel"]').click();
+    await flush();
+    expect(confirmBox()!.textContent).toContain('修正した内容が反映されていません');
+    expect(confirmBtn('ok').textContent).toBe('破棄して戻る');
+    expect(confirmBtn('cancel').textContent).toBe('修正を続ける');
+    expect(document.activeElement).toBe(confirmBtn('cancel'));
+    confirmBtn('cancel').click(); await flush();
+    expect(confirmBox()).toBeNull();
+    expect(fixEl().hidden).toBe(false);
+    expect($('.ld-fix-d').textContent).toBe('+0.1°');                                     // 直した内容はそのまま
+    escFix(); await flush();
+    expect(confirmBox()).not.toBeNull();
+    confirmBox()!.parentElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    await flush();
+    expect(confirmBox()).toBeNull();
+    expect(fixEl().hidden).toBe(false);
+    expect(dialog()).not.toBeNull();                                                      // 読み込みの確認画面も閉じない
+    escFix(); await flush();
+    confirmBtn('ok').click(); await flush();
+    expect(fixEl().hidden).toBe(true);
+    expect($('.ld-cur').textContent).toContain('計測ライン: ファイルのまま(修正なし)');
+  });
+
+  it('セクターを足しただけ・消しただけでも確かめる。いったん決めた内容から変えていなければ確認なし', async () => {
+    await open();
+    const fm = maps.at(-1)!;
+    $<HTMLButtonElement>('[data-fix="draw"]').click();
+    fm.drawLine({ lat: A.lat - 0.0027, lon: A.lon }, { lat: A.lat - 0.0029, lon: A.lon });
+    $<HTMLButtonElement>('[data-fix="apply"]').click();                                   // 決める
+    $<HTMLButtonElement>('.ld-prev-fix').click();
+    $<HTMLButtonElement>('[data-fix="cancel"]').click();                                  // 決めた内容のまま → 確認なし
+    await flush();
+    expect(confirmBox()).toBeNull();
+    expect(fixEl().hidden).toBe(true);
+    $<HTMLButtonElement>('.ld-prev-fix').click();
+    document.querySelector<HTMLButtonElement>('.ld-fix-row [data-fix="del"]')!.click();   // 消す
+    $<HTMLButtonElement>('[data-fix="cancel"]').click();
+    await flush();
+    expect(confirmBox()).not.toBeNull();
+    confirmBtn('ok').click(); await flush();
+    expect($('.ld-cur').textContent).toContain('セクター: 修正あり(2 本。追加 1)');        // 決めた内容に戻る
   });
 });

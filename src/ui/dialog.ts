@@ -84,6 +84,27 @@ export function alertDialog(o: Base & { ok?: string }, host: HTMLElement = docum
   }, undefined, host);
 }
 
+/**
+ * はい / いいえ を選んでもらうダイアログ。ok を押せば true、cancel・Esc なら false。
+ * 初めは cancel(取り消せない操作をしない側)にフォーカスする。ok は左、cancel は右の青いボタン
+ */
+export function confirmDialog(o: Base & { ok: string; cancel: string }, host: HTMLElement = document.body): Promise<boolean> {
+  return open<boolean>((box, close) => {
+    head(box, o);
+    const ok = button(o.ok);
+    ok.dataset.dialog = 'ok';
+    const cancel = button(o.cancel, 'pri');
+    cancel.dataset.dialog = 'cancel';
+    ok.addEventListener('click', () => close(true));
+    cancel.addEventListener('click', () => close(false));
+    const row = document.createElement('div');
+    row.className = 'modal-actions';
+    row.append(ok, cancel);
+    box.appendChild(row);
+    return { focus: cancel };
+  }, false, host);
+}
+
 /** 文字を1つ入力してもらうダイアログ。キャンセルなら null。空のままでは OK を押せない。 */
 export function promptDialog(
   o: Base & { label: string; value: string; ok?: string; cancel?: string },
