@@ -1,6 +1,6 @@
 import type { Session } from '../store/session';
 import { mountCompareView, type CompareView } from './compareView';
-import { mountImportView } from './importView';
+import { type ImportApi, mountImportView } from './importView';
 import type { MapFactory } from './mapTypes';
 import type { Theme, ThemeController } from './theme';
 import { SLOTS } from '../core';
@@ -45,7 +45,7 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
   const topRight = root.querySelector<HTMLElement>('#top-right')!;
   let current: ViewName = 'import';
   let compare: CompareView | null = null;
-  let importApi: { closeWork(): void; editCircuit(id: string): void; isEditing(): boolean; openActiveSet(): void } | null = null;
+  let importApi: ImportApi | null = null;
 
   function navigate(v: ViewName) {
     if (v !== current && importApi?.isEditing()) return;     // サーキットの登録・編集中は、保存かキャンセルするまで移れない
@@ -68,6 +68,19 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
       compare?.hide();
     }
     renderNav();
+  }
+
+  /** 利用者の操作でほかの画面へ移る。位置補正で補正量を動かしたままなら、確かめてから移る */
+  let asking = false;
+  async function leaveTo(v: ViewName) {
+    if (v !== current && importApi?.needsLeaveConfirm()) {
+      if (asking) return;
+      asking = true;
+      const ok = await importApi.confirmLeave();
+      asking = false;
+      if (!ok) return;
+    }
+    navigate(v);
   }
 
   function renderNav() {
@@ -102,7 +115,7 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
   root.querySelector('header')!.addEventListener('click', (e) => {
     const el = (e.target as HTMLElement).closest<HTMLElement>('[data-act]');
     if (!el) return;
-    if (el.dataset.act === 'nav') navigate(el.dataset.view as ViewName);
+    if (el.dataset.act === 'nav') void leaveTo(el.dataset.view as ViewName);
     if (el.dataset.act === 'about') { void showAbout(); return; }
     if (el.dataset.act === 'theme') theme.set(el.dataset.theme as Theme);
   });
@@ -129,7 +142,7 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
     });
   }
 
-  importApi = mountImportView(importEl, session, { onCompare: () => navigate('compare'), onWorkChange: renderNav, mapFactory, theme, zoom: () => prefs.get('zoom').value as number });
+  importApi = mountImportView(importEl, session, { onCompare: () => void leaveTo('compare'), onWorkChange: renderNav, mapFactory, theme, zoom: () => prefs.get('zoom').value as number });
   session.subscribe(renderTop);
   theme.subscribe(renderTop);
   renderTop();

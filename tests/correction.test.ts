@@ -38,6 +38,9 @@ const north = () => $<HTMLInputElement>('#cor-north');
 const key = (k: string, shiftKey = false, target: EventTarget = document) =>
   target.dispatchEvent(new KeyboardEvent('keydown', { key: k, shiftKey, bubbles: true, cancelable: true }));
 const mapOf = () => maps[maps.length - 1];
+const dialog = () => document.querySelector<HTMLElement>('.modal');
+const dialogBtn = (k: 'ok' | 'cancel') => document.querySelector<HTMLButtonElement>(`.modal [data-dialog="${k}"]`)!;
+const flush = () => new Promise((r) => setTimeout(r, 0));
 
 describe('セッション: 位置補正の保存と、書き出し・読み込み', () => {
   it('補正量は保存され、次に同じログを読み込むと自動で適用される', () => {
@@ -156,10 +159,14 @@ describe('データ管理画面から位置補正の画面へ', () => {
     expect(mapOf().editCb).toBeNull();
   });
 
-  it('キャンセルで元のデータ管理の表示へ戻り、何も変わらない', () => {
+  it('キャンセルで元のデータ管理の表示へ戻り、何も変わらない(補正量を動かしていれば、確かめてから)', async () => {
     openCorrect();
     key('ArrowUp');
     $<HTMLButtonElement>('#cor-cancel').click();
+    expect(dialog()!.textContent).toContain('位置補正が保存されていません');
+    expect(dialogBtn('ok').textContent).toBe('破棄して閉じる');
+    dialogBtn('ok').click();
+    await flush();
     expect(work().hidden).toBe(true);
     expect($('#import-body').hidden).toBe(false);
     expect(session.logs[0].offset).toEqual({ east: 0, north: 0 });
@@ -172,6 +179,80 @@ describe('データ管理画面から位置補正の画面へ', () => {
     key('ArrowUp');
     expect(north().value).toBe('0');
     expect(mapOf().editCb).toBeNull();
+  });
+});
+
+describe('補正量を動かしたまま、ほかの画面へ移るとき(1.2.1)', () => {
+  it('補正量を動かしていなければ、確かめずに閉じる(キャンセル・上部のタブ)', () => {
+    openCorrect();
+    key('ArrowUp'); key('ArrowDown');                                              // 動かしても、元に戻っていれば変更なし
+    $<HTMLButtonElement>('#cor-cancel').click();
+    expect(dialog()).toBeNull();
+    expect(work().hidden).toBe(true);
+    openCorrect();
+    $<HTMLButtonElement>('[data-act="nav"][data-view="settings"]').click();
+    expect(dialog()).toBeNull();
+    expect($('#view-settings').hidden).toBe(false);
+  });
+
+  it('上部のタブ: 確かめる。「補正を続ける」なら位置補正の画面に残り、補正量もそのまま', async () => {
+    openCorrect();
+    key('ArrowUp');
+    $<HTMLButtonElement>('[data-act="nav"][data-view="settings"]').click();
+    expect(dialog()!.textContent).toContain('位置補正が保存されていません');
+    expect(dialog()!.textContent).toContain('破棄して移動すると');
+    expect(dialogBtn('ok').textContent).toBe('破棄して移動する');
+    expect(dialogBtn('cancel').textContent).toBe('補正を続ける');
+    expect(document.activeElement).toBe(dialogBtn('cancel'));
+    dialogBtn('cancel').click();
+    await flush();
+    expect(dialog()).toBeNull();
+    expect($('#view-import').hidden).toBe(false);
+    expect($('#view-settings').hidden).toBe(true);
+    expect(work().hidden).toBe(false);
+    expect(north().value).toBe('0.5');
+    key('ArrowUp');                                                                 // 矢印キーも効いたまま
+    expect(north().value).toBe('1');
+  });
+
+  it('上部のタブ: 「破棄して移動する」なら移り、補正量は保存しない', async () => {
+    openCorrect();
+    key('ArrowUp');
+    $<HTMLButtonElement>('[data-act="nav"][data-view="help"]').click();
+    dialogBtn('ok').click();
+    await flush();
+    expect($('#view-help').hidden).toBe(false);
+    expect(work().hidden).toBe(true);
+    expect(session.logs[0].offset).toEqual({ east: 0, north: 0 });
+    expect(store.get('offsets')).toBeFalsy();
+  });
+
+  it('カードの横の「比較画面へ」も確かめる', async () => {
+    session.toggleAssignment('A', { logId: 'u', lap: 1 });
+    openCorrect();
+    key('ArrowRight');
+    $<HTMLButtonElement>('[data-act="goto-compare"]').click();
+    expect(dialog()).not.toBeNull();
+    dialogBtn('cancel').click();
+    await flush();
+    expect($('#view-compare').hidden).toBe(true);
+    expect(work().hidden).toBe(false);
+    $<HTMLButtonElement>('[data-act="goto-compare"]').click();
+    dialogBtn('ok').click();
+    await flush();
+    expect($('#view-compare').hidden).toBe(false);
+    expect(work().hidden).toBe(true);
+    expect(session.logs[0].offset).toEqual({ east: 0, north: 0 });
+  });
+
+  it('キャンセル: 「補正を続ける」なら位置補正の画面に残る', async () => {
+    openCorrect();
+    key('ArrowLeft');
+    $<HTMLButtonElement>('#cor-cancel').click();
+    dialogBtn('cancel').click();
+    await flush();
+    expect(work().hidden).toBe(false);
+    expect(east().value).toBe('-0.5');
   });
 });
 

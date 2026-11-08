@@ -1,5 +1,6 @@
 import { type Lap, type PreviewPick, type PreviewRange, type Slot, SLOTS, detectLaps, findCrossings, formatLapTime, matchLap, metersPerDegree, pickPreviewRanges } from '../core';
 import type { LoadedLog, Session } from '../store/session';
+import { confirmDialog } from './dialog';
 import type { MapFactory, TrackMap } from './mapTypes';
 import type { ThemeController } from './theme';
 
@@ -9,7 +10,14 @@ export interface CorrectDeps {
   /** 適用・キャンセルのあと(データ管理画面へ戻る) */
   onDone: () => void;
 }
-export interface CorrectView { show(logId: string, set?: number): void; hide(): void }
+export interface CorrectView {
+  show(logId: string, set?: number): void;
+  hide(): void;
+  /** 補正量を動かしたまま、まだ「適用して保存」していないか */
+  isDirty(): boolean;
+  /** 補正量を動かしたままほかの画面へ移るとき: 確かめて、移ってよければ true */
+  confirmLeave(): Promise<boolean>;
+}
 
 const STEPS = [0.1, 0.5, 1];
 /** 地図に出す点の数の上限(描く区間が長いときだけ間引く) */
@@ -102,6 +110,23 @@ export function mountCorrectView(root: HTMLElement, session: Session, deps: Corr
   let checked = new Set<number>();
   /** 開いた比較セットで、この Run のラップを割り当てているカード(ラップ番号 → カード) */
   let slotOfLap = new Map<number, Slot>();
+
+  /** 補正量を、開いたとき(保存済み)から動かしたか。地図に出すラップ・ドラッグの切り替え・移動量は含めない */
+  const dirty = () => visible && (draft.east !== saved.east || draft.north !== saved.north);
+  /** 保存していない補正量があれば、破棄してよいか確かめる。close = 「キャンセル」で閉じるとき */
+  async function confirmDiscard(close: boolean): Promise<boolean> {
+    if (!dirty()) return true;
+    return confirmDialog({
+      title: '位置補正が保存されていません',
+      detail: `破棄して${close ? '閉じる' : '移動する'}と、この画面で動かした補正量は元に戻ります。`,
+      ok: close ? '破棄して閉じる' : '破棄して移動する', cancel: '補正を続ける',
+    });
+  }
+  /** キャンセル: 保存していない補正量があれば確かめてから閉じる */
+  async function cancelCorrect() {
+    if (dirty() && (!(await confirmDiscard(true)) || !visible)) return;
+    deps.onDone();
+  }
 
   const accent = () => getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#4aa3ff';
 
@@ -218,7 +243,7 @@ export function mountCorrectView(root: HTMLElement, session: Session, deps: Corr
       case 'nudge': { const [x, y] = dirDelta(d.dir!); nudge(x, y); break; }
       case 'cor-zero': draft = { east: 0, north: 0 }; changed(); break;
       case 'cor-revert': draft = { ...saved }; changed(); break;
-      case 'cor-cancel': deps.onDone(); break;
+      case 'cor-cancel': void cancelCorrect(); break;
       case 'cor-pick-all': case 'cor-pick-none':
         checked = new Set(d.act === 'cor-pick-all' ? laps.map((x) => x.number) : []);
         root.querySelectorAll<HTMLInputElement>('[data-pick]').forEach((c) => { c.checked = checked.has(Number(c.dataset.pick)); });
@@ -305,5 +330,7 @@ export function mountCorrectView(root: HTMLElement, session: Session, deps: Corr
       if (timer) { clearTimeout(timer); timer = null; }
       map?.setEditDrag(null);
     },
+    isDirty: dirty,
+    confirmLeave: () => confirmDiscard(false),
   };
 }
