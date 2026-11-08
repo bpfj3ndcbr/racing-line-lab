@@ -47,9 +47,9 @@ describe('設定タブ', () => {
     expect(Array.from(root.querySelectorAll('#view-settings h3')).map((h) => h.textContent)).toEqual(['外観', 'マップ', '速度グラフ', '再生・セクター', '起動時', 'プライバシー']);
   });
 
-  it('項目: テーマ / 描画 / 引き出し線の表示 / 倍率 / 初期位置 / 追従 / 最低速度 / 横軸 / 再生速度 / セクターボタンの動作 / 自動読み込み / 利用状況の送信 と、初期化ボタン', () => {
+  it('項目: テーマ / 描画 / 引き出し線の表示 / 倍率 / 初期位置 / 追従 / 速度レンジ / 横軸 / 再生速度 / セクターボタンの動作 / 自動読み込み / 利用状況の送信 と、初期化ボタン', () => {
     const names = Array.from(root.querySelectorAll('#view-settings .sname')).map((e) => e.textContent);
-    expect(names).toEqual(['テーマ', '描画', '引き出し線の表示', '倍率', '初期位置', '追従', '最低速度', '横軸', '再生速度', 'セクターボタンの動作', '最後の走行データを自動で読み込む', '利用状況の送信']);
+    expect(names).toEqual(['テーマ', '描画', '引き出し線の表示', '倍率', '初期位置', '追従', '速度レンジ', '横軸', '再生速度', 'セクターボタンの動作', '最後の走行データを自動で読み込む', '利用状況の送信']);
     expect($('[data-reset]')).toBeTruthy();
   });
 
@@ -214,26 +214,62 @@ describe('倍率', () => {
   });
 });
 
-describe('速度グラフの最低速度', () => {
+describe('速度グラフの速度レンジ(案件 18)', () => {
   const ticks = () => Array.from(root.querySelectorAll('svg.speed-graph .g-tick[text-anchor="end"]')).map((t) => t.textContent);   // 縦軸の目盛りだけ
-  it('初期は 0 km/h。スライダーで上げると、縦軸の下限がその値になる', () => {
+  const lo = () => $<HTMLInputElement>('[data-yrange="min"]');
+  const hi = () => $<HTMLInputElement>('[data-yrange="max"]');
+  const text = () => $('[data-yrange-text]').textContent;
+  it('初期は 0 km/h 〜 自動。名前は「速度レンジ」で、つまみは 2 つ', () => {
+    expect($('[data-yrange]').closest('.srow')!.querySelector('.sname')!.textContent).toBe('速度レンジ');
+    expect(lo().value).toBe('0');
+    expect(hi().value).toBe('400');
+    expect(hi().getAttribute('aria-valuetext')).toBe('自動');
+    expect(text()).toBe('0 km/h 〜 自動');
+    expect(Array.from(root.querySelectorAll('.yrange-ticks span')).map((t) => t.textContent)).toEqual(['0', '100', '200', '300', '自動']);
+  });
+  it('最低速度のつまみで、縦軸の下限が変わる', () => {
     nav('compare');
     expect(ticks()).toContain('0');
-    const s = $<HTMLInputElement>('[data-ymin]');
-    expect(s.value).toBe('0');
-    slide(s, 50);
-    expect($('[data-ymin-text]').textContent).toBe('50 km/h');
+    nav('settings');
+    slide(lo(), 50);
+    expect(text()).toBe('50 km/h 〜 自動');
     expect(new Prefs(session).yMin).toBe(50);
+    nav('compare');
     expect(ticks()).not.toContain('0');
     expect(ticks()[0]).toBe('50');
   });
-  it('起動時にも反映される。「記憶する」のチェックは無い', () => {
+  it('最高速度のつまみで、縦軸の上限が変わる。右端に戻すと自動', () => {
+    nav('settings');
+    slide(lo(), 100);
+    slide(hi(), 150);
+    expect(text()).toBe('100 〜 150 km/h');
+    expect(new Prefs(session).yMax).toBe(150);
+    nav('compare');
+    expect(ticks()).toEqual(['100', '110', '120', '130', '140', '150']);            // 狭い範囲は、細かい目盛り
+    nav('settings');
+    slide(hi(), 400);
+    expect(text()).toBe('100 km/h 〜 自動');
+    expect(new Prefs(session).yMax).toBeNull();
+  });
+  it('2 つのつまみは 10 km/h より近づかない(動かしたほうが止まる)', () => {
+    slide(hi(), 120);
+    slide(lo(), 200);
+    expect(lo().value).toBe('110');
+    expect(text()).toBe('110 〜 120 km/h');
+    slide(hi(), 50);
+    expect(hi().value).toBe('120');
+    expect(new Prefs(session).yMin).toBe(110);
+    expect(new Prefs(session).yMax).toBe(120);
+  });
+  it('起動時にも反映される。「記憶する」のチェックは無い。1.1.x の「最低速度」の保存(yMin)をそのまま引き継ぐ', () => {
     store = new MemoryStore();
-    boot((p) => p.setYMin(30));
+    boot((p, s) => s.setSetting('prefs', { ...s.getSetting('prefs', {}), yMin: 30 }));
+    expect(lo().value).toBe('30');
+    expect(text()).toBe('30 km/h 〜 自動');
     nav('compare');
     expect(ticks()).not.toContain('0');
     expect(row('xKind')).toBeTruthy();
-    expect(root.querySelector('[data-ymin]')!.closest('.srow')!.querySelector('input[type=checkbox]')).toBeNull();
+    expect(root.querySelector('[data-yrange]')!.closest('.srow')!.querySelector('input[type=checkbox]')).toBeNull();
   });
 });
 
@@ -258,6 +294,21 @@ describe('Prefs(保存の仕組み)', () => {
     expect(p.get('mapMode')).toEqual({ remember: true, value: 'line' });
     expect(p.get('zoom').value).toBe(0);
     expect(p.yMin).toBe(0);
+    expect(p.yMax).toBeNull();
+  });
+  it('速度レンジ: 範囲の外・最低速度 + 10 未満の最高速度は、初期値(0 / 自動)に戻る', () => {
+    const s = new Session(new MemoryStore());
+    const p = new Prefs(s);
+    s.setSetting('prefs', { yMin: 500, yMax: 'x' });
+    expect([p.yMin, p.yMax]).toEqual([0, null]);
+    s.setSetting('prefs', { yMin: 100, yMax: 100 });
+    expect([p.yMin, p.yMax]).toEqual([100, null]);
+    s.setSetting('prefs', { yMin: 100, yMax: 400 });
+    expect(p.yMax).toBeNull();
+    p.setSpeedRange(40, 250);
+    expect([p.yMin, p.yMax]).toEqual([40, 250]);
+    p.setSpeedRange(40, null);
+    expect(s.getSetting<Record<string, unknown>>('prefs', {})).not.toHaveProperty('yMax');
   });
   it('initial: 記憶する → 前回の状態(無ければ初期値)、しない → 初期値', () => {
     const s = new Session(new MemoryStore());

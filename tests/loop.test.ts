@@ -45,13 +45,13 @@ describe('1 周分のログ(輪)の判定', () => {
     expect(checkLoop(log)?.closed).toBe(false);
   });
 
-  it('輪でないログは closeLoop でそのまま。輪は 2 周分につなぎ、2 回目に呼んでも同じ', () => {
+  it('輪でないログは closeLoop でそのまま。輪は 3 周分につなぎ、2 回目に呼んでも同じ', () => {
     const open = ride(0, 300);
     expect(closeLoop(open)).toBe(open);
     const ring = ride(0, 360);
     const closed = closeLoop(ring);
     expect(closed.loop?.n).toBe(ring.t.length);
-    expect(closed.t.length).toBe(2 * ring.t.length - 1);
+    expect(closed.t.length).toBe(3 * ring.t.length - 2);
     expect(closed.loop!.period).toBeCloseTo(PERIOD, 0);
     for (let i = 1; i < closed.t.length; i++) expect(closed.t[i]).toBeGreaterThan(closed.t[i - 1]);   // 時刻は戻らない
     expect(closeLoop(closed)).toBe(closed);

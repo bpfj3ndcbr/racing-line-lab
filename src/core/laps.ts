@@ -104,14 +104,12 @@ export function detectLapRun(
   const laps: Lap[] = [];
   let hasHead = false;
 
-  // 元のログでは完了ラップが取れない(通過が 1 回以下)とき、始点から 1 周分(終わりは含まない)の中の通過が 1 回なら、
-  // そこから 1 周後の通過までを 1 周分のラップにする。終わりを含めないのは、計測ラインが始点に重なっているとき、
-  // 先頭の通過と 1 周後の同じ通過を 2 回数えないため
-  const loopEnd = log.loop ? log.t[0] + log.loop.period : 0;
-  const inPeriod = log.loop && cross.length <= 1 ? all.filter((c) => c.time < loopEnd) : [];
-  if (inPeriod.length === 1) {
-    const next = all.find((c) => c.index > inPeriod[0].index);
-    if (next) laps.push(makeLap(log, 1, inPeriod[0].time, next.time, true));
+  // 元のログでは完了ラップが取れない(通過が 1 回以下)とき、つないだ部分まで使って、最初の通過から次の通過までを
+  // 1 周分のラップにする(1 つだけ)。計測ラインが始点やつなぎ目に重なっていても、同じ場所の通過を 2 回数えない
+  const first = log.loop && cross.length <= 1 ? all[0] : undefined;
+  if (first) {
+    const next = all.find((c) => c.index > first.index);
+    if (next) laps.push(makeLap(log, 1, first.time, next.time, true));
   } else {
     for (let i = 0; i + 1 < cross.length; i++) {
       laps.push(makeLap(log, i + 1, cross[i].time, cross[i + 1].time, true));

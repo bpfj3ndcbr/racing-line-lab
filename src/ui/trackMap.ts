@@ -143,6 +143,12 @@ export const createLeafletMap: MapFactory = (el): TrackMap => {
       for (const l of lines) {
         const a = L.latLng(l.line.a.lat, l.line.a.lon), b = L.latLng(l.line.b.lat, l.line.b.lon);
         lineBounds = lineBounds ? lineBounds.extend(a).extend(b) : L.latLngBounds([a, b]);
+        if (l.before) {
+          // 補正前: 灰色の破線(補正後の線の下に描くため、配列の先に置くこと)。名前は出さない
+          L.polyline([a, b], { color: '#000', weight: 5, opacity: 0.35, interactive: false }).addTo(lineLayer);
+          L.polyline([a, b], { color: '#d0d0d0', weight: 3, opacity: 1, dashArray: '6 5', interactive: false }).addTo(lineLayer);
+          continue;
+        }
         const color = l.selected ? '#00e5ff' : l.kind === 'control' ? '#ffd23f' : '#ffffff';
         L.polyline([a, b], { color: '#000', weight: 6, opacity: 0.4, interactive: false }).addTo(lineLayer);
         L.polyline([a, b], { color, weight: l.selected ? 4 : 3, opacity: 1, interactive: false }).addTo(lineLayer);

@@ -1,6 +1,6 @@
 import {
   type HeatRun as CoreRun, type Lap, type LapSeries, PlaybackEngine, SLOTS, type Slot,
-  accelSeries, buildLapSeries, formatLapTime, heatColor, heatRuns, sampleSeries, speedColor, speedRange, speedRuns, timeAtDistance,
+  accelSeries, alignedSeries, buildLapSeries, pickRuler, formatLapTime, heatColor, heatRuns, sampleSeries, speedColor, speedRange, speedRuns, timeAtDistance,
 } from '../core';
 import type { LoadedLog, Session } from '../store/session';
 import { Prefs, RATE_CHOICES, ZOOM_CHOICES, type LabelV, type PrefKey } from '../store/prefs';
@@ -9,7 +9,11 @@ import { clamp, makeSplitter } from './splitter';
 import type { HeatRun, MapFactory, TrackMap } from './mapTypes';
 import type { ThemeController } from './theme';
 
-interface Car { slot: Slot; log: LoadedLog; lap: Lap; series: LapSeries; accel: HeatRun[]; speed: HeatRun[] }
+/**
+ * series: ラップの時系列(距離は速度の積み上げ)。
+ * track: 距離を、物差しの車の走行ラインに投影した距離に置き換えたもの。横軸「距離」で使う(コース上の同じ位置が同じ距離になる)
+ */
+interface Car { slot: Slot; log: LoadedLog; lap: Lap; series: LapSeries; track: LapSeries; accel: HeatRun[]; speed: HeatRun[] }
 /** line = 車ごとの色の線 / speed = 速度のヒートマップ / accel = 加速・減速のマップ */
 type MapMode = 'line' | 'speed' | 'accel';
 type Follow = 'fixed' | 'leader' | Slot;
@@ -26,7 +30,7 @@ export interface CompareDeps {
 export interface CompareView {
   show(): void; hide(): void; readonly engine: PlaybackEngine;
   /** 設定タブで初期値が変わったとき、その項目を比較画面にも反映する(「記憶する」項目は何もしない) */
-  applyPref(key: PrefKey | 'yMin' | 'startPos' | 'autoLoad'): void;
+  applyPref(key: PrefKey | 'yRange' | 'startPos' | 'autoLoad'): void;
 }
 
 const RATES = RATE_CHOICES;
@@ -176,6 +180,8 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   const ref = () => cars[0];
   const offOf = (c: Car) => off.get(c.slot) ?? 0;
   /** 再生時刻 tau のときの、その車のラップ内の時刻(範囲の外は端に張り付く) */
+  /** 横軸に合わせた時系列: 距離のときは、物差しに投影した距離のもの */
+  const sv = (c: Car) => (xKind === 'dist' ? c.track : c.series);
   const localOf = (c: Car, tau: number) => Math.min(Math.max(tau + offOf(c), 0), c.series.duration);
   /** 全体の長さ: 最後の車が走り終えるまで */
   const totalDuration = () => xKind === 'dist' && ref()
@@ -243,7 +249,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   const graph: SpeedGraph = new SpeedGraph($('cmp-graph'), (v) => {
     const r = ref();
     if (!r) return;
-    engine.seek(xKind === 'time' ? v : timeAtDistance(r.series, v) - offOf(r));
+    engine.seek(xKind === 'time' ? v : timeAtDistance(r.track, v) - offOf(r));
   }, (k) => {
     $('cmp-zoom').textContent = `×${k}`;
     $<HTMLButtonElement>('cmp-zin').disabled = k >= ZOOM_MAX;
@@ -278,8 +284,11 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
     });
     // 色は全車で共通: 速度は全車を通した範囲で、加減速は同じ段階表で決める
     range = speedRange(built.map((b) => b.series));
+    // 距離の物差し: 記録の間隔がいちばん細かい車(同じなら基準車)。画面の基準車は変えない
+    const ruler = built[pickRuler(built.map((b) => ({ series: b.series, complete: b.lap.complete })))];
     cars = built.map((b) => ({
       ...b,
+      track: alignedSeries(ruler.series, b.series, ruler.lap.complete && b.lap.complete),
       accel: toRuns(heatRuns(accelSeries(b.series)), heatColor),
       speed: toRuns(speedRuns(b.series, range.lo, range.hi), speedColor),
     }));
@@ -357,11 +366,11 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
     graph.setData(
       cars.map((c) => ({
         slot: c.slot, y: c.series.speed,
-        x: xKind === 'time' ? Float64Array.from(c.series.t, (t) => t - offOf(c)) : c.series.dist,
+        x: xKind === 'time' ? Float64Array.from(c.series.t, (t) => t - offOf(c)) : c.track.dist,
       })),
       xKind,
       r ? r.lap.sectorTimes.flatMap((t, i) => t === null ? [] : [{
-        label: `S${i + 1}`, x: xKind === 'time' ? t - offOf(r) : sampleSeries(r.series, t).dist,
+        label: `S${i + 1}`, x: xKind === 'time' ? t - offOf(r) : sampleSeries(r.track, t).dist,
       }]) : [],
       keepView,
     );
@@ -593,10 +602,11 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
     $<HTMLButtonElement>('cmp-ff').disabled = engine.playing;
     if (!r) { graph.setCursor(null, []); map?.setCars([]); return; }
 
-    // 時間ベース: 全車が同じ経過時間の位置。距離ベース(速度グラフが「距離」): 基準の車と同じ走行距離の位置(その場所での走行ラインと速度を比べる)
-    const refSample = sampleSeries(r.series, localOf(r, tau));
+    // 時間ベース: 全車が同じ経過時間の位置。距離ベース(速度グラフが「距離」): 基準の車と同じ距離の位置(その場所での走行ラインと速度を比べる)。
+    // 距離ベースの距離は、物差しの走行ラインに投影したもの(コース上の同じ断面にいれば同じ距離)
+    const refSample = sampleSeries(sv(r), localOf(r, tau));
     const samples = cars.map((c) => ({
-      c, s: xKind === 'dist' && c !== r ? sampleSeries(c.series, timeAtDistance(c.series, refSample.dist)) : c === r ? refSample : sampleSeries(c.series, localOf(c, tau)),
+      c, s: xKind === 'dist' && c !== r ? sampleSeries(c.track, timeAtDistance(c.track, refSample.dist)) : c === r ? refSample : sampleSeries(c.series, localOf(c, tau)),
     }));
     const refDist = samples[0].s.dist;
     const onMap = samples.filter(({ c }) => !hidden.has(c.slot));
@@ -635,10 +645,13 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
 
   type Sample = { c: Car; s: { lat: number; lon: number; dist: number } };
 
-  /** 追従の対象: 先頭 = 表示中の車のうち、今いちばん長く走っている車(同じなら若い枠) */
+  /**
+   * 追従の対象: 先頭 = 表示中の車のうち、今いちばん長く走っている車(同じなら若い枠)。
+   * 横軸「距離」では全車が同じ距離にいるので、先頭は決めず、表示中のいちばん若い枠(ふつうは基準車)を追う
+   */
   function followTarget(samples: Sample[]) {
     if (follow === 'fixed' || !samples.length) return null;
-    if (follow === 'leader') return samples.reduce((a, b) => (b.s.dist > a.s.dist ? b : a));
+    if (follow === 'leader') return xKind === 'dist' ? samples[0] : samples.reduce((a, b) => (b.s.dist > a.s.dist ? b : a));
     return samples.find((x) => x.c.slot === follow) ?? null;
   }
 
@@ -779,14 +792,14 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   setPressed('[data-act="xkind"]', (b) => b.dataset.kind === xKind);
   engine.setRate(prefs.initial('rate'));
   setPressed('[data-act="rate"]', (b) => Number(b.dataset.rate) === engine.rate);
-  graph.setYMin(prefs.yMin);
+  graph.setYRange(prefs.yMin, prefs.yMax);
   syncFollowButtons();
   syncLabelBtn();
   renderLegend();
   syncModeUi();
 
-  function applyPref(key: PrefKey | 'yMin' | 'startPos' | 'autoLoad') {
-    if (key === 'yMin') { graph.setYMin(prefs.yMin); return; }
+  function applyPref(key: PrefKey | 'yRange' | 'startPos' | 'autoLoad') {
+    if (key === 'yRange') { graph.setYRange(prefs.yMin, prefs.yMax); return; }
     if (key === 'startPos') { if (visible && cars.length) applyInitialView(); return; }
     if (key === 'autoLoad') return;
     if (prefs.get(key).remember) return;                       // 「記憶する」の項目は、前回の状態のまま

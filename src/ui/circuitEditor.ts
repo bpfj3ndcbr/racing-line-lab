@@ -1,7 +1,9 @@
 import { gsiGeocode, type GeoHit, type Geocoder } from '../io/geocode';
-import { type GeoLine, distanceM, formatCln, formatSci, metersPerDegree, parseCln, parseSci, roundLine } from '../core';
-import type { Session } from '../store/session';
-import { alertDialog } from './dialog';
+import {
+  type GeoLine, LINE_DIGITS, distanceM, formatCln, formatSci, metersPerDegree, parseCln, parseSci, roundLine, sectorPassTimes, shiftLine,
+} from '../core';
+import type { LoadedLog, Session } from '../store/session';
+import { alertDialog, confirmDialog } from './dialog';
 import { downloadText } from './download';
 import type { MapFactory, TrackMap } from './mapTypes';
 import type { ThemeController } from './theme';
@@ -34,8 +36,14 @@ const LONG_LINE_M = 60;
  */
 export function mountCircuitEditor(root: HTMLElement, session: Session, deps: CircuitEditorDeps): CircuitEditor {
   root.innerHTML = `
-    <div class="corr">
+    <div class="corr ce">
       <div class="corr-map-wrap">
+        <div class="ce-head">
+          <span class="ce-head-t" id="ce-title">サーキットの登録</span><span class="ce-head-s">計測ライン・セクターの設定</span><span class="grow"></span>
+          <label class="ce-head-name"><span>サーキット名:</span><input id="ce-name" type="text" placeholder="例: オートポリス" aria-label="サーキット名"></label>
+          <button class="btn pri" id="ce-save" data-act="ce-save">登録完了</button>
+          <button class="btn" id="ce-cancel" data-act="ce-cancel">キャンセル</button>
+        </div>
         <div class="map" id="ce-map"></div>
         <form class="geo" id="ce-geo" role="search" autocomplete="off">
           <input id="ce-geo-q" type="search" placeholder="住所で検索..." aria-label="住所で検索" enterkeyhint="search">
@@ -44,13 +52,7 @@ export function mountCircuitEditor(root: HTMLElement, session: Session, deps: Ci
         <div class="map-hint" id="ce-hint" hidden></div>
       </div>
       <aside class="corr-side" aria-label="サーキットの登録・編集">
-        <div class="h" id="ce-title">サーキットの登録</div>
-        <div class="corr-actions ce-top">
-          <button class="btn pri" id="ce-save" data-act="ce-save">登録</button>
-          <button class="btn" id="ce-cancel" data-act="ce-cancel">キャンセル</button>
-        </div>
         <div class="msg" id="ce-msg" role="status"></div>
-        <label class="frow2 col"><span>名前</span><input id="ce-name" type="text" placeholder="例: オートポリス" aria-label="サーキット名"></label>
         <section class="ce-group" aria-labelledby="ce-g1">
           <h3 id="ce-g1">ラインの追加・削除</h3>
           <div class="ce-draw">
@@ -64,7 +66,7 @@ export function mountCircuitEditor(root: HTMLElement, session: Session, deps: Ci
               <button class="btn" id="ce-discard" data-act="ce-discard" title="仮のラインを捨てます">破棄</button>
             </div>
           </div>
-          <div class="ce-list-h" id="ce-list-h">登録済みライン</div>
+          <div class="ce-list-h" id="ce-list-h"><span>登録済みライン</span><button class="btn sm ce-sort" id="ce-sort" data-act="ce-sort">セクター整列</button></div>
           <div id="ce-list" class="ce-list" role="list" aria-label="ラインの一覧"></div>
           <div class="corr-laps" id="ce-lines" role="status"></div>
         </section>
@@ -117,6 +119,22 @@ export function mountCircuitEditor(root: HTMLElement, session: Session, deps: Ci
   let part: Part = 'm';
   let step = 0.1;
   const msg = (t: string) => { $('ce-msg').textContent = t; };
+  /** 開いたときの内容(案件 23)。キャンセルのとき、これと違えば「保存されていません」と確かめる。地図の表示位置は含めない */
+  let opened = '';
+  const snapshot = () => JSON.stringify([$<HTMLInputElement>('ce-name').value.trim(), control, sectors]);
+  const dirty = () => !!draft || snapshot() !== opened;
+  /** キャンセル: 保存していない変更があれば確かめてから閉じる */
+  async function cancelEdit() {
+    if (dirty()) {
+      const discard = await confirmDialog({
+        title: '編集中の内容が保存されていません',
+        detail: '破棄して閉じると、計測ライン・セクター・サーキット名の変更は元に戻ります。',
+        ok: '破棄して閉じる', cancel: '編集を続ける',
+      });
+      if (!discard || !visible) return;
+    }
+    deps.onDone();
+  }
 
   const label = (k: Key) => (k === 'c' ? '計測ライン' : `S${Number(k.slice(1)) + 1}`);
   const lineOf = (k: Key | null): GeoLine | null => (k === null ? null : k === 'c' ? control : sectors[Number(k.slice(1))] ?? null);
@@ -160,6 +178,52 @@ export function mountCircuitEditor(root: HTMLElement, session: Session, deps: Ci
     if (final) { pushHandles(); renderInfo(); }
   }
 
+  // ---------- セクター整列(案件 21) ----------
+  /**
+   * 並べ替えに使う走行ログ: 表示中の比較セットのログを先に、無ければほかのセットのログから、
+   * 計測ラインを通って 1 周を走り切ったラップがある最初のログ。位置補正は、ラインを逆にずらして判定する。
+   * 一覧を描き直すたびに調べるので、計測ラインと読み込み済みのログが変わらない間は、結果を使い回す
+   */
+  let sortCache: { key: string; log: LoadedLog | null } | null = null;
+  const back = (l: LoadedLog, g: GeoLine) => shiftLine(g, -l.offset.east, -l.offset.north);
+  function sortLog(): LoadedLog | null {
+    if (!control) return null;
+    const seen = new Set<string>();
+    const logs = [session.active, ...session.sets.filter((w) => w !== session.active)].flatMap((w) => w.logs)
+      .filter((l) => (seen.has(l.id) ? false : (seen.add(l.id), true)));
+    const key = JSON.stringify([control, logs.map((l) => [l.id, l.offset.east, l.offset.north])]);
+    if (sortCache?.key !== key) {
+      const c = control;
+      sortCache = { key, log: logs.find((l) => sectorPassTimes(l.log, back(l, c), []) !== null) ?? null };
+    }
+    return sortCache.log;
+  }
+  /** 「セクター整列」を押せない理由(押せるなら空) */
+  function sortBlocked(): string {
+    if (!control) return '計測ラインを引いてから使えます';
+    if (sectors.length < 2) return 'セクターが 2 本以上あるときに使えます';
+    if (draft) return '引いたラインを「確定」か「破棄」してから使えます';
+    if (!sortLog()) return '計測ラインを通る走行ログ(1 周を走り切ったもの)が読み込まれていないため、使えません';
+    return '';
+  }
+  /** セクターを、走行ログが通った順に並べ替える(通らないセクターは最後に、元の順で)。選んでいるラインは選んだまま */
+  function sortSectors() {
+    const log = sortLog();
+    if (!log || !control || sortBlocked()) return;
+    const times = sectorPassTimes(log.log, back(log, control), sectors.map((g) => back(log, g)));
+    if (!times) return;
+    const keep = selected && selected !== 'c' ? sectors[Number(selected.slice(1))] : null;
+    const order = sectors.map((line, k) => ({ line, k, t: times[k] })).sort((p, q) => p.t - q.t || p.k - q.k);
+    const missed = order.filter((x) => x.t === Infinity);
+    const same = order.every((x, i) => x.k === i);
+    sectors = order.map((x) => x.line);
+    if (keep) selected = `s${sectors.indexOf(keep)}`;
+    refresh();
+    const name = log.log.fileName;
+    const miss = missed.length ? ` ${missed.map((x) => `S${sectors.indexOf(x.line) + 1}`).join('・')} は走行ログが通らないため、最後にしました。` : '';
+    msg(same ? `すでに通った順です(走行ログ: ${name})。${miss}` : `セクターを通った順に並べ替えました(走行ログ: ${name})。${miss}`);
+  }
+
   // ---------- 表示 ----------
   function renderList() {
     $('ce-list').innerHTML = keys().map((k) => {
@@ -188,6 +252,9 @@ export function mountCircuitEditor(root: HTMLElement, session: Session, deps: Ci
     if (draft) $('ce-draft-text').textContent = `${draftLabel()} を引きました(未確定)。つまみや矢印キーで直して、「確定」を押してください。`;
     $<HTMLButtonElement>('ce-export-cln').disabled = !control;
     $<HTMLButtonElement>('ce-export-sci').disabled = sectors.length === 0;
+    const blocked = sortBlocked();
+    $<HTMLButtonElement>('ce-sort').disabled = !!blocked;
+    $('ce-sort').title = blocked || 'セクターを、読み込み済みの走行ログが通った順に並べ替えます';
     $<HTMLButtonElement>('ce-draw-control').disabled = !!control;
     $('ce-draw-control').classList.toggle('pri', !control);
     $('ce-draw-sector').classList.toggle('pri', nudgeSector && !!control && !drawing);          // 計測ラインは必ず必要なので、まだ無いうちは青で案内する
@@ -341,7 +408,7 @@ export function mountCircuitEditor(root: HTMLElement, session: Session, deps: Ci
     if (draft) { msg('引いたラインを「確定」するか「破棄」してください。'); return; }
     if (!control) { msg('計測ラインを引くか、.cln ファイルを読み込んでください。'); return; }
     if (!editId) {
-      const r = session.registerCircuit(name, formatCln([control]), formatSci(sectors), view);
+      const r = session.registerCircuit(name, formatCln([control], LINE_DIGITS), formatSci(sectors, 1, LINE_DIGITS), view);
       if (!r.ok && r.reason === 'duplicate') { msg(''); await dupWarn(name); return; }
       if (!r.ok) { msg(r.message); return; }
       session.message = r.message;
@@ -366,7 +433,7 @@ export function mountCircuitEditor(root: HTMLElement, session: Session, deps: Ci
     const d = el.dataset;
     switch (d.act) {
       case 'ce-save': void save(); break;
-      case 'ce-cancel': deps.onDone(); break;
+      case 'ce-cancel': void cancelEdit(); break;
       case 'ce-draw': setDrawing(drawing === d.kind ? null : (d.kind as 'control' | 'sector')); break;
       case 'ce-select': selected = d.key as Key; setDrawing(null); break;
       case 'ce-confirm': confirmDraft(); break;
@@ -378,6 +445,7 @@ export function mountCircuitEditor(root: HTMLElement, session: Session, deps: Ci
         refresh();
         break;
       }
+      case 'ce-sort': sortSectors(); break;
       case 'ce-move': {
         const i = Number(d.key!.slice(1)), j = i + Number(d.d);
         if (j < 0 || j >= sectors.length) break;
@@ -416,8 +484,8 @@ export function mountCircuitEditor(root: HTMLElement, session: Session, deps: Ci
       control = c?.control ?? null;
       sectors = [...(c?.sectors ?? [])];
       selected = null; drawing = null; draft = null; part = 'm';
-      $('ce-title').textContent = c ? `サーキットの編集: ${c.name}` : 'サーキットの登録';
-      $('ce-save').textContent = c ? '保存' : '登録';
+      $('ce-title').textContent = c ? 'サーキットの編集' : 'サーキットの登録';
+      $('ce-save').textContent = c ? '保存' : '登録完了';
       $<HTMLInputElement>('ce-name').value = c?.name ?? '';
       $<HTMLInputElement>('ce-cln').value = '';
       $<HTMLInputElement>('ce-sci').value = '';
@@ -426,6 +494,7 @@ export function mountCircuitEditor(root: HTMLElement, session: Session, deps: Ci
       map ??= deps.mapFactory($('ce-map'));
       map.setDrawMode(null);
       refresh();
+      opened = snapshot();
       map.invalidate();
       const z = deps.zoom?.() ?? 0;
       if (z > 0) {                                   // 設定の倍率(数値)。中心は、登録した表示位置・ライン・走行ログの位置

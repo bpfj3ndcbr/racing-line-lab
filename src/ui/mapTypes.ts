@@ -4,7 +4,11 @@ import type { GeoLine, Slot } from '../core';
 /** ヒートマップ用の色分け区間(points の from〜to 番目を color で描く) */
 export interface HeatRun { from: number; to: number; color: string }
 export interface MapTrack { slot: Slot; points: [number, number][]; color: string; heat?: HeatRun[] }
-export interface MapLine { label: string; line: GeoLine; kind: 'sector' | 'control'; /** 編集中に選んでいるライン(目立つ色で描く) */ selected?: boolean }
+export interface MapLine {
+  label: string; line: GeoLine; kind: 'sector' | 'control';
+  /** 編集中に選んでいるライン(目立つ色で描く) */ selected?: boolean;
+  /** 補正前のライン(灰色の破線で描き、名前は出さない。案件 15) */ before?: boolean;
+}
 /** 編集用のつまみ(ドラッグで動かす点) */
 export interface EditHandle { id: string; lat: number; lon: number; /** 線全体を動かすつまみ */ mid?: boolean }
 /** heading = 進行方向(度、北=0、時計回り)。三角形の向きに使う */

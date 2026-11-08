@@ -1,6 +1,6 @@
 {
   "name": "racing-line-lab",
-  "version": "1.1.0",
+  "version": "1.1.6",
   "private": true,
   "type": "module",
   "scripts": {
@@ -49,6 +49,9 @@
       ],
       "category": "public.app-category.sports",
       "icon": "build/icon.png"
+    },
+    "dmg": {
+      "icon": null
     },
     "win": {
       "target": [

@@ -392,6 +392,17 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
   border:1px solid var(--btn-border);border-radius:var(--r-s);font-variant-numeric:tabular-nums}
 .corr-pad{display:grid;grid-template-columns:repeat(4,28px);gap:6px}
 .corr-step{display:flex;align-items:center;gap:8px}
+.corr-pick{flex:none;border:1px solid var(--border);border-radius:var(--r-l);background:var(--surface);overflow:hidden}
+.corr-pick-h{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:6px 8px;border-bottom:1px solid var(--border);background:var(--sec-bg)}
+.corr-pick-h b{flex:1 0 100%;font-size:12px}
+.corr-pick-h .btn{min-height:24px;height:24px;padding:0 8px;font-size:11px}
+.corr-pick-list{max-height:190px;overflow-y:auto}
+.corr-pick-row{display:grid;grid-template-columns:18px 52px 1fr 20px;align-items:center;gap:6px;padding:3px 8px;cursor:pointer;font-variant-numeric:tabular-nums}
+.corr-pick-row:nth-child(even){background:var(--sec-bg)}
+.corr-pick-row.ex{color:var(--muted)}
+.corr-pick-row input{margin:0}
+.corr-pick-slot i{display:block;width:18px;height:18px;line-height:18px;border-radius:50%;text-align:center;font-size:10px;font-weight:700;font-style:normal}
+.corr-lost{margin-top:4px;color:var(--warn)}
 .corr-laps{min-height:36px;padding:6px 8px;font-size:11px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-m)}
 .corr-actions{display:flex;flex-direction:column;gap:6px;margin-top:4px}
 .corr-actions .btn{min-height:34px;justify-content:center}
@@ -433,7 +444,8 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 [hidden]{display:none!important}
 
 /* 一覧の見出し(コマンドのボタンと区別する) */
-.ce-list-h{font-weight:700;font-size:12px;margin-top:4px}
+.ce-list-h{font-weight:700;font-size:12px;margin-top:4px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.ce-list-h .ce-sort{min-height:24px;height:24px;padding:0 10px;font-size:11px;font-weight:400}
 /* 走行ログ: マウスが乗っているラップの行を強調する */
 .row:not(.hd){transition:background-color .08s}
 .row:not(.hd):hover{background:color-mix(in srgb,var(--accent) 14%,var(--surface));box-shadow:inset 4px 0 0 var(--accent)}
@@ -501,6 +513,24 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .seg.slide button{min-height:30px;height:30px;font-size:11px;padding:0 12px}
 .swl{font-size:11px;min-width:5em}
 .slider{width:240px;max-width:100%;accent-color:var(--accent)}
+/* 速度レンジ(設定タブ): 1 本のバーに、つまみが 2 つ。2 つの range を重ね、つまみだけを押せるようにする */
+.yrange{width:300px;max-width:100%;flex:none}
+.yrange-bar{position:relative;height:24px;--pad:8px}
+.yrange-trk,.yrange-fill{position:absolute;top:10px;height:4px;border-radius:2px;pointer-events:none}
+.yrange-trk{left:var(--pad);right:var(--pad);background:var(--border-strong)}
+.yrange-fill{left:calc(var(--pad) + (100% - 2 * var(--pad)) * var(--lo));width:calc((100% - 2 * var(--pad)) * (var(--hi) - var(--lo)));background:var(--accent)}
+.yrange-bar input{position:absolute;inset:0;width:100%;height:24px;margin:0;background:none;pointer-events:none;-webkit-appearance:none;appearance:none}
+.yrange-bar input.top{z-index:1}
+.yrange-bar input::-webkit-slider-runnable-track{height:24px;background:none}
+.yrange-bar input::-moz-range-track{background:none}
+.yrange-bar input::-webkit-slider-thumb{pointer-events:auto;-webkit-appearance:none;width:16px;height:16px;margin-top:4px;border-radius:50%;
+  background:var(--accent);border:2px solid var(--surface);box-shadow:0 0 0 1px var(--accent);cursor:pointer}
+.yrange-bar input::-moz-range-thumb{pointer-events:auto;width:12px;height:12px;border-radius:50%;background:var(--accent);border:2px solid var(--surface);
+  box-shadow:0 0 0 1px var(--accent);cursor:pointer}
+.yrange-bar input:focus-visible{outline:none}
+.yrange-bar input:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 1px var(--accent),0 0 0 3px var(--focus)}
+.yrange-ticks{position:relative;height:14px;margin:0 var(--pad, 8px);font-size:10px;color:var(--muted)}
+.yrange-ticks span{position:absolute;left:calc(100% * var(--at));transform:translateX(-50%);white-space:nowrap}
 .switch{position:relative;width:46px;height:24px;border-radius:12px;border:1px solid var(--btn-border);background:var(--surface-2);cursor:pointer;padding:0;flex:none}
 .switch i{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:var(--muted);transition:left .12s,background-color .12s}
 .switch.on{background:var(--accent);border-color:var(--accent)}
@@ -528,6 +558,12 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .set-sec.set-active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
 .set-sec.set-active .set-radio{background:var(--accent);color:var(--accent-on);border-color:var(--accent)}
 .set-sec .toolbar.set-circuit{padding-bottom:0}
+/* 比較セットの「使用するサーキット」とボタン: 小さめにして、幅があれば 1 列に並べる */
+.set-tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
+.set-tools .toolbar{gap:8px}
+.set-tools .btn,.set-tools select,.set-tools .seg button{min-height:30px;height:30px;font-size:12px}
+.set-tools .btn,.set-tools .seg button{padding:0 10px}
+.set-tools select{max-width:260px}
 
 .cmp-set{display:flex;align-items:center;gap:6px;font-size:11px}
 .cmp-set select{flex:1;min-width:0}
@@ -583,10 +619,92 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 /* 上部のタブは、すべて「データ管理」の幅にそろえる */
 .navtabs{display:grid;grid-auto-flow:column;grid-auto-columns:1fr}
 .navtab{justify-content:center}
-#ce-msg{min-height:0}
+#ce-msg{min-height:0;flex:none}   /* 右の欄が長くても、つぶれて重ならないように */
 #ce-msg:empty{display:none}
-.corr-actions.ce-top{flex-direction:row;margin:0}
-.corr-actions.ce-top .btn{flex:1}
+/* サーキットの登録・編集: 比較画面と見分けやすいよう、地図の上に見出しの帯を置く(A〜D のカードは隠す) */
+.corr.ce{--ce-head-h:52px}
+.ce-head{position:absolute;left:0;right:0;top:0;height:var(--ce-head-h);z-index:1200;display:flex;align-items:center;gap:14px;
+  padding:0 14px 0 12px;background:var(--sec-head);border-bottom:1px solid var(--border-strong);border-left:5px solid var(--accent)}
+.ce-head-t{font-size:16px;font-weight:700;white-space:nowrap}
+.ce-head-s{color:var(--muted);white-space:nowrap}
+.ce-head-name{display:flex;align-items:center;gap:8px;white-space:nowrap}
+.ce-head-name input{width:260px;min-height:32px;padding:0 10px;color:var(--text);background:var(--surface);
+  border:1px solid var(--border-strong);border-radius:var(--r-m)}
+.ce-head .btn{min-height:32px;min-width:110px;justify-content:center}
+.corr.ce .corr-map-wrap>.map{top:var(--ce-head-h)}
+.corr.ce .geo{top:calc(var(--ce-head-h) + 10px)}
+.corr.ce .map-hint{top:calc(var(--ce-head-h) + 10px)}
+.view-ce>.slots{display:none!important}
+/* 読み込みの確認ダイアログ: 上に選んでいるもの、下にファイルと選択肢の行(1 つを選ぶ) */
+.modal.ld{width:min(900px,calc(100vw - 32px))}
+.ld-top{display:flex;gap:12px;align-items:stretch}
+.ld-top .ld-cur{flex:1;min-width:0}
+.ld-prev{position:relative;flex:none;width:300px;height:170px;overflow:hidden;border:1px solid var(--border-strong);border-radius:var(--r-l);background:var(--surface-2)}
+.ld-prev-mode{position:absolute;z-index:1100;top:6px;right:6px}
+.ld-prev-mode[hidden]{display:none}
+.ld-prev-none{position:absolute;inset:0;z-index:1200;display:flex;align-items:center;justify-content:center;padding:12px;text-align:center;
+  color:var(--muted);background:var(--sec-bg)}
+.ld-prev-none[hidden]{display:none}
+.ld-prev-fix{position:absolute;z-index:1100;top:6px;left:6px;min-height:28px;height:28px;padding:0 9px;font-size:11px}
+/* 計測ラインの修正(案件 15): 確認ダイアログの中身を切り替える */
+.ld-fix-h{font-weight:700;margin:2px 0 8px}
+.ld-fix-h span{font-weight:400;color:var(--muted);margin-left:8px}
+.ld-fix-body{display:flex;gap:12px;align-items:stretch}
+.ld-fix-map{position:relative;flex:1;min-width:0;height:420px;max-height:calc(100vh - 260px);min-height:240px;overflow:hidden;
+  border:1px solid var(--border-strong);border-radius:var(--r-l);background:var(--surface-2)}
+.ld-fix-map .map{position:absolute;inset:0}
+.ld-fix-side{flex:none;width:250px;display:flex;flex-direction:column;gap:10px}
+.ld-fix-g{padding:8px 10px;border:1px solid var(--border);border-radius:var(--r-l);background:var(--sec-bg)}
+.ld-fix-gh{font-weight:700;margin-bottom:2px}
+.ld-fix-side .sub{color:var(--muted);font-size:12px}
+.ld-fix-range{width:100%;margin-top:6px}
+.ld-fix-ang{display:flex;align-items:center;gap:6px;margin-top:4px}
+.ld-fix-ang .ib{min-height:28px;height:28px}
+.ld-fix-deg{width:80px;min-height:28px;padding:0 6px;color:var(--text);background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r-m);
+  font-variant-numeric:tabular-nums}
+.ld-fix-tbl{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;margin:6px 0 0}
+.ld-fix-tbl dt{color:var(--muted)}
+.ld-fix-tbl dd{margin:0;font-weight:700;font-variant-numeric:tabular-nums}
+.ld-fix-reset{align-self:flex-start}
+/* 「読み込みを取り消す」は、ボタンの並びの左端(案件 22) */
+.modal-actions .ld-undo{margin-right:auto}
+/* 修正の画面の線の一覧(案件 17) */
+.ld-fix-list{display:flex;flex-direction:column;gap:3px;max-height:170px;overflow:auto;margin:6px 0}
+.ld-fix-row{display:flex;align-items:center;gap:6px}
+.ld-fix-row .ld-fix-name{flex:none;width:92px;min-height:26px;height:26px;padding:0 8px;justify-content:flex-start;font-size:11px;white-space:nowrap}
+.ld-fix-row.sel .ld-fix-name{background:var(--accent);border-color:var(--accent);color:var(--accent-on);font-weight:700}
+.ld-fix-row .ib{min-height:26px;height:26px}
+.ld-fix-st{flex:1;min-width:0;font-size:11px;color:var(--muted)}
+.ld-fix-st.mod{color:var(--accent)}
+.ld-fix-st.add{color:var(--good)}
+.ld-fix-st.ng{color:var(--warn)}
+.ld-fix-gap{flex:none;width:28px}
+.ld-fix-of{font-weight:400;color:var(--muted);margin-left:6px}
+.ld-fix-draw{align-self:flex-start;min-height:28px;height:28px;padding:0 12px}
+.ld-fix-leg{display:flex;gap:16px;margin-top:6px;font-size:12px;color:var(--muted)}
+.ld-fix-leg i{display:inline-block;width:24px;height:0;vertical-align:middle;margin-right:5px;border-top:3px solid #00e5ff}
+.ld-fix-leg i.before{border-top:3px dashed #9a9a9a}
+.ld-name{display:flex;align-items:center;gap:8px;margin-top:6px}
+.ld-name input{flex:1;min-width:0;max-width:280px;min-height:30px;padding:0 8px;color:var(--text);background:var(--surface);
+  border:1px solid var(--border-strong);border-radius:var(--r-m)}
+.ld-name-msg{color:var(--warn);font-size:12px;min-height:0}
+.ld-cur{padding:8px 12px;background:var(--sec-bg);border:1px solid var(--accent);border-left-width:4px;border-radius:var(--r-l)}
+.ld-cur-h{font-weight:700;margin-bottom:2px}
+.ld-cur-l{padding-left:1em}
+.ld-cur-l span{color:var(--muted)}
+.ld-list{display:flex;flex-direction:column;gap:6px;overflow-y:auto;min-height:0}
+.ld-row{border:1px solid var(--border);border-radius:var(--r-l);background:var(--surface);padding:8px 12px;
+  display:grid;grid-template-columns:minmax(0,1fr) 230px 320px;gap:4px 14px;align-items:start}
+.ld-row.ld-extra{background:var(--sec-bg)}
+.ld-row .fn{font-weight:600;word-break:break-all}
+.ld-row .meta{color:var(--muted);font-size:12px}
+.ld-row .st .tag{display:inline-block}
+.tag.cur{color:var(--accent);border-color:var(--accent);font-weight:700}
+.ld-row .res{display:flex;flex-direction:column;gap:5px}
+.ld-opt{display:flex;gap:6px;align-items:flex-start;cursor:pointer;line-height:1.4}
+.ld-opt input{margin-top:2px}
+.ld-row .from{color:var(--muted);font-size:11.5px;display:block}
+.modal .ld-note{color:var(--muted);font-size:12px}
 
 /* 「計測ラインを引く」「セクターを追加」は同じ大きさ(押した状態で文字が太くなっても変わらない) */
 .ce-draw .btn{flex:1 1 0;min-height:30px;height:30px;padding:0 6px;white-space:nowrap;justify-content:center;box-sizing:border-box}

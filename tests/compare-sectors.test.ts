@@ -469,3 +469,27 @@ describe('動作の切り替えは、選んでいるセクターに反映され�
     expect(time().startsWith('0:20.0')).toBe(true);
   });
 });
+
+/** 点から線分までの距離(m) */
+function offLine(p: { lat: number; lon: number }, l: { a: { lat: number; lon: number }; b: { lat: number; lon: number } }) {
+  const ky = 111000, kx = 111000 * Math.cos((p.lat * Math.PI) / 180);
+  const ax = (l.a.lon - p.lon) * kx, ay = (l.a.lat - p.lat) * ky, bx = (l.b.lon - p.lon) * kx, by = (l.b.lat - p.lat) * ky;
+  const dx = bx - ax, dy = by - ay;
+  const u = Math.min(1, Math.max(0, -(ax * dx + ay * dy) / (dx * dx + dy * dy)));
+  return Math.hypot(ax + u * dx, ay + u * dy);
+}
+
+describe('横軸「距離」のセクターボタン(案件 20)', () => {
+  it.skipIf(!big)('どのセクターを押しても、全車がセクターのライン上に並ぶ(距離は物差しの走行ラインに投影したもの)', () => {
+    setupTwo();
+    $<HTMLButtonElement>('[data-act="xkind"][data-kind="dist"]').click();
+    const n = lapOf('A').sectorTimes.length;
+    expect(n).toBeGreaterThan(3);
+    for (let k = 0; k < n; k++) {
+      if (lapOf('A').sectorTimes[k] == null || lapOf('B').sectorTimes[k] == null) continue;
+      sector(k).click();
+      const line = session.resolveRef(session.assignment.A)!.log.circuit!.sectors[k];
+      for (const slot of ['A', 'B']) expect(offLine(carPos(slot), line)).toBeLessThan(2);
+    }
+  });
+});

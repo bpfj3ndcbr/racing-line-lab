@@ -19,7 +19,11 @@ export type LabelV = 'off' | 'speed' | 'name';
 /** 倍率の初期値: 0 = サーキット全体(登録した表示位置、無ければ走行ライン全体)、それ以外は地図のズーム */
 export const ZOOM_CHOICES = [14, 15, 16, 17, 18, 19, 20];
 export const RATE_CHOICES = [0.25, 0.5, 1, 2, 3];
-export const YMIN_CHOICES = { min: 0, max: 100, step: 10 };
+/**
+ * 速度グラフの縦軸の範囲(設定の「速度レンジ」。km/h)。バーは min〜max を step 刻み。
+ * 最高速度のつまみを max(右端)に置くと「自動」(走行データに合わせて決まる)。最低と最高は gap 以上空ける
+ */
+export const SPEED_RANGE = { min: 0, max: 400, step: 10, gap: 10 };
 
 export interface PrefValues {
   theme: ThemeV;
@@ -59,7 +63,7 @@ const clean: { [K in PrefKey]: (v: unknown) => PrefValues[K] | null } = {
 };
 
 export type StartPos = 'center' | 'control';
-interface Saved { items?: Partial<Record<PrefKey, { remember?: unknown; value?: unknown }>>; yMin?: unknown; startPos?: unknown; autoLoad?: unknown; analytics?: unknown }
+interface Saved { items?: Partial<Record<PrefKey, { remember?: unknown; value?: unknown }>>; yMin?: unknown; yMax?: unknown; startPos?: unknown; autoLoad?: unknown; analytics?: unknown }
 
 export class Prefs {
   constructor(private s: PrefStore) {}
@@ -81,12 +85,28 @@ export class Prefs {
     this.write({ ...cur, items: { ...cur.items, [k]: { remember: now.remember, value: now.value, ...p } } });
   }
 
-  /** 速度グラフの最低速度(km/h)。これは操作で変わらないので「記憶する」は無い */
+  /**
+   * 速度グラフの縦軸の最低速度(km/h)。操作で変わらないので「記憶する」は無い。
+   * 保存のキーは 1.1.x までの「最低速度」と同じ yMin(前の設定をそのまま引き継ぐ)
+   */
   get yMin(): number {
     const v = this.saved().yMin;
-    return typeof v === 'number' && v >= YMIN_CHOICES.min && v <= YMIN_CHOICES.max ? Math.round(v / YMIN_CHOICES.step) * YMIN_CHOICES.step : 0;
+    const { min, max, step, gap } = SPEED_RANGE;
+    return typeof v === 'number' && v >= min && v <= max - gap ? Math.round(v / step) * step : 0;
   }
-  setYMin(v: number) { this.write({ ...this.saved(), yMin: v }); }
+  /** 速度グラフの縦軸の最高速度(km/h)。null = 自動(走行データに合わせる)。最低速度 + gap より小さい値は自動に戻す */
+  get yMax(): number | null {
+    const v = this.saved().yMax;
+    const { max, step, gap } = SPEED_RANGE;
+    if (typeof v !== 'number' || !Number.isFinite(v)) return null;
+    const r = Math.round(v / step) * step;
+    return r >= max || r < this.yMin + gap ? null : r;
+  }
+  /** 速度レンジを保存する(max = null で自動) */
+  setSpeedRange(min: number, max: number | null) {
+    const { yMax: _old, ...rest } = this.saved();
+    this.write({ ...rest, yMin: min, ...(max === null ? {} : { yMax: max }) });
+  }
 
   /** 地図の初期位置: 'center' = 地図の中心(登録した表示位置・走行ライン全体の中心)、'control' = コントロールラインの中心。操作で変わらないので「記憶する」は無い */
   get startPos(): StartPos { return this.saved().startPos === 'control' ? 'control' : 'center'; }

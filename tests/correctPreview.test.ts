@@ -87,14 +87,15 @@ describe('位置補正の画面: 長いログでも、ラインを崩さずに�
   const shown = () => root.querySelector('#cor-shown')!.textContent;
   const tracks = () => maps[maps.length - 1].tracks;
 
-  it('ラップがあれば、ベスト 3 ラップを間引かずに、1 ラップずつ別の線で描く(停止中の 2 時間は描かない)', () => {
+  it('ラップがあれば、最初はベスト 3 ラップにチェックが付き、間引かずに、1 ラップずつ別の線で描く(停止中の 2 時間は描かない)', () => {
     session.registerCircuit('円', clnText, '');
     session.addLog(circleLog([40, 38, 34, 39, 36, 41, 40], 7200), 'c');
     const done = session.logs[0].laps.filter((l) => l.complete);
     expect(done.length).toBeGreaterThan(3);
     open();
     const best = [...done].sort((a, b) => a.duration - b.duration).slice(0, 3).map((l) => l.number).sort((a, b) => a - b);
-    expect(shown()).toBe(`表示中: ベスト 3 ラップ(LAP ${best.join('・')})`);
+    const picked = Array.from(root.querySelectorAll<HTMLInputElement>('[data-pick]')).filter((c) => c.checked).map((c) => Number(c.dataset.pick));
+    expect(picked).toEqual(best);                                                  // 最初のチェックはベスト 3(案件 19)
     expect(tracks()).toHaveLength(3);
     for (const [i, no] of best.entries()) {
       const l = done.find((x) => x.number === no)!;

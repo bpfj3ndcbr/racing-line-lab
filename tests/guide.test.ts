@@ -6,7 +6,7 @@ import { Prefs } from '../src/store/prefs';
 import { Session } from '../src/store/session';
 import { mountApp } from '../src/ui/app';
 import { ThemeController } from '../src/ui/theme';
-import { FakeMap } from './helpers';
+import { FakeMap, headOf } from './helpers';
 
 const cln = readFileSync('fixtures/cl_autopolis.cln', 'utf8');
 const sci = readFileSync('fixtures/autopolis.sci', 'utf8');
@@ -164,13 +164,16 @@ describe('割り当て: 速いものから自動 / 手動', () => {
 });
 
 describe('はじめかた', () => {
-  it('ログが無いときは手順 1 が「いまここ」。ログを追加してサーキットが無ければ手順 2(地図・ファイル・登録済みの入口)', () => {
+  it('ログが無いときは手順 1 が「いまここ」。ログを追加してサーキットが無ければ手順 2(候補・地図・ファイル・登録済みの入口)', () => {
     expect(curStep()).toBe(0);
     expect($('#guide').textContent).toContain('走行ログ(.vbo)を追加…');
     session.addLog(parseOne(), 'u', 0);
     expect(curStep()).toBe(1);
+    // テスト用のログは 1 周分(輪)なので、計測ラインの候補がある(候補のボタンが青)
     const labels = Array.from(root.querySelectorAll('#guide .gstep.cur button')).map((b) => b.textContent);
-    expect(labels).toEqual(['地図で登録…', '.cln / .sci ファイルで登録…']);
+    expect(labels).toEqual(['ログの計測ラインで登録…', '地図で登録…', '.cln / .sci ファイルで登録…']);
+    expect($('[data-act="guide-cand"]').classList.contains('pri')).toBe(true);
+    expect($('[data-act="guide-map"]').classList.contains('pri')).toBe(false);
     session.registerCircuit('別', '1\r\n34.0\r\n131.0\r\n34.001\r\n131.001\r\n', '');
     expect(Array.from(root.querySelectorAll('#guide .gstep.cur button')).map((b) => b.textContent)).toContain('登録済みから選ぶ');
   });
@@ -199,8 +202,15 @@ describe('はじめかた', () => {
   it('セットの中の「サーキットが見つかりません」にも、同じ入口のボタンがある', () => {
     session.addLog(parseOne(), 'u', 1);
     const labels = Array.from(root.querySelectorAll('#sec-set-1 .empty button')).map((b) => b.textContent);
-    expect(labels).toEqual(['地図で登録…', '.cln / .sci ファイルで登録…']);
-    expect(root.querySelector('#sec-set-1 .empty [data-act="circ-map"]')!.classList.contains('pri')).toBe(true);
+    expect(labels).toEqual(['ログの計測ラインで登録…', '地図で登録…', '.cln / .sci ファイルで登録…']);
+    expect(root.querySelector('#sec-set-1 .empty [data-act="circ-cand"]')!.classList.contains('pri')).toBe(true);
+    // 候補が無いログ(輪でない)では、地図で登録が青。ほかのログの候補を借りないように、先のログは外しておく
+    // (先頭 8 割のログは、輪のログから計算した計測ラインの位置から始まるので、借りられるかどうかが丸めの桁で変わる)
+    session.removeLog('u', 1);
+    session.addLog(headOf(parseOne(), 0.8), 'h', 2);
+    const set2 = Array.from(root.querySelectorAll('#sec-set-2 .empty button')).map((b) => b.textContent);
+    expect(set2).toEqual(['地図で登録…', '.cln / .sci ファイルで登録…']);
+    expect(root.querySelector('#sec-set-2 .empty [data-act="circ-map"]')!.classList.contains('pri')).toBe(true);
   });
 
   it('ラップが出たのに割り当てが無いセットには、自動割り当ての案内が出る(表示していないセットでも)', () => {
@@ -255,7 +265,8 @@ describe('比較画面から、サーキット(セクター)を編集して比�
     btn.click();
     expect($<HTMLElement>('#view-import').hidden).toBe(false);
     expect($<HTMLElement>('.work-circuit').hidden).toBe(false);
-    expect($('#ce-title').textContent).toContain('オートポリス');
+    expect($('#ce-title').textContent).toBe('サーキットの編集');
+    expect($<HTMLInputElement>('#ce-name').value).toBe('オートポリス');
     expect($('#ce-draw-sector').classList.contains('pri')).toBe(true);        // 比較画面から来たときは「セクターを追加」が青
     $<HTMLButtonElement>('#ce-save').click();
     await flush();

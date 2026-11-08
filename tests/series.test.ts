@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
-import { PlaybackEngine, buildLapSeries, detectLaps, parseCln, parseSci, parseVbo, sampleSeries, timeAtDistance } from '../src/core';
+import { PlaybackEngine, alignedSeries, buildLapSeries, detectLaps, parseCln, parseSci, parseVbo, sampleSeries, timeAtDistance } from '../src/core';
 
 const fx = (n: string) => `fixtures/${n}`;
 const control = parseCln(readFileSync(fx('cl_autopolis.cln'), 'utf8'))[0];
@@ -69,4 +69,29 @@ describe('再生エンジン', () => {
     expect(e.t).toBeCloseTo(1.0, 9);
   });
   it('長さが縮むと位置も収まる', () => { const e = mk(); e.seek(9); e.setDuration(5); expect(e.t).toBe(5); });
+});
+
+describe.skipIf(!existsSync(fx('session_20260506_094550_autopolis.vbo')))('距離の横軸を物差しに投影してそろえる(案件 20、オートポリスの実際のログ、10Hz)', () => {
+  const ctl = parseCln(readFileSync(fx('cl_autopolis.cln'), 'utf8'))[0];
+  const secs = parseSci(readFileSync(fx('autopolis.sci'), 'utf8')).map((s) => s.line);
+  const big = parseVbo(readFileSync(fx('session_20260506_094550_autopolis.vbo'), 'utf8'), 's.vbo');
+  const laps = detectLaps(big, ctl, secs).filter((l) => l.complete);
+  const series = laps.map((l) => buildLapSeries(big, l));
+
+  it('セクターを通る位置の距離が、全ラップでそろう(ピットから出たラップも含む)', () => {
+    const r = series[0];
+    let rawMax = 0, alignedMax = 0;
+    laps.forEach((l, i) => {
+      const a = alignedSeries(r, series[i]);
+      l.sectorTimes.forEach((t, k) => {
+        const t0 = laps[0].sectorTimes[k];
+        if (t == null || t0 == null) return;
+        const target = sampleSeries(r, t0).dist;
+        rawMax = Math.max(rawMax, Math.abs(sampleSeries(series[i], t).dist - target));
+        alignedMax = Math.max(alignedMax, Math.abs(sampleSeries(a, t).dist - target));
+      });
+    });
+    expect(rawMax).toBeGreaterThan(20);                                 // 今の距離では、数十 m ずれる
+    expect(alignedMax).toBeLessThan(1);
+  });
 });
