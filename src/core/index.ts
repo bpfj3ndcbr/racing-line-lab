@@ -13,3 +13,4 @@ export * from './series';
 export * from './playback';
 export * from './heat';
 export * from './correctPreview';
+export * from './align';

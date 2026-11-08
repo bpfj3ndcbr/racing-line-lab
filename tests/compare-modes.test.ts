@@ -245,6 +245,7 @@ describe('地図の追従', () => {
 
   it.skipIf(!existsSync(bigPath))('先頭追従: その時点で最も長く走っている車(B が速いので途中から B が先頭)', () => {
     setupTwo();
+    $<HTMLButtonElement>('[data-act="xkind"][data-kind="time"]').click();    // 先頭が決まるのは時間ベース
     followBtn('leader').click();
     const carAt = (slot: string) => fake.cars.find((c) => c.slot === slot)!;
     seekTo(0);
@@ -256,6 +257,16 @@ describe('地図の追従', () => {
     followBtn('A').click();
     seekTo(101);
     expect(fake.centers[fake.centers.length - 1]).toEqual([carAt('A').lat, carAt('A').lon]);
+  });
+
+  it.skipIf(!existsSync(bigPath))('先頭追従(横軸「距離」): 全車が同じ距離にいるので、表示中のいちばん若い枠(基準車)を追う', () => {
+    setupTwo();
+    followBtn('leader').click();
+    const carAt = (slot: string) => fake.cars.find((c) => c.slot === slot)!;
+    for (const t of [0, 40, 100]) {
+      seekTo(t);
+      expect(fake.centers[fake.centers.length - 1]).toEqual([carAt('A').lat, carAt('A').lon]);
+    }
   });
 
   it('割り当てを外すと、その枠への追従は固定に戻る', () => {
