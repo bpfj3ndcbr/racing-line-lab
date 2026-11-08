@@ -665,6 +665,19 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .ld-fix-tbl dt{color:var(--muted)}
 .ld-fix-tbl dd{margin:0;font-weight:700;font-variant-numeric:tabular-nums}
 .ld-fix-reset{align-self:flex-start}
+/* 修正の画面の線の一覧(案件 17) */
+.ld-fix-list{display:flex;flex-direction:column;gap:3px;max-height:170px;overflow:auto;margin:6px 0}
+.ld-fix-row{display:flex;align-items:center;gap:6px}
+.ld-fix-row .ld-fix-name{flex:none;width:92px;min-height:26px;height:26px;padding:0 8px;justify-content:flex-start;font-size:11px;white-space:nowrap}
+.ld-fix-row.sel .ld-fix-name{background:var(--accent);border-color:var(--accent);color:var(--accent-on);font-weight:700}
+.ld-fix-row .ib{min-height:26px;height:26px}
+.ld-fix-st{flex:1;min-width:0;font-size:11px;color:var(--muted)}
+.ld-fix-st.mod{color:var(--accent)}
+.ld-fix-st.add{color:var(--good)}
+.ld-fix-st.ng{color:var(--warn)}
+.ld-fix-gap{flex:none;width:28px}
+.ld-fix-of{font-weight:400;color:var(--muted);margin-left:6px}
+.ld-fix-draw{align-self:flex-start;min-height:28px;height:28px;padding:0 12px}
 .ld-fix-leg{display:flex;gap:16px;margin-top:6px;font-size:12px;color:var(--muted)}
 .ld-fix-leg i{display:inline-block;width:24px;height:0;vertical-align:middle;margin-right:5px;border-top:3px solid #00e5ff}
 .ld-fix-leg i.before{border-top:3px dashed #9a9a9a}

@@ -79,15 +79,21 @@ export function loopControlLine(log: TrackLog, len = CANDIDATE_LINE_M): GeoLine 
   return perpendicularLine(c, travel, len);
 }
 
-/** セクターを、計測ラインから始まる最初の完了ラップの中で通る順に並べる。通らないものは最後に(元の順) */
-export function orderSectors(log: TrackLog, control: GeoLine, sectors: GeoLine[]): GeoLine[] {
+/**
+ * 各セクターを、計測ラインから始まる最初の完了ラップの中で通る時刻(通らなければ Infinity)。
+ * 完了ラップが無ければ null
+ */
+export function sectorPassTimes(log: TrackLog, control: GeoLine, sectors: GeoLine[]): number[] | null {
   const lap = detectLapRun(log, control, [], { partial: 'never' }).laps.find((l) => l.complete);
-  if (!lap) return sectors;
-  const at = sectors.map((line, k) => {
-    const hit = findCrossings(log, line).find((c) => c.time >= lap.startTime - 1 && c.time < lap.endTime);
-    return { line, k, t: hit ? hit.time : Infinity };
-  });
-  return at.sort((p, q) => p.t - q.t || p.k - q.k).map((x) => x.line);
+  if (!lap) return null;
+  return sectors.map((line) => findCrossings(log, line).find((c) => c.time >= lap.startTime - 1 && c.time < lap.endTime)?.time ?? Infinity);
+}
+
+/** セクターを、計測ラインから始まる最初の完了ラップの中で通る順に並べる。通らないものは最後に(元の順) */
+export function orderSectors<T extends GeoLine>(log: TrackLog, control: GeoLine, sectors: T[]): T[] {
+  const times = sectorPassTimes(log, control, sectors);
+  if (!times) return sectors;
+  return sectors.map((line, k) => ({ line, k, t: times[k] })).sort((p, q) => p.t - q.t || p.k - q.k).map((x) => x.line);
 }
 
 /** 走行ログから候補を作る。[laptiming] を優先し、無ければ輪のログから計算する。どちらも無ければ null */

@@ -588,12 +588,12 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
     const plan = planLoad(session, set, ids, wasEmpty);
     if (!plan) return;
     if (prefer && plan.options.some((o) => o.key === prefer)) plan.initial = prefer;
-    const { option: o, name, control } = await loadDialog(plan, { mapFactory: opts.mapFactory, nameTaken: (n) => nameExists(session.circuits, n) });
+    const { option: o, name, control, sectors } = await loadDialog(plan, { mapFactory: opts.mapFactory, nameTaken: (n) => nameExists(session.circuits, n) });
     if (o.kind === 'circuit') { session.setCircuit(o.circuit.id, set); scrollToSet(set); }
     if (o.kind === 'cand') {
-      // ファイルの計測ラインは、そのまま(ダイアログで直したなら、直した線で)登録して、ラップの割り当てに進む
+      // ファイルの計測ラインとセクターは、そのまま(ダイアログで直したなら、直した線で)登録して、ラップの割り当てに進む
       const c = o.candidate;
-      const r = session.registerCircuit(name, formatCln([control ?? c.control], LINE_DIGITS), formatSci(c.sectors, 1, LINE_DIGITS));   // 表示位置は決めない(走行ラインに合わせて表示)
+      const r = session.registerCircuit(name, formatCln([control ?? c.control], LINE_DIGITS), formatSci(sectors ?? c.sectors, 1, LINE_DIGITS));   // 表示位置は決めない(走行ラインに合わせて表示)
       if (!r.ok) { session.say(r.message); return; }
       session.message = r.message;
       session.setCircuit(session.circuits[session.circuits.length - 1].id, set);

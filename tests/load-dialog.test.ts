@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest';
-import { distanceM, formatCln, lineBearing, lineMid, metersPerDegree } from '../src/core';
+import { type GeoLine, distanceM, formatCln, lineBearing, lineMid, metersPerDegree } from '../src/core';
 import { MemoryStore } from '../src/io/storage';
 import { Session } from '../src/store/session';
 import { mountApp } from '../src/ui/app';
@@ -13,11 +13,15 @@ const R = 300, V = 100 / 3.6;
 const A = { lat: 33, lon: 131 }, B = { lat: 34.8, lon: 136.5 };
 const pad = (v: number, w: number) => (v < 0 ? '-' : '+') + Math.abs(v).toFixed(6).padStart(w, '0');
 /** 中心 c の半径 300 m の円を 800° 走る .vbo(timing = true なら、北の点に [laptiming] の Start を入れる) */
-function vboText(c: { lat: number; lon: number }, timing: boolean, name = 'テストサーキット'): string {
+/**
+ * 中心 c の円(半径 R)を反時計回りに span 度(既定は 2 周あまり)走るログ。timing = 計測ライン(北の点)の情報を入れる。
+ * splits = セクターの位置(円の角度、ファイルの順)
+ */
+function vboText(c: { lat: number; lon: number }, timing: boolean, name = 'テストサーキット', splits: number[] = [], span = 800): string {
   const m = metersPerDegree(c.lat);
   const step = ((V * 0.1) / R) * (180 / Math.PI);
   const rows: string[] = [];
-  for (let i = 0; i * step <= 800; i++) {
+  for (let i = 0; i * step <= span; i++) {
     const a = (i * step * Math.PI) / 180;
     const lat = c.lat + (R * Math.sin(a)) / m.lat, lon = c.lon + (R * Math.cos(a)) / m.lon;
     const t = 36000 + i * 0.1;
@@ -26,13 +30,27 @@ function vboText(c: { lat: number; lon: number }, timing: boolean, name = 'テ�
   }
   const p1 = { lat: c.lat + R / m.lat, lon: c.lon }, p2 = { lat: p1.lat, lon: c.lon + 50 / m.lon };
   const lt = timing
-    ? `[session data]\r\nname ${name}\r\n\r\n[laptiming]\r\nStart ${pad(-p1.lon * 60, 12)} ${pad(p1.lat * 60, 12)} ${pad(-p2.lon * 60, 12)} ${pad(p2.lat * 60, 12)} ¬ Control line\r\n\r\n`
+    ? `[session data]\r\nname ${name}\r\n\r\n[laptiming]\r\nStart ${pad(-p1.lon * 60, 12)} ${pad(p1.lat * 60, 12)} ${pad(-p2.lon * 60, 12)} ${pad(p2.lat * 60, 12)} ¬ Control line\r\n`
+      // [laptiming] の線は、p1 を通り p2 → p1 の向きに直交する。p1 = 円の上の点、p2 = そこから接線の向きに 50 m
+      + splits.map((deg, i) => {
+        const r = (deg * Math.PI) / 180;
+        const q1 = { lat: c.lat + (R * Math.sin(r)) / m.lat, lon: c.lon + (R * Math.cos(r)) / m.lon };
+        const q2 = { lat: q1.lat + (50 * Math.cos(r)) / m.lat, lon: q1.lon - (50 * Math.sin(r)) / m.lon };
+        return `Split ${pad(-q1.lon * 60, 12)} ${pad(q1.lat * 60, 12)} ${pad(-q2.lon * 60, 12)} ${pad(q2.lat * 60, 12)} ¬ Split ${i + 1}\r\n`;
+      }).join('')
+      + '\r\n'
     : '';
   return `File created on 06/05/2026 at 10:00:00\r\n\r\n[header]\r\nsatellites\r\n\r\n[comments]\r\ntest\r\n\r\n${lt}`
     + `[column names]\r\nsats time lat long velocity heading height\r\n\r\n[data]\r\n${rows.join('\r\n')}\r\n`;
 }
 const file = (name: string, text: string) => ({ name, size: text.length, text: async () => text }) as unknown as File;
 const flush = () => new Promise((r) => setTimeout(r, 20));
+/** 円の deg 度(東 = 0°、反時計回り)の点で、コースを横切る線(中心から外へ向かう) */
+function radial(c: { lat: number; lon: number }, deg: number): GeoLine {
+  const m = metersPerDegree(c.lat), a = (deg * Math.PI) / 180;
+  const at = (r: number) => ({ lat: c.lat + (r * Math.sin(a)) / m.lat, lon: c.lon + (r * Math.cos(a)) / m.lon });
+  return { a: at(R - 10), b: at(R + 10) };
+}
 /** 北の点(円の 90°)で、コースを横切る線 */
 function northLine(c: { lat: number; lon: number }) {
   const m = metersPerDegree(c.lat);
@@ -238,12 +256,13 @@ describe('計測ラインの修正(案件 15)', () => {
     await flush(); await flush();
     expect($('.ld-prev-fix').hidden).toBe(false);
     expect($('.ld-cur').textContent).toContain('計測ライン: ファイルのまま(修正なし)');
-    // 「セクター」のときは押せない(直せるのは計測ラインだけ)
+    expect($('.ld-prev-fix').textContent).toBe('計測ラインを修正');
+    // 「セクター」のときも押せて、名前が「セクターを修正」になる(案件 17。どちらから開いても、計測ラインとセクターを直せる)
     $<HTMLButtonElement>('.ld-prev-mode [data-zoom="all"]').click();
-    expect($<HTMLButtonElement>('.ld-prev-fix').disabled).toBe(true);
-    expect($('.ld-prev-fix').title).toContain('「計測ライン付近」に切り替えると');
-    $<HTMLButtonElement>('.ld-prev-mode [data-zoom="near"]').click();
     expect($<HTMLButtonElement>('.ld-prev-fix').disabled).toBe(false);
+    expect($('.ld-prev-fix').textContent).toBe('セクターを修正');
+    $<HTMLButtonElement>('.ld-prev-mode [data-zoom="near"]').click();
+    expect($('.ld-prev-fix').textContent).toBe('計測ラインを修正');
     pick('map');
     expect($('.ld-prev-fix').hidden).toBe(true);
     pick('later');
@@ -253,7 +272,7 @@ describe('計測ラインの修正(案件 15)', () => {
     $<HTMLButtonElement>('.ld-prev-fix').click();
     expect($('.modal.ld .ld-main').hidden).toBe(true);
     expect(fixEl().hidden).toBe(false);
-    expect(fixEl().textContent).toContain('計測ラインの修正');
+    expect(fixEl().textContent).toContain('計測ライン・セクターの修正');
     expect(ok().hidden).toBe(true);
     expect($<HTMLButtonElement>('[data-fix="apply"]').hidden).toBe(false);
     expect(document.querySelector('.modal.ld input[name="ld-opt"]')).toBeNull();         // 元の画面の入力欄は残さない
@@ -354,5 +373,160 @@ describe('計測ラインの修正(案件 15)', () => {
     expect(val('ld-fix-mv')).toBe('0.0 m');
     $<HTMLButtonElement>('[data-fix="apply"]').click();
     expect($('.ld-cur').textContent).toContain('ファイルのまま(修正なし)');
+  });
+});
+
+describe('セクターの修正・追加(案件 17)', () => {
+  // ログは北(90°)の計測ラインから反時計回り: 西(180°)→ 南(270°)→ 東(0°)の順に通る。ファイルのセクターは、南・西の順に書く
+  const fixEl = () => $('.modal.ld .ld-fix');
+  const names = () => Array.from(document.querySelectorAll('.ld-fix-list .ld-fix-name')).map((b) => b.textContent);
+  const selName = () => $('.ld-fix-list [aria-pressed="true"]').textContent;
+  const stOf = (name: string) => Array.from(document.querySelectorAll<HTMLElement>('.ld-fix-row'))
+    .find((r) => r.querySelector('.ld-fix-name')!.textContent === name)!.querySelector('.ld-fix-st')!.textContent;
+  const btn = (sel: string) => $<HTMLButtonElement>(sel);
+  const rowBtn = (name: string, act: string) => Array.from(document.querySelectorAll<HTMLElement>('.ld-fix-row'))
+    .find((r) => r.querySelector('.ld-fix-name')!.textContent === name)!.querySelector<HTMLButtonElement>(`[data-fix="${act}"]`)!;
+  /** 線の中心が、円の何度の位置か */
+  const degOf = (l: GeoLine) => {
+    const c = lineMid(l), m = metersPerDegree(A.lat);
+    return Math.round(((Math.atan2((c.lat - A.lat) * m.lat, (c.lon - A.lon) * m.lon) * 180) / Math.PI + 360) % 360);
+  };
+  async function openSectors(splits = [270, 180]) {
+    drop(0, [file('rc.vbo', vboText(A, true, 'テストサーキット', splits))]);
+    await flush(); await flush();
+    btn('.ld-prev-mode [data-zoom="all"]').click();
+    btn('.ld-prev-fix').click();
+    return maps.at(-1)!;
+  }
+
+  it('「セクターを修正」で開くと、線の一覧(通った順)が出て S1 を選んだ状態。地図は 1 周全体', async () => {
+    const fm = await openSectors();
+    expect(names()).toEqual(['計測ライン', 'S1', 'S2']);
+    expect(selName()).toBe('S1');
+    expect(fm.fitted).toBeGreaterThan(0);
+    expect(fm.lines.filter((l) => !l.before).map((l) => [l.label, l.kind, degOf(l.line), !!l.selected]))
+      .toEqual([['計測ライン', 'control', 90, false], ['S1', 'sector', 180, true], ['S2', 'sector', 270, false]]);
+    expect(fm.lines.find((l) => l.before)?.kind).toBe('sector');                           // 選んでいる S1 の補正前
+    expect(fm.handles.map((h) => h.id)).toEqual(['a', 'b', 'm']);
+    expect($('.ld-fix-of').textContent).toBe('(S1)');
+    // 一覧で選ぶと、その線を直す対象になり、地図がその線へ寄る
+    rowBtn('S2', 'sel').click();
+    expect(selName()).toBe('S2');
+    expect($('.ld-fix-of').textContent).toBe('(S2)');
+    const c = lineMid(radial(A, 270));
+    expect(fm.view.lat).toBeCloseTo(c.lat, 6);
+    expect(fm.view.zoom).toBeGreaterThanOrEqual(18);
+    // 一覧のボタンにフォーカスがあるまま、矢印キーで続けて動かせる(描き直しでフォーカスが外れない)
+    const press = () => document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true }));
+    expect(document.activeElement!.textContent).toBe('S2');
+    press(); press(); press();
+    expect($('.ld-fix-mv').textContent).toBe('0.3 m');
+    expect(document.activeElement!.textContent).toBe('S2');
+    expect(stOf('S2')).toBe('修正済み');
+  });
+
+  it('「計測ラインを修正」から開いたときは、計測ラインを選んだ状態', async () => {
+    drop(0, [file('rc.vbo', vboText(A, true, 'テストサーキット', [180]))]);
+    await flush(); await flush();
+    btn('.ld-prev-fix').click();
+    expect(names()).toEqual(['計測ライン', 'S1']);
+    expect(selName()).toBe('計測ライン');
+    expect(rowBtn('計測ライン', 'del')).toBeNull();                                         // 計測ラインは消せない
+  });
+
+  it('「セクターを追加」で地図に引くと、通った順に並べ直して番号を振り直す。通らない線は最後に「通りません」', async () => {
+    const fm = await openSectors();
+    btn('[data-fix="draw"]').click();
+    expect(btn('[data-fix="draw"]').getAttribute('aria-pressed')).toBe('true');
+    expect($('.ld-fix-draw-hint').hidden).toBe(false);
+    expect(fm.handles).toEqual([]);                                                         // 引いている間は、つまみを出さない
+    fm.drawLine(radial(A, 0).a, radial(A, 0).b);                                            // 東: 最後に通る
+    expect(btn('[data-fix="draw"]').getAttribute('aria-pressed')).toBe('false');
+    expect(names()).toEqual(['計測ライン', 'S1', 'S2', 'S3']);
+    expect(selName()).toBe('S3');
+    expect(stOf('S3')).toBe('追加');
+    btn('[data-fix="draw"]').click();
+    fm.drawLine(radial(A, 135).a, radial(A, 135).b);                                        // 北西: 計測ラインの次に通る
+    expect(selName()).toBe('S1');
+    expect(stOf('S1')).toBe('追加');
+    expect(fm.lines.filter((l) => !l.before && l.kind === 'sector').map((l) => [l.label, degOf(l.line)]))
+      .toEqual([['S1', 135], ['S2', 180], ['S3', 270], ['S4', 0]]);
+    btn('[data-fix="draw"]').click();
+    const m = metersPerDegree(A.lat);
+    fm.drawLine({ lat: A.lat, lon: A.lon - 20 / m.lon }, { lat: A.lat, lon: A.lon + 20 / m.lon });   // 円の中心: どのラップも通らない
+    expect(names()).toEqual(['計測ライン', 'S1', 'S2', 'S3', 'S4', 'S5']);
+    expect(selName()).toBe('S5');
+    expect(stOf('S5')).toBe('通りません');
+  });
+
+  it('引いている途中の Esc は、引くのをやめるだけ(修正の画面は閉じない)', async () => {
+    await openSectors();
+    btn('[data-fix="draw"]').click();
+    fixEl().dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    expect(fixEl().hidden).toBe(false);
+    expect(btn('[data-fix="draw"]').getAttribute('aria-pressed')).toBe('false');
+    expect($('.ld-fix-draw-hint').hidden).toBe(true);
+  });
+
+  it('直す・足す・消すをまとめて「この位置にする」で決め、登録するとそのセクターで登録される', async () => {
+    const fm = await openSectors();
+    // S1(西)を回す → 修正済み
+    const n = $<HTMLInputElement>('.ld-fix-deg');
+    n.value = String((lineBearing(radial(A, 180)) + 3) % 360);
+    n.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(stOf('S1')).toBe('修正済み');
+    // S2(南)を消し、東に足す
+    rowBtn('S2', 'del').click();
+    expect(names()).toEqual(['計測ライン', 'S1']);
+    btn('[data-fix="draw"]').click();
+    fm.drawLine(radial(A, 0).a, radial(A, 0).b);
+    btn('[data-fix="apply"]').click();
+    expect(fixEl().hidden).toBe(true);
+    expect($('.ld-cur').textContent).toContain('計測ライン: ファイルのまま(修正なし)');
+    expect($('.ld-cur').textContent).toContain('セクター: 修正あり(2 本。修正 1・追加 1・削除 1)');
+    await flush();
+    expect(maps[0].lines.filter((l) => l.kind === 'sector').map((l) => [l.label, degOf(l.line)])).toEqual([['S1', 180], ['S2', 0]]);   // プレビュー
+    // もう一度開くと、直した状態から続けられる
+    btn('.ld-prev-fix').click();
+    expect(names()).toEqual(['計測ライン', 'S1', 'S2']);
+    expect(stOf('S2')).toBe('追加');
+    btn('[data-fix="apply"]').click();
+    ok().click();
+    await flush();
+    expect(dialog()).toBeNull();
+    const c = session.circuits[0];
+    expect(c.sectors.map(degOf)).toEqual([180, 0]);
+    expect(lineBearing(c.sectors[0])).toBeCloseTo((lineBearing(radial(A, 180)) + 3) % 360, 1);
+    expect(degOf(c.control!)).toBe(90);
+    expect(session.sets[0].logs[0].laps.find((l) => l.complete)!.sectorTimes.every((t) => t !== null)).toBe(true);
+  });
+
+  it('「キャンセル」では、消したセクターも元に戻る', async () => {
+    await openSectors();
+    rowBtn('S1', 'del').click();
+    btn('[data-fix="cancel"]').click();
+    expect($('.ld-cur').textContent).toContain('セクター: ファイルのまま(2 本)');
+    btn('.ld-prev-fix').click();
+    expect(names()).toEqual(['計測ライン', 'S1', 'S2']);
+  });
+
+  it('セクターの無い候補(計算した計測ライン)でも、セクターを足して登録できる', async () => {
+    drop(0, [file('loop.vbo', vboText(A, false, '', [], 360))]);                     // 1 周分だけのログ(計測ラインを計算する)
+    await flush(); await flush();
+    expect($('.ld-cur').textContent).toContain('計算した計測ライン');
+    expect($('.ld-cur').textContent).toContain('セクター: なし');
+    btn('.ld-prev-mode [data-zoom="all"]').click();
+    btn('.ld-prev-fix').click();
+    const fm = maps.at(-1)!;
+    expect(names()).toEqual(['計測ライン']);
+    expect(selName()).toBe('計測ライン');
+    btn('[data-fix="draw"]').click();
+    fm.drawLine(radial(A, 270).a, radial(A, 270).b);
+    expect(names()).toEqual(['計測ライン', 'S1']);
+    btn('[data-fix="apply"]').click();
+    expect($('.ld-cur').textContent).toContain('セクター: 修正あり(1 本。追加 1)');
+    ok().click();
+    await flush();
+    expect(session.circuits[0].sectors).toHaveLength(1);
   });
 });
