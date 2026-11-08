@@ -1,4 +1,4 @@
-import { type PreviewPick, SLOTS, detectLaps, findCrossings, formatLapTime, metersPerDegree, pickPreviewRanges } from '../core';
+import { type Lap, type PreviewPick, type PreviewRange, type Slot, SLOTS, detectLaps, findCrossings, formatLapTime, matchLap, metersPerDegree, pickPreviewRanges } from '../core';
 import type { LoadedLog, Session } from '../store/session';
 import type { MapFactory, TrackMap } from './mapTypes';
 import type { ThemeController } from './theme';
@@ -15,13 +15,16 @@ const STEPS = [0.1, 0.5, 1];
 /** 地図に出す点の数の上限(描く区間が長いときだけ間引く) */
 const MAX_POINTS = 20000;
 const PREVIEW_DELAY_MS = 250;
+/** 最初にチェックを付けるラップの数(カードに割り当て中のラップが無いとき、ベストから) */
+const DEFAULT_PICK = 3;
 const round2 = (v: number) => Math.round(v * 100) / 100;
 const fmtM = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
 
 /**
  * 位置補正の画面(Run ごと)。
- * 地図の上でドラッグするとラインが動く / 矢印キーで微調整 / 数値でも入力できる。
- * 「適用して保存」で補正量を保存し、ラップ・セクターを検出し直す。
+ * 地図の上でドラッグするとラインが動く(「ラインを動かす」のとき)/ 矢印キーで微調整 / 数値でも入力できる。
+ * 地図に出すラップは、右の欄の一覧のチェックで選ぶ(案件 19。最初は、カードに割り当て中のラップ、無ければベスト 3、完了ラップも無ければ参考値のラップ)。
+ * 「適用して保存」で補正量を保存し、ラップ・セクターを検出し直す。割り当ては、同じラップが見つかれば残る。
  */
 /** 地図に何を描いているかの説明 */
 function shownText(p: PreviewPick): string {
@@ -41,8 +44,8 @@ export function mountCorrectView(root: HTMLElement, session: Session, deps: Corr
         <div class="map" id="cor-map"></div>
         <div class="map-ov tl">
           <span class="seg sm" role="group" aria-label="地図の上のドラッグ">
-            <button data-act="cor-mode" data-mode="line" aria-pressed="true" class="on" title="ドラッグでラインを動かします">ラインを動かす</button>
-            <button data-act="cor-mode" data-mode="map" aria-pressed="false" title="ドラッグで地図を動かします">地図を動かす</button>
+            <button data-act="cor-mode" data-mode="line" aria-pressed="false" title="ドラッグでラインを動かします">ラインを動かす</button>
+            <button data-act="cor-mode" data-mode="map" aria-pressed="true" class="on" title="ドラッグで地図を動かします">地図を動かす</button>
           </span>
         </div>
       </div>
@@ -50,7 +53,12 @@ export function mountCorrectView(root: HTMLElement, session: Session, deps: Corr
         <div class="h" id="cor-title">位置補正</div>
         <div class="sub" id="cor-file"></div>
         <div class="sub" id="cor-shown"></div>
-        <div class="sub">地図の上をドラッグするとラインが動きます。矢印キーで微調整(Shift で 10 倍)。</div>
+        <div class="corr-pick" id="cor-pick" hidden>
+          <div class="corr-pick-h"><b id="cor-pick-count"></b>
+            <button type="button" class="btn" data-act="cor-pick-all">すべて選ぶ</button><button type="button" class="btn" data-act="cor-pick-none">すべて外す</button></div>
+          <div class="corr-pick-list" id="cor-pick-list" role="group" aria-label="地図に出すラップ"></div>
+        </div>
+        <div class="sub">「ラインを動かす」にすると、地図の上のドラッグでラインが動きます。矢印キーで微調整(Shift で 10 倍)。</div>
         <div class="corr-fields">
           <label class="frow2"><span>東へ</span><input id="cor-east" type="number" step="0.1" aria-label="東への補正量(メートル)"><span>m</span></label>
           <label class="frow2"><span>北へ</span><input id="cor-north" type="number" step="0.1" aria-label="北への補正量(メートル)"><span>m</span></label>
@@ -88,6 +96,12 @@ export function mountCorrectView(root: HTMLElement, session: Session, deps: Corr
   let base: { lat: Float64Array; lon: Float64Array }[] = [];
   let mPer = metersPerDegree(33);
   let timer: ReturnType<typeof setTimeout> | null = null;
+  /** 開いたときのラップ(一覧はこれで固定し、補正量を動かしても変えない) */
+  let laps: Lap[] = [];
+  /** 地図に出すラップ(番号) */
+  let checked = new Set<number>();
+  /** 開いた比較セットで、この Run のラップを割り当てているカード(ラップ番号 → カード) */
+  let slotOfLap = new Map<number, Slot>();
 
   const accent = () => getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#4aa3ff';
 
@@ -125,16 +139,55 @@ export function mountCorrectView(root: HTMLElement, session: Session, deps: Corr
     timer = null;
     const c = log?.circuit;
     if (!log || !c) return;
-    if (!findCrossings(log.log, c.control, { offset: draft }).length) {
-      $('cor-laps').textContent = 'この補正量では、コントロールラインを通過しません。';
-      return;
+    const crosses = findCrossings(log.log, c.control, { offset: draft }).length > 0;
+    const all = crosses ? detectLaps(log.log, c.control, c.sectors, { offset: draft }) : [];
+    const done = all.filter((l) => l.complete);
+    const head = !crosses ? 'この補正量では、コントロールラインを通過しません。'
+      : done.length ? `この補正量では ${done.length} ラップ ・ ベスト ${formatLapTime(Math.min(...done.map((l) => l.duration)))}`
+        : `この補正量では、完了したラップはありません(参考値 ${all.length} 件)。`;
+    // 割り当て中のラップが、この補正量でも見つかるか(見つからなければ、適用すると解除される)
+    const lost = [...slotOfLap].filter(([n]) => { const lap = laps.find((x) => x.number === n); return !lap || !matchLap(lap, all, log?.log.loop?.period); })
+      .map(([n, slot]) => `${slot}(LAP ${n})`);
+    $('cor-laps').textContent = head;
+    if (lost.length) {
+      const w = document.createElement('div');
+      w.className = 'corr-lost';
+      w.textContent = `この補正量では ${lost.join('、')} のラップが見つかりません。適用すると、その割り当てを解除します。`;
+      $('cor-laps').appendChild(w);
     }
-    const all = detectLaps(log.log, c.control, c.sectors, { offset: draft });
-    const laps = all.filter((l) => l.complete);
-    $('cor-laps').textContent = laps.length
-      ? `この補正量では ${laps.length} ラップ ・ ベスト ${formatLapTime(Math.min(...laps.map((l) => l.duration)))}`
-      : `この補正量では、完了したラップはありません(参考値 ${all.length} 件)。`;
   }
+
+  /** 地図に描く区間(補正なしの点)を作り直す。点が多いときは、全体で MAX_POINTS 点ほどに間引く */
+  function buildBase() {
+    if (!log) return;
+    const l = log, n = l.log.t.length;
+    const ranges: PreviewRange[] = laps.length
+      ? laps.filter((x) => checked.has(x.number)).map((x) => ({ from: x.startIndex, to: Math.min(n - 1, x.endIndex + 1) }))   // endIndex は終点の直前のサンプルなので 1 つ先まで
+      : pickPreviewRanges(l.log, l.laps).ranges;
+    const total = ranges.reduce((s, r) => s + r.to - r.from + 1, 0);
+    const every = Math.max(1, Math.ceil(total / MAX_POINTS));
+    base = ranges.map((r) => {
+      const idx: number[] = [];
+      for (let i = r.from; i < r.to; i += every) idx.push(i);
+      idx.push(r.to);
+      return { lat: Float64Array.from(idx, (i) => l.log.lat[i]), lon: Float64Array.from(idx, (i) => l.log.lon[i]) };
+    });
+  }
+  /** ラップの一覧(チェックボックス・LAP・タイム・割り当て中のカード) */
+  function renderPick() {
+    const best = Math.min(...laps.filter((x) => x.complete).map((x) => x.duration));
+    $('cor-pick-list').innerHTML = laps.map((x) => {
+      const slot = slotOfLap.get(x.number);
+      const ex = !x.complete || x.duration > best * 1.2;
+      return `<label class="corr-pick-row${ex ? ' ex' : ''}"><input type="checkbox" data-pick="${x.number}"${checked.has(x.number) ? ' checked' : ''}>
+        <span>LAP ${x.number}</span><span class="num">${formatLapTime(x.duration)}${x.complete ? '' : '(参考値)'}</span>
+        <span class="corr-pick-slot">${slot ? `<i class="s${slot.toLowerCase()}" title="カード ${slot} に割り当て中">${slot}</i>` : ''}</span></label>`;
+    }).join('');
+    updatePickCount();
+  }
+  function updatePickCount() { $('cor-pick-count').textContent = `地図に出すラップ ${checked.size} / ${laps.length}`; }
+  /** チェックを変えたとき: 地図だけ描き直す(表示位置は変えない) */
+  function pickChanged() { updatePickCount(); buildBase(); pushTrack(); }
 
   const nudge = (dEast: number, dNorth: number) => { draft = { east: draft.east + dEast, north: draft.north + dNorth }; changed(); };
   const setMode = (m: 'line' | 'map') => {
@@ -166,11 +219,23 @@ export function mountCorrectView(root: HTMLElement, session: Session, deps: Corr
       case 'cor-zero': draft = { east: 0, north: 0 }; changed(); break;
       case 'cor-revert': draft = { ...saved }; changed(); break;
       case 'cor-cancel': deps.onDone(); break;
+      case 'cor-pick-all': case 'cor-pick-none':
+        checked = new Set(d.act === 'cor-pick-all' ? laps.map((x) => x.number) : []);
+        root.querySelectorAll<HTMLInputElement>('[data-pick]').forEach((c) => { c.checked = checked.has(Number(c.dataset.pick)); });
+        pickChanged();
+        break;
       case 'cor-apply':
         if (log) session.setOffset(log.id, { ...draft });
         deps.onDone();
         break;
     }
+  });
+  root.addEventListener('change', (e) => {
+    const t = e.target as HTMLInputElement;
+    if (!t.matches('[data-pick]')) return;
+    const no = Number(t.dataset.pick);
+    if (t.checked) checked.add(no); else checked.delete(no);
+    pickChanged();
   });
   root.addEventListener('input', (e) => {
     const t = e.target as HTMLInputElement;
@@ -209,26 +274,25 @@ export function mountCorrectView(root: HTMLElement, session: Session, deps: Corr
       document.addEventListener('keydown', onKey);
       saved = { ...l.offset };
       draft = { ...l.offset };
-      // 地図に出すのは、合わせるのに足りる数ラップだけ(開いたときの補正量で選び、操作中は替えない)。
-      // 補正量は、あとから足して動かす
-      const pick = pickPreviewRanges(l.log, l.laps);
-      const total = pick.ranges.reduce((s, r) => s + r.to - r.from + 1, 0);
-      const every = Math.max(1, Math.ceil(total / MAX_POINTS));
-      base = pick.ranges.map((r) => {
-        const idx: number[] = [];
-        for (let i = r.from; i < r.to; i += every) idx.push(i);
-        idx.push(r.to);
-        return { lat: Float64Array.from(idx, (i) => l.log.lat[i]), lon: Float64Array.from(idx, (i) => l.log.lon[i]) };
-      });
-      $('cor-shown').textContent = shownText(pick);
+      // 地図に出すラップは、一覧のチェックで選ぶ(開いたときのラップで、操作中は替えない)。
+      // 最初は、カードに割り当て中のラップ、無ければベスト 3。ラップが無いログは、今までどおり走行中の区間などを出す
+      laps = l.laps;
+      slotOfLap = new Map(SLOTS.flatMap((s) => { const r = w.assignment[s]; return r?.logId === l.id ? [[r.lap, s] as [number, Slot]] : []; }));
+      const best = laps.filter((x) => x.complete).sort((a, b) => a.duration - b.duration).slice(0, DEFAULT_PICK).map((x) => x.number);
+      checked = new Set(slotOfLap.size ? [...slotOfLap.keys()].filter((n) => laps.some((x) => x.number === n))
+        : best.length ? best : laps.map((x) => x.number));                         // 完了ラップが無ければ、参考値のラップ
+      $('cor-pick').hidden = !laps.length;
+      $('cor-shown').hidden = !!laps.length;
+      if (laps.length) renderPick();
+      else $('cor-shown').textContent = shownText(pickPreviewRanges(l.log, l.laps));
+      buildBase();
       const n = l.log.t.length;
       mPer = metersPerDegree(l.log.lat[Math.floor(n / 2)] ?? 33);
       $('cor-title').textContent = `Run ${l.no} の位置補正`;
       $('cor-file').textContent = l.log.fileName;
-      const assigned = SLOTS.some((s) => w.assignment[s]?.logId === l.id);
-      $('cor-note').textContent = assigned ? '※ 適用すると、この Run の A〜D への割り当ては解除されます(ラップを検出し直すため)。' : '';
+      $('cor-note').textContent = slotOfLap.size ? '適用しても、補正の前と同じラップが見つかれば、A〜D の割り当てはそのまま残ります。' : '';
       map ??= deps.mapFactory($('cor-map'));
-      setMode('line');
+      setMode('map');                                        // 最初は地図を動かせる状態(ラインを動かすときは切り替える)
       setStep(0.5);
       pushLines();
       changed();

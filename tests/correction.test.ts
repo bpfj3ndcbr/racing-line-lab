@@ -54,10 +54,22 @@ describe('セッション: 位置補正の保存と、書き出し・読み込�
     expect(session.assignment.A).not.toBeNull();
     session.setOffset('u', { east: 300, north: 300 });                  // 大きくずらすと、コントロールラインを通らない
     expect(session.logs[0].laps).toHaveLength(0);
-    expect(session.assignment.A).toBeNull();
+    expect(session.assignment.A).toBeNull();                              // 同じラップが無いので解除して、知らせる
+    expect(session.message).toBe('位置補正で A(LAP 1) のラップが無くなったため、割り当てを解除しました。');
     session.setOffset('u', { east: 0, north: 0 });
     expect(session.logs[0].laps.length).toBeGreaterThan(0);
     expect(JSON.parse(session.exportOffsets()).offsets).toEqual({});
+  });
+
+  it('同じファイルを入れたほかの比較セットの割り当ても、同じラップが見つかれば残る(案件 19)', () => {
+    session.addLog(utc(), 'u', 1);
+    session.toggleAssignment('A', { logId: 'u', lap: 1 }, 0);
+    session.toggleAssignment('B', { logId: 'u', lap: 1 }, 1);
+    expect(session.setOffset('u', { east: 1, north: 1 })).toEqual([]);
+    expect(session.sets[0].assignment.A).toEqual({ logId: 'u', lap: 1 });
+    expect(session.sets[1].assignment.B).toEqual({ logId: 'u', lap: 1 });
+    expect(session.setOffset('u', { east: 300, north: 300 })).toEqual([{ set: 0, slot: 'A', lap: 1 }, { set: 1, slot: 'B', lap: 1 }]);
+    expect(session.message).toBe('位置補正で 比較セット1 の A(LAP 1)、比較セット2 の B(LAP 1) のラップが無くなったため、割り当てを解除しました。');
   });
 
   it('書き出した JSON を読み込むと、補正量が戻る。まだ読み込んでいないログの分も保存される', () => {
@@ -114,7 +126,9 @@ describe('データ管理画面から位置補正の画面へ', () => {
     const m = mapOf();
     expect(m.tracks.length).toBeGreaterThan(0);                                     // 1 周分のログ(輪)なので、1 周分の完了ラップを描く
     expect(m.tracks[0].points.length).toBeGreaterThan(100);
-    expect($('#cor-shown').textContent).toBe('表示中: ベスト 1 ラップ(LAP 1)');
+    expect($('#cor-pick').hidden).toBe(false);                                      // 地図に出すラップの一覧(最初はベスト)
+    expect($('#cor-pick-count').textContent).toBe('地図に出すラップ 1 / 1');
+    expect($<HTMLInputElement>('[data-pick="1"]').checked).toBe(true);
     expect(m.lines.map((l) => l.label)).toContain('計測ライン');
     expect(m.fitted).toBeGreaterThan(0);
     expect($('.navtab[data-view="import"]').getAttribute('aria-current')).toBe('page');   // 「データ管理」にいると分かる
@@ -122,11 +136,24 @@ describe('データ管理画面から位置補正の画面へ', () => {
     expect(north().value).toBe('0');
   });
 
-  it('完了ラップが無いログは、走行中の区間を描く', () => {
+  it('完了ラップが無いログは、参考値のラップにチェックを付けて描く', () => {
     session.addLog(headOf(utc(), 0.8), 'h');                                        // 1 周の途中までのログ(輪ではない)
     $<HTMLButtonElement>('[data-act="correct"][data-log="h"]').click();
     expect(mapOf().tracks.length).toBeGreaterThan(0);
+    expect($('#cor-pick-list').textContent).toContain('参考値');
+    expect(Array.from(root.querySelectorAll<HTMLInputElement>('[data-pick]')).every((c) => c.checked)).toBe(true);
+  });
+  it('ラップが 1 つも無いログは、今までどおり走行中の区間を描く(一覧は出さない)', () => {
+    session.setOffset('u', { east: 300, north: 300 });                              // 計測ラインを通らない
+    openCorrect();
+    expect($('#cor-pick').hidden).toBe(true);
     expect($('#cor-shown').textContent).toContain('ラップが無いため');
+    expect(mapOf().tracks.length).toBeGreaterThan(0);
+  });
+  it('最初は「地図を動かす」(ドラッグで地図が動く)', () => {
+    openCorrect();
+    expect($('[data-act="cor-mode"][data-mode="map"]').getAttribute('aria-pressed')).toBe('true');
+    expect(mapOf().editCb).toBeNull();
   });
 
   it('キャンセルで元のデータ管理の表示へ戻り、何も変わらない', () => {
@@ -149,7 +176,7 @@ describe('データ管理画面から位置補正の画面へ', () => {
 });
 
 describe('ラインを動かす', () => {
-  beforeEach(() => openCorrect());
+  beforeEach(() => { openCorrect(); $<HTMLButtonElement>('[data-act="cor-mode"][data-mode="line"]').click(); });
 
   it('地図をドラッグすると、その分(メートル)ラインが動く。東・北が正', () => {
     const before = mapOf().tracks[0].points[10];
@@ -226,6 +253,18 @@ describe('ラインを動かす', () => {
 });
 
 describe('完了ラップが無いログの補正量の見込み', () => {
+  it('割り当て中のラップが、その補正量で見つからなければ、適用する前に知らせる(案件 19)', () => {
+    vi.useFakeTimers();
+    session.toggleAssignment('A', { logId: 'u', lap: 1 });
+    openCorrect();
+    vi.advanceTimersByTime(300);
+    expect($('#cor-laps').textContent).not.toContain('見つかりません');
+    expect($('#cor-pick-list').textContent).toContain('A');                    // 割り当て中の印
+    east().value = '300'; east().dispatchEvent(new Event('input', { bubbles: true }));
+    vi.advanceTimersByTime(300);
+    expect($('#cor-laps').textContent).toContain('A(LAP 1) のラップが見つかりません。適用すると、その割り当てを解除します。');
+  });
+
   it('参考値の件数を表示する', () => {
     session.addLog(headOf(utc(), 0.8), 'h');                                        // 1 周の途中までのログ(輪ではない)
     vi.useFakeTimers();
@@ -237,16 +276,16 @@ describe('完了ラップが無いログの補正量の見込み', () => {
 });
 
 describe('適用して保存', () => {
-  it('補正量を保存してデータ管理画面へ戻る。補正済みの表示になる。割り当ての解除を事前に知らせる', () => {
+  it('補正量を保存してデータ管理画面へ戻る。補正済みの表示になる。同じラップが見つかれば、割り当ては残る', () => {
     session.toggleAssignment('A', { logId: 'u', lap: 1 });
     openCorrect();
-    expect($('#cor-note').textContent).toContain('割り当ては解除');
+    expect($('#cor-note').textContent).toContain('割り当てはそのまま残ります');
     key('ArrowUp'); key('ArrowRight', true);
     $<HTMLButtonElement>('#cor-apply').click();
     expect(session.logs[0].offset).toEqual({ east: 5, north: 0.5 });
     expect(work().hidden).toBe(true);
     expect($<HTMLButtonElement>('[data-act="correct"]').textContent).toBe('位置補正(済)');
-    expect(session.assignment.A).toBeNull();
+    expect(session.assignment.A).toEqual({ logId: 'u', lap: 1 });
     expect(JSON.parse(store.get('offsets')!)).toEqual({ u: { east: 5, north: 0.5 } });
   });
 
@@ -258,7 +297,7 @@ describe('適用して保存', () => {
     openCorrect();
     for (let i = 0; i < 4; i++) key('ArrowUp', true);                               // 北へ 20 m
     $<HTMLButtonElement>('#cor-apply').click();
-    session.toggleAssignment('A', { logId: 'u', lap: 1 });
+    expect(session.assignment.A).toEqual({ logId: 'u', lap: 1 });                   // 割り当ては残る(案件 19)
     $<HTMLButtonElement>('[data-act="nav"][data-view="compare"]').click();
     const p1 = maps[0].tracks[0].points[0];
     expect(p1[0] - p0[0]).toBeGreaterThan(0.00001);
@@ -267,7 +306,7 @@ describe('適用して保存', () => {
 
 const bigPath = fx('session_20260506_094550_autopolis.vbo');
 describe.skipIf(!existsSync(bigPath))('長いログ(13 ラップ)', () => {
-  it('補正量の見込みにラップ数・ベストが出る。地図にはベスト 3 ラップだけを描く', () => {
+  it('補正量の見込みにラップ数・ベストが出る。最初は地図にベスト 3 ラップを描き、一覧のチェックで選び直せる', () => {
     vi.useFakeTimers();
     session.addLog(parseVbo(readFileSync(bigPath, 'utf8'), 'big.vbo'), 'big');
     const row = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-act="correct"]'))[1];
@@ -275,6 +314,17 @@ describe.skipIf(!existsSync(bigPath))('長いログ(13 ラップ)', () => {
     vi.advanceTimersByTime(300);
     expect($('#cor-laps').textContent).toMatch(/^この補正量では 1\d ラップ ・ ベスト \d:\d\d\.\d$/);
     expect(mapOf().tracks).toHaveLength(3);
-    expect($('#cor-shown').textContent).toMatch(/^表示中: ベスト 3 ラップ\(LAP \d+・\d+・\d+\)$/);
+    const boxes = Array.from(root.querySelectorAll<HTMLInputElement>('[data-pick]'));
+    expect(boxes.length).toBeGreaterThan(10);
+    expect(boxes.filter((c) => c.checked)).toHaveLength(3);
+    $<HTMLButtonElement>('[data-act="cor-pick-all"]').click();
+    expect(mapOf().tracks).toHaveLength(boxes.length);
+    expect(mapOf().tracks.reduce((s, t) => s + t.points.length, 0)).toBeLessThanOrEqual(20000 + boxes.length);   // 点が多いときは間引く
+    $<HTMLButtonElement>('[data-act="cor-pick-none"]').click();
+    expect(mapOf().tracks).toHaveLength(0);
+    const one = boxes[0];
+    one.checked = true; one.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(mapOf().tracks).toHaveLength(1);
+    expect($('#cor-pick-count').textContent).toBe(`地図に出すラップ 1 / ${boxes.length}`);
   });
 });

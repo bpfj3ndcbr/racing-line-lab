@@ -1,6 +1,6 @@
 import {
   type Assignment, type Circuit, type GeoLine, type Lap, type LapRef, type LineCandidate, type MapView, type Offset, type Slot, type TrackLog,
-  SLOTS, clearLog, closeLoop, detectLapRun, emptyAssignment, findCrossings, lineCandidate, matchCircuit, nameExists, parseCln, parseSci, parseVbo,
+  SLOTS, clearLog, closeLoop, detectLapRun, emptyAssignment, findCrossings, lineCandidate, matchCircuit, matchLap, nameExists, parseCln, parseSci, parseVbo,
   roundLine, toggleAssign,
 } from '../core';
 import type { KeyValueStore } from '../io/storage';
@@ -29,6 +29,8 @@ export interface LoadedLog {
 
 /** 候補と、その候補を作ったログ(ほかのログの候補を使うときは、そのログ) */
 export interface CandidateRef { candidate: LineCandidate; from: LoadedLog }
+/** 位置補正で、同じラップが見つからずに解除した割り当て(set = 比較セットの番号) */
+export interface LostAssignment { set: number; slot: Slot; lap: number }
 
 export interface CircuitResult {
   ok: boolean;
@@ -351,22 +353,44 @@ export class Session {
   }
 
   /** 位置補正量を変更し、ラップを再計算する。(0, 0) に戻したときは保存からも消す。同じファイルが入っている全部のセットに効く */
-  setOffset(id: string, offset: Offset): void {
-    if (!this.sets.some((w) => w.logs.some((x) => x.id === id))) return;
-    this.applyOffset(id, offset);
+  /**
+   * 位置補正量を変える。割り当ては、補正の前と同じラップ(matchLap)が見つかれば残し、
+   * 見つからなかったものだけ解除して、message で知らせる(案件 19)。解除したもの(セット・カード・ラップ番号)を返す
+   */
+  setOffset(id: string, offset: Offset): LostAssignment[] {
+    if (!this.sets.some((w) => w.logs.some((x) => x.id === id))) return [];
+    const lost = this.applyOffset(id, offset);
     this.saveOffsets();
+    if (lost.length) {
+      const multi = new Set(lost.map((x) => x.set)).size > 1 || lost.some((x) => x.set !== this.activeIndex);
+      this.message = `位置補正で ${lost.map((x) => `${multi ? this.setName(x.set) + ' の ' : ''}${x.slot}(LAP ${x.lap})`).join('、')} のラップが無くなったため、割り当てを解除しました。`;
+    }
     this.emit();
+    return lost;
   }
 
-  private applyOffset(id: string, offset: Offset) {
+  private applyOffset(id: string, offset: Offset): LostAssignment[] {
     if (offset.east === 0 && offset.north === 0) delete this.offsets[id]; else this.offsets[id] = offset;
-    for (const w of this.sets) {
+    const lost: LostAssignment[] = [];
+    this.sets.forEach((w, set) => {
       const l = w.logs.find((x) => x.id === id);
-      if (!l) continue;
+      if (!l) return;
+      // 補正の前に割り当てていたラップ(補正のあとに、同じラップを探して付け直す)
+      const keep = SLOTS.flatMap((slot) => {
+        const ref = w.assignment[slot];
+        const lap = ref?.logId === id ? l.laps.find((x) => x.number === ref.lap) : undefined;
+        return lap ? [{ slot, lap }] : [];
+      });
       l.offset = offset;
       w.assignment = clearLog(w.assignment, id);
       this.resolveSet(w);
-    }
+      for (const k of keep) {
+        const hit = matchLap(k.lap, l.laps, l.log.loop?.period);
+        if (hit) w.assignment = { ...w.assignment, [k.slot]: { logId: id, lap: hit.number } };
+        else lost.push({ set, slot: k.slot, lap: k.lap.number });
+      }
+    });
+    return lost;
   }
   /**
    * 「終端の調整」: ラップ番号 lap の終端を、ラップ開始から sec 秒にする(null で調整をやめる)。
