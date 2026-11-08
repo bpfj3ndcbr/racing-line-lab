@@ -50,6 +50,9 @@
       "category": "public.app-category.sports",
       "icon": "build/icon.png"
     },
+    "dmg": {
+      "icon": null
+    },
     "win": {
       "target": [
         "nsis"
