@@ -174,13 +174,28 @@ describe('枠・開閉・タブ・テーマ', () => {
     }
   });
 
-  it('サーキットは3つのタブ: 初期は「ファイルによる登録」が選ばれている', () => {
+  it('サーキットは3つのタブ: 先頭は「登録済みサーキット」で、初期はこれが選ばれている(案件 25)', () => {
     const tabs = Array.from(root.querySelectorAll<HTMLElement>('#sec-circuit [role="tab"]'));
-    expect(tabs.map((t) => t.textContent)).toEqual(['ファイルによる登録', '地図による登録', '登録済みサーキット']);
+    expect(tabs.map((t) => t.textContent)).toEqual(['登録済みサーキット', 'ファイルによる登録', '地図による登録']);
     expect(tabs.map((t) => t.getAttribute('aria-selected'))).toEqual(['true', 'false', 'false']);
-    expect(root.querySelector<HTMLElement>('#panel-reg')!.hidden).toBe(false);
-    expect(root.querySelector<HTMLElement>('#panel-list')!.hidden).toBe(true);
+    expect(tabs.map((t) => t.tabIndex)).toEqual([0, -1, -1]);
+    expect(root.querySelector<HTMLElement>('#panel-list')!.hidden).toBe(false);
+    expect(root.querySelector<HTMLElement>('#panel-reg')!.hidden).toBe(true);
+    expect(root.querySelector<HTMLElement>('#panel-map')!.hidden).toBe(true);
+    expect(root.querySelector('#circuit-list')!.textContent).toContain('登録済みのサーキットはありません');   // 無くても一覧のタブ。登録のタブへの案内が出る
     expect(root.querySelector('#circuit-badge')!.textContent).toBe('未登録');
+  });
+
+  it('サーキットのタブのキー操作は、新しい並びの順(→ / ← / Home / End)', () => {
+    const key = (k: string) => root.querySelector<HTMLElement>('#sec-circuit [role="tab"][aria-selected="true"]')!
+      .dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
+    const selected = () => root.querySelector<HTMLElement>('#sec-circuit [role="tab"][aria-selected="true"]')!.textContent;
+    key('ArrowRight'); expect(selected()).toBe('ファイルによる登録');
+    key('ArrowRight'); expect(selected()).toBe('地図による登録');
+    key('ArrowRight'); expect(selected()).toBe('登録済みサーキット');
+    key('ArrowLeft'); expect(selected()).toBe('地図による登録');
+    key('Home'); expect(selected()).toBe('登録済みサーキット');
+    key('End'); expect(selected()).toBe('地図による登録');
   });
 
   it('件数バッジと、上部のサーキット名', () => {

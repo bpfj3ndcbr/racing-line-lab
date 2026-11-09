@@ -43,6 +43,8 @@ export function stepFromEnd(sec: number, max: number): number {
   return Math.min(n - 1, Math.max(HALF_STEPS + 1, HALF_STEPS + Math.round(((sec - FINE_SEC) / (max - FINE_SEC)) * HALF_STEPS)));
 }
 const JOINED_TITLE = 'ファイルの計測線とアプリの計測線が異なるため、計測線付近のデータを調整して、1 周分のラップにしています';
+/** 「サーキット」のタブの並び(案件 25 で「登録済みサーキット」を先頭に) */
+const TAB_ORDER = ['list', 'reg', 'map'] as const;
 const dateOf = (l: LoadedLog) => (l.log.startEpochMs ? formatJst(l.log.startEpochMs) : '日時不明');
 
 /** 読み込み画面。session の状態を描画し、操作を session に渡す。 */
@@ -98,11 +100,11 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
         <div class="sec-body">
           <div class="ctabs">
             <div class="tablist" role="tablist" aria-label="サーキットの管理">
-              <button class="tab" role="tab" id="tab-reg" aria-controls="panel-reg" aria-selected="true" data-act="ctab" data-tab="reg">ファイルによる登録</button>
+              <button class="tab" role="tab" id="tab-list" aria-controls="panel-list" aria-selected="true" data-act="ctab" data-tab="list">登録済みサーキット</button>
+              <button class="tab" role="tab" id="tab-reg" aria-controls="panel-reg" aria-selected="false" tabindex="-1" data-act="ctab" data-tab="reg">ファイルによる登録</button>
               <button class="tab" role="tab" id="tab-map" aria-controls="panel-map" aria-selected="false" tabindex="-1" data-act="ctab" data-tab="map">地図による登録</button>
-              <button class="tab" role="tab" id="tab-list" aria-controls="panel-list" aria-selected="false" tabindex="-1" data-act="ctab" data-tab="list">登録済みサーキット</button>
             </div>
-            <div class="tab-body" role="tabpanel" id="panel-reg" aria-labelledby="tab-reg">
+            <div class="tab-body" role="tabpanel" id="panel-reg" aria-labelledby="tab-reg" hidden>
               <div class="circ-form">
                 <label class="frow"><span>名前</span><input id="c-name" type="text" placeholder="例: オートポリス"></label>
                 <label class="frow"><span>コントロールライン(.cln)</span><input id="c-cln" type="file" accept=".cln"></label>
@@ -116,7 +118,7 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
               <p class="sub">走行ログに走行データを登録した後に、走行ログ画面の「使用するサーキット」で「走行ログ位置のサーキットを新規に登録する」を選択すると、付近のサーキットが自動で表示され登録が簡単です。</p>
               <div class="btn-row"><button class="btn" data-act="open-circuit-editor" title="大きな画面で、地図を見ながら登録します">地図を開いて登録…</button></div>
             </div>
-            <div class="tab-body" role="tabpanel" id="panel-list" aria-labelledby="tab-list" hidden>
+            <div class="tab-body" role="tabpanel" id="panel-list" aria-labelledby="tab-list">
               <div id="circuit-list"></div>
               <div id="list-msg" class="msg" role="status"></div>
             </div>
@@ -155,7 +157,7 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
   const reloadInput = $<HTMLInputElement>('reload-input');
   const offsetsInput = $<HTMLInputElement>('offsets-input');
   const listMsg = $('list-msg');
-  let ctab: 'reg' | 'map' | 'list' = 'reg';
+  let ctab: 'reg' | 'map' | 'list' = 'list';               // 開いたときは「登録済みサーキット」(案件 25)
   let reloadTarget: { id: string; kind: 'control' | 'sectors' } | null = null;
 
   // ---------- 描画 ----------
@@ -281,7 +283,7 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
   }
 
   function applyTabs() {
-    for (const t of ['reg', 'map', 'list'] as const) {
+    for (const t of TAB_ORDER) {
       const sel = t === ctab;
       const tab = $('tab-' + t);
       tab.setAttribute('aria-selected', String(sel));
@@ -747,7 +749,7 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
   root.addEventListener('keydown', (e) => {
     const tab = (e.target as HTMLElement).closest<HTMLElement>('[role="tab"]');
     if (!tab) return;
-    const order: ('reg' | 'map' | 'list')[] = ['reg', 'map', 'list'];
+    const order = TAB_ORDER;
     let i = order.indexOf(ctab);
     if (e.key === 'ArrowRight') i = (i + 1) % order.length;
     else if (e.key === 'ArrowLeft') i = (i - 1 + order.length) % order.length;
