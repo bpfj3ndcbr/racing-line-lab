@@ -49,7 +49,7 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
 
   function navigate(v: ViewName) {
     if (v !== current && importApi?.isEditing()) return;     // サーキットの登録・編集中は、保存かキャンセルするまで移れない
-    if (v === 'import' && current !== 'import') importApi?.openActiveSet();     // ほかのタブから戻ったら、表示セットだけを開く
+    if (v === 'import' && current !== 'import') importApi?.closeSets();     // ほかのタブから戻ったら、比較セットはすべて閉じる(案件 26)
     current = v;
     if (v === 'help' && !helpEl.firstChild) mountHelpView(helpEl);     // 開いたときに 1 回だけ作る
     helpEl.hidden = v !== 'help';

@@ -64,7 +64,8 @@ export interface ImportApi {
   closeWork(): void;
   editCircuit(id: string): void;
   isEditing(): boolean;
-  openActiveSet(): void;
+  /** ほかのタブから「データ管理」に移ったとき: 比較セットをすべて閉じる(案件 26) */
+  closeSets(): void;
   /** 位置補正の画面で、補正量を動かしたまま保存していないか(ほかの画面へ移る前に確かめる) */
   needsLeaveConfirm(): boolean;
   /** 位置補正の画面の保存していない補正量を、破棄して移ってよいか確かめる */
@@ -468,7 +469,9 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
       const el = setEls[i];
       renderSetBars(i, w);
       renderAlias(i);
-      el.querySelector('.set-badge')!.textContent = `${w.logs.length} 本`;
+      const badge = el.querySelector<HTMLElement>('.set-badge')!;
+      badge.textContent = `${w.logs.length} 本`;
+      badge.classList.toggle('has-logs', w.logs.length > 0);           // 走行ログの入った比較セットは、閉じていても分かるように緑(案件 26)
       const radio = el.querySelector<HTMLInputElement>('[data-active-set]')!;
       radio.checked = i === session.activeIndex;
       radio.disabled = w.logs.length === 0;
@@ -829,8 +832,7 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
     isEditing: editingCircuit,
     needsLeaveConfirm: () => work === 'correct' && !!correct?.isDirty(),
     confirmLeave: () => (work === 'correct' && correct ? correct.confirmLeave() : Promise.resolve(true)),
-    /** 「データ管理」タブに移ったとき: 表示セットの比較セットだけを開き、ほかは閉じる(何も無ければ比較セット1) */
-    openActiveSet() { setEls.forEach((el, i) => { el.open = i === session.activeIndex; }); },
+    closeSets() { setEls.forEach((el) => { el.open = false; }); },
     /** 比較画面から: サーキットを編集する(終わったら比較に戻る) */
     editCircuit(id: string) { openWork('circuit', id, undefined, undefined, true); backToCompare = work === 'circuit'; },
   };

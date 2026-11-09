@@ -554,6 +554,7 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .slots-row{display:flex;gap:12px;align-items:center}
 .sets-head{display:flex;flex-direction:column;gap:8px}
 .set-sec .badge{margin-left:4px}
+.set-badge.has-logs{color:var(--good);border-color:var(--good);font-weight:700}
 .set-radio{display:inline-flex;align-items:center;gap:6px;margin-left:16px;font-size:11px;font-weight:600;cursor:pointer;padding:2px 8px;border:1px solid var(--border);border-radius:var(--r-s);background:var(--surface)}
 .set-sec.set-active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
 .set-sec.set-active .set-radio{background:var(--accent);color:var(--accent-on);border-color:var(--accent)}
