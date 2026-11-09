@@ -126,7 +126,9 @@ describe('読み込み画面', () => {
 describe('レイアウトとセクター表示', () => {
   it('「サーキット」「比較セット」のグループ見出しがあり、登録項目は前者に入る', () => {
     const h = Array.from(root.querySelectorAll('h2')).map((e) => e.textContent);
-    expect(h).toEqual(['サーキット', '走行ライン補正データ管理', '比較セット1', '比較セット2', '比較セット3', '比較セット4', '比較セット5']);
+    expect(h).toEqual(['サーキット', '走行ライン補正データ管理', '比較セット', '比較セット1', '比較セット2', '比較セット3', '比較セット4', '比較セット5']);
+    const group = root.querySelector('#sets-group')!;                                   // 比較セット1〜5は 1 つの枠にまとめる(案件 27)
+    expect(Array.from(group.querySelectorAll('.set-sec')).map((e) => e.id)).toEqual(['sec-set-0', 'sec-set-1', 'sec-set-2', 'sec-set-3', 'sec-set-4']);
     const circuitSec = root.querySelector('#sec-circuit')!;
     expect(circuitSec.textContent).toContain('ファイルによる登録');
     expect(circuitSec.textContent).toContain('地図による登録');
@@ -134,6 +136,18 @@ describe('レイアウトとセクター表示', () => {
     const logSec = root.querySelector('#sec-set-0')!;
     expect(logSec.textContent).toContain('走行ログを追加');
     expect(logSec.textContent).toContain('セクタータイムを表示');
+  });
+
+  it('比較セットの見出しの要約: サーキット名と A〜D の割り当て(案件 27)', () => {
+    const sum = (i: number) => root.querySelector(`#sec-set-${i} .set-sum`)!;
+    expect(sum(0).textContent).toBe('—');
+    session.registerCircuit('オートポリス', cln, sci);
+    session.addLog(utc(), 'u');
+    expect(sum(0).textContent).toBe('オートポリス割り当てなし');
+    session.toggleAssignment('B', { logId: 'u', lap: 1 });
+    expect(sum(0).textContent).toBe('オートポリスB割り当て 1');
+    expect(sum(0).querySelector('.sum-slots i')!.className).toBe('sb');
+    expect(sum(1).textContent).toBe('—');
   });
 
   it('ラップ一覧は横スクロール領域に入っている', () => {

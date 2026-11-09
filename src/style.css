@@ -24,6 +24,8 @@
   --warn: #8a5a00;
   --focus: #1f6fd1;
   --row-assigned: #e2edfb;
+  --set-open-head: color-mix(in srgb, var(--accent) 14%, var(--surface));   /* 開いた比較セットの見出しの行(案件 27。% で濃さを調整) */
+  --set-open-bg: color-mix(in srgb, var(--accent) 6%, var(--sec-head));      /* 開いた比較セットの、中身の枠の外側 */
   /* ボタン(うっすら立体) */
   --btn-top: #fafbfc; --btn-bottom: #dfe3e9; --btn-border: #a3acb9;
   --btn-shadow: 0 1px 0 rgba(255,255,255,.9) inset, 0 1px 2px rgba(20,30,50,.25);
@@ -58,6 +60,8 @@
   --warn: #ffc83d;
   --focus: #6cb6ff;
   --row-assigned: #2f3b4a;
+  --set-open-head: color-mix(in srgb, var(--accent) 30%, var(--surface));
+  --set-open-bg: color-mix(in srgb, var(--accent) 6%, var(--sec-head));
   --btn-top: #474d53; --btn-bottom: #353a3f; --btn-border: #171a1d;
   --btn-shadow: 0 1px 0 rgba(255,255,255,.12) inset, 0 2px 3px rgba(0,0,0,.5);
   --btn-pressed: 0 2px 4px rgba(0,0,0,.6) inset;
@@ -146,8 +150,8 @@ select{min-height:44px;padding:0 10px;background:var(--surface);border:1px solid
 .circ-form input[type=text]{min-height:44px;padding:0 10px;background:var(--surface-2);border:1px solid var(--btn-border);border-radius:var(--r-s)}
 
 /* 走行データ(ファイルごとのカード+表) */
-.file{border:1px solid var(--border-strong);border-radius:var(--r-l);background:var(--surface);overflow:hidden;margin-bottom:16px}
-.fh{display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--surface-2);border-bottom:1px solid var(--border);flex-wrap:wrap}
+.file{border:2px solid var(--border-strong);border-radius:var(--r-l);background:var(--surface);overflow:hidden;margin-bottom:16px}
+.fh{display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--surface-2);border-bottom:2px solid var(--border-strong);flex-wrap:wrap}
 .fno{font-weight:800;font-size:14px}
 .fn{flex:1;min-width:200px}
 .tag{font-size:11px;padding:2px 8px;border-radius:var(--r-l);border:1px solid var(--border-strong);color:var(--muted)}
@@ -549,16 +553,49 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 
 /* 比較セット 1〜5 */
 .slots{flex-direction:column;align-items:stretch;gap:8px}
-.slots-title{font-size:12px;color:var(--muted)}
+.slots-title{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
 .slots-title b{color:var(--text);font-size:13px}
 .slots-row{display:flex;gap:12px;align-items:center}
 .sets-head{display:flex;flex-direction:column;gap:8px}
 .set-sec .badge{margin-left:4px}
+.set-shown{display:inline-flex;align-items:center;min-width:88px;margin-left:16px}
 .set-badge.has-logs{color:var(--good);border-color:var(--good);font-weight:700}
-.set-radio{display:inline-flex;align-items:center;gap:6px;margin-left:16px;font-size:11px;font-weight:600;cursor:pointer;padding:2px 8px;border:1px solid var(--border);border-radius:var(--r-s);background:var(--surface)}
 .set-sec.set-active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
-.set-sec.set-active .set-radio{background:var(--accent);color:var(--accent-on);border-color:var(--accent)}
 .set-sec .toolbar.set-circuit{padding-bottom:0}
+/* 比較セット1〜5を 1 つの枠にまとめる(案件 27): 行は交互に色分け、表示セットは左端に帯、開いたら見出しを目立たせて中身を一段下げる */
+.sets-group{flex:none;border:1px solid var(--border-strong);border-radius:var(--r-l);background:var(--sec-bg);box-shadow:var(--sec-shadow);overflow:hidden}
+.sets-group-h{display:flex;align-items:center;gap:12px;min-height:40px;padding:0 16px;background:var(--sec-head);border-bottom:1px solid var(--border-strong)}
+.sets-group-h h2{font-size:14px}
+.sets-group-sub{font-size:11px;color:var(--muted)}
+.sets-group .set-sec{border:0;border-radius:0;box-shadow:none;border-top:1px solid var(--border)}
+.sets-group .set-sec:first-of-type{border-top:0}
+.sets-group .set-sec>.sec-h{border-radius:0;min-height:44px;background:var(--surface)}
+.sets-group .set-sec:nth-of-type(even)>.sec-h{background:var(--surface-2)}
+.sets-group .set-sec>.sec-h h2{font-size:15px}
+.sets-group .set-sec.set-active{border-color:var(--border);box-shadow:inset 4px 0 0 var(--accent)}
+.sets-group .set-sec.set-active>.sec-h{box-shadow:inset 4px 0 0 var(--accent)}
+.sets-group .set-sec[open]{background:var(--set-open-bg)}
+.sets-group .set-sec[open]>.sec-h{min-height:52px;background:var(--set-open-head);border-bottom:2px solid var(--accent);border-radius:0}
+.sets-group .set-sec[open]>.sec-h h2{font-size:17px}
+.sets-group .set-sec[open]>.sec-body{margin:12px 16px 16px 40px;border:1px solid var(--border-strong);border-radius:var(--r-m);background:var(--sec-bg)}
+.set-sum{display:inline-flex;align-items:center;gap:16px;margin-left:12px;font-size:12px}
+.set-sum .sum-muted{color:var(--muted)}
+.set-sum .sum-slots{display:inline-flex;align-items:center;gap:3px}
+.set-sum .sum-slots i{display:inline-block;min-width:18px;height:18px;line-height:18px;border-radius:var(--r-s);text-align:center;font-size:11px;font-weight:700;font-style:normal}
+.set-sum .sum-slots i:last-of-type{margin-right:4px}
+/* 比較セットのタブ(案件 27。「タブ / 一覧」で切り替える) */
+.sets-view{margin-left:auto}
+.sets-tabs{display:flex;flex-wrap:wrap;align-items:flex-end;gap:4px;padding:10px 12px 0 16px;background:var(--sec-head);border-bottom:2px solid var(--accent)}
+.set-tab{display:flex;align-items:center;gap:8px;padding:8px 14px;border:1px solid var(--border-strong);border-bottom:0;border-radius:var(--r-m) var(--r-m) 0 0;background:var(--surface-2);color:var(--muted);font:inherit;font-weight:700;cursor:pointer}
+.set-tab.on{border:2px solid var(--accent);border-bottom:0;margin-bottom:-2px;padding-bottom:10px;background:var(--set-open-head);color:var(--text)}
+/* 「表示中」の印(比較セットのタブ・比較画面) */
+.shown-mark{display:inline-flex;align-items:center;gap:3px;flex:none;padding:0 6px;height:18px;border:1px solid var(--accent);border-radius:9px;background:var(--surface);color:var(--accent);font-size:10px;font-weight:700;line-height:1}
+.sets-group.as-tabs .set-sec:not(.tab-on){display:none}
+.sets-group.as-tabs .set-sec.tab-on{box-shadow:inset 4px 0 0 var(--accent)}
+.sets-group.as-tabs .set-sec.tab-on>.sec-h{border-bottom-width:1px;box-shadow:inset 4px 0 0 var(--accent)}
+.sets-group.as-tabs .set-sec.tab-on>.sec-h{cursor:default}
+.sets-group.as-tabs .set-sec.tab-on>.sec-h :is(.chev,h2,.set-badge,.sec-hint,.set-sum){display:none}
+.sets-group.as-tabs .set-shown[data-k="on"]{display:none}   /* タブに「表示中」があるので、中の見出しには出さない */
 /* 比較セットの「使用するサーキット」とボタン: 小さめにして、幅があれば 1 列に並べる */
 .set-tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
 .set-tools .toolbar{gap:8px}

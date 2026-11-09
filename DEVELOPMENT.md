@@ -84,6 +84,7 @@ npm run build        # 型チェック + ビルド(dist/)
 | `ui.compare.layout` | 比較画面の右パネルの幅・グラフの高さ(`v` が保存形式の版。形式を変えるときは版を上げる) |
 | `ui.setAliases` / `ui.slotAliases` | 比較セットの別名 / カード(セットごとの A〜D)の別名 |
 | `ui.guideClosed` / `ui.guideSeen` | はじめかたの表示状態 |
+| `ui.setsView` | 「データ管理」の比較セットの並べ方(`tabs` / `list`) |
 
 保存の形式を変えるときは、古い形式を読み替える処理を足すか、版を上げて初期値に戻してください。
 

@@ -40,27 +40,27 @@ const $ = <T extends HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
 const log = () => parseVbo(vbo, 'u.vbo');
 
 describe('比較セット 1〜5', () => {
-  it('5 つの枠があり、「表示セット」のラジオボタンが 1 つだけ選ばれている(初期は比較セット1)', () => {
+  it('5 つの枠があり、表示セット(初期は比較セット1)の見出しにだけ「表示中」の印。ほかは「表示中にする」(案件 27)', () => {
     expect(SET_COUNT).toBe(5);
     expect(Array.from(root.querySelectorAll('.set-sec h2')).map((h) => h.textContent)).toEqual(['比較セット1', '比較セット2', '比較セット3', '比較セット4', '比較セット5']);
-    const radios = Array.from(root.querySelectorAll<HTMLInputElement>('[data-active-set]'));
-    expect(radios.map((r) => r.checked)).toEqual([true, false, false, false, false]);
-    expect(new Set(radios.map((r) => r.name)).size).toBe(1);
-    expect($('.set-radio').textContent).toContain('表示セット');
+    const shown = Array.from(root.querySelectorAll<HTMLElement>('.set-sec .set-shown')).map((e) => e.textContent);
+    expect(shown).toEqual(['表示中', '表示中にする', '表示中にする', '表示中にする', '表示中にする']);
+    expect($('#sec-set-0 .set-shown .shown-mark')).not.toBeNull();
   });
 
-  it('上部のカードに「表示中: 比較セットN」の題が付く。ラジオボタンで切り替わる', () => {
-    expect($('#slots .slots-title').textContent).toBe('表示中: 比較セット1');
+  it('上部のカードに「表示中」の印と比較セットの名前の題が付く。「表示中にする」で切り替わる', () => {
+    expect($('#slots .slots-title').textContent).toBe('表示中比較セット1');
+    expect($('#slots .slots-title .shown-mark')).not.toBeNull();
     session.addLog(log(), 'u', 2);
-    const r = $<HTMLInputElement>('[data-active-set="2"]');
-    r.checked = true;
-    r.dispatchEvent(new Event('change', { bubbles: true }));
+    $<HTMLButtonElement>('#sec-set-2 [data-act="set-active"]').click();
     expect(session.activeIndex).toBe(2);
-    expect($('#slots .slots-title').textContent).toBe('表示中: 比較セット3');
-    expect($<HTMLInputElement>('[data-active-set="0"]').checked).toBe(false);
+    expect($('#slots .slots-title').textContent).toBe('表示中比較セット3');
+    expect($('#sec-set-2 .set-shown .shown-mark')).not.toBeNull();
+    expect($('#sec-set-0 [data-act="set-active"]')).not.toBeNull();
   });
 
-  it('最初のログが入ったセットは自動で開く。空のセットは閉じたまま(比較セット1だけ初期は開いている)', () => {
+  it('一覧のとき: 最初のログが入ったセットは自動で開く。空のセットは閉じたまま(比較セット1だけ初期は開いている)', () => {
+    $<HTMLButtonElement>('[data-act="sets-view"][data-view="list"]').click();
     expect(root.querySelector<HTMLDetailsElement>('#sec-set-0')!.open).toBe(true);
     expect(root.querySelector<HTMLDetailsElement>('#sec-set-1')!.open).toBe(false);
     session.registerCircuit('オートポリス', cln, sci);
@@ -82,13 +82,13 @@ describe('比較セット 1〜5', () => {
 });
 
 describe('ログが 0 件のセット / 比較画面のセット選択 / 地図で新規登録', () => {
-  it('0 件のセットのラジオボタンは選べない。ログが入ると選べる。session も切り替えを受け付けない', () => {
-    const radios = () => Array.from(root.querySelectorAll<HTMLInputElement>('[data-active-set]'));
-    expect(radios().map((r) => r.disabled)).toEqual([true, true, true, true, true]);
+  it('0 件のセットの「表示中にする」は押せない。ログが入ると押せる。session も切り替えを受け付けない', () => {
+    const btns = () => [1, 2, 3, 4].map((i) => root.querySelector<HTMLButtonElement>(`#sec-set-${i} [data-act="set-active"]`)!.disabled);
+    expect(btns()).toEqual([true, true, true, true]);
     session.setActive(3);
     expect(session.activeIndex).toBe(0);
     session.addLog(log(), 'u', 3);
-    expect(radios().map((r) => r.disabled)).toEqual([true, true, true, false, true]);
+    expect(btns()).toEqual([true, true, false, true]);
     session.setActive(3);
     expect(session.activeIndex).toBe(3);
   });

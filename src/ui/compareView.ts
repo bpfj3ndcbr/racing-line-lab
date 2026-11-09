@@ -8,6 +8,7 @@ import { SpeedGraph, ZOOM_MAX, type XKind } from './speedGraph';
 import { clamp, makeSplitter } from './splitter';
 import type { HeatRun, MapFactory, TrackMap } from './mapTypes';
 import type { ThemeController } from './theme';
+import { SHOWN_MARK } from './marks';
 
 /**
  * series: ラップの時系列(距離は速度の積み上げ)。
@@ -106,7 +107,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
         <aside class="cmp-side" id="cmp-side" aria-label="走行データ">
           <div class="side-upper" id="cmp-upper">
             <div class="side-upper-in" id="cmp-upper-in">
-              <label class="sel cmp-set" id="cmp-set-wrap">表示中 <select id="cmp-set" data-fk="cmp-set"></select></label>
+              <label class="sel cmp-set" id="cmp-set-wrap">${SHOWN_MARK}<select id="cmp-set" data-fk="cmp-set" aria-label="表示中の比較セット"></select></label>
               <div id="cmp-cards" class="cmp-cards"></div>
               <div class="sec-block" id="cmp-sec-block">
                 <div class="h sec-h-row" id="cmp-sec-h"><span>セクター</span><button class="btn xs" id="cmp-edit-circuit" data-act="edit-circuit" hidden title="このサーキットのセクターを追加・編集します(終わったら比較に戻ります)">セクターを追加・編集…</button></div>

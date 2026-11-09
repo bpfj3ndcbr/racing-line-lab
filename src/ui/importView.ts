@@ -7,6 +7,7 @@ import { candidateLabel, loadDialog, planLoad } from './loadDialog';
 import { mountCorrectView, type CorrectView } from './correctView';
 import { alertDialog, promptDialog } from './dialog';
 import type { MapFactory } from './mapTypes';
+import { SHOWN_MARK } from './marks';
 import type { ThemeController } from './theme';
 
 const esc = (s: string) =>
@@ -43,6 +44,8 @@ export function stepFromEnd(sec: number, max: number): number {
   return Math.min(n - 1, Math.max(HALF_STEPS + 1, HALF_STEPS + Math.round(((sec - FINE_SEC) / (max - FINE_SEC)) * HALF_STEPS)));
 }
 const JOINED_TITLE = 'ファイルの計測線とアプリの計測線が異なるため、計測線付近のデータを調整して、1 周分のラップにしています';
+/** 比較セットの並べ方(案件 27) */
+type SetsView = 'tabs' | 'list';
 /** 「サーキット」のタブの並び(案件 25 で「登録済みサーキット」を先頭に) */
 const TAB_ORDER = ['list', 'reg', 'map'] as const;
 const dateOf = (l: LoadedLog) => (l.log.startEpochMs ? formatJst(l.log.startEpochMs) : '日時不明');
@@ -72,13 +75,13 @@ export interface ImportApi {
   confirmLeave(): Promise<boolean>;
 }
 
-/** 比較セット i+1 の枠。表示セットを選ぶラジオボタン、使用するサーキット、ログの追加、ラップの一覧 */
+/** 比較セット i+1 の枠。「表示中」の印か「表示中にする」、使用するサーキット、ログの追加、ラップの一覧 */
 function setHtml(i: number): string {
   const hint = '<span class="sec-hint"><span class="h-open">クリックで閉じる</span><span class="h-closed">クリックで開く</span></span>';
   return `
       <details class="sec set-sec" id="sec-set-${i}" data-set="${i}"${i === 0 ? ' open' : ''}>
         <summary class="sec-h"><span class="chev" aria-hidden="true"></span><h2>比較セット${i + 1}</h2><span class="badge set-badge"></span>
-          <label class="set-radio"><input type="radio" name="active-set" data-active-set="${i}"> 表示セット</label><span class="set-alias" data-set="${i}"></span><span class="grow"></span>${hint}</summary>
+          <span class="set-shown" data-set="${i}"></span><span class="set-alias" data-set="${i}"></span><span class="set-sum" data-set="${i}"></span><span class="grow"></span>${hint}</summary>
         <div class="sec-body">
           <div class="set-tools"><div class="toolbar set-circuit"></div><div class="toolbar set-bar"></div></div>
           <div class="set-hint" hidden></div>
@@ -142,7 +145,13 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
       <div class="sets-head">
         <div id="msg" class="msg" role="status"></div>
       </div>
-      ${Array.from({ length: SET_COUNT }, (_, i) => setHtml(i)).join('')}
+      <section class="sets-group" id="sets-group" aria-labelledby="h-sets">
+        <div class="sets-group-h"><h2 id="h-sets">比較セット</h2><span class="sets-group-sub"></span><span class="grow"></span>
+          <span class="seg tiny sets-view" role="group" aria-label="比較セットの並べ方">
+            <button data-act="sets-view" data-view="tabs" title="比較セットをタブで切り替えて、1 つずつ表示します">タブ</button><button data-act="sets-view" data-view="list" title="比較セットを縦に並べ、見出しを押して開閉します">一覧</button></span></div>
+        <div class="sets-tabs" role="tablist" aria-label="比較セット" hidden></div>
+        ${Array.from({ length: SET_COUNT }, (_, i) => setHtml(i)).join('')}
+      </section>
     </div>
     <input id="vbo-input" type="file" multiple accept=".vbo" hidden>
     <input id="reload-input" type="file" hidden>
@@ -162,7 +171,7 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
   let reloadTarget: { id: string; kind: 'control' | 'sectors' } | null = null;
 
   // ---------- 描画 ----------
-  // ---------- セットの別名(見出しの「表示セット」の右) ----------
+  // ---------- セットの別名(見出しの「表示中」の印の右) ----------
   let aliasEditing: number | null = null;
   const aliasShown = new Map<number, string>();     // 見出しを作り直すのは、状態が変わったときだけ(入力中の文字を消さないため)
   function renderAlias(i: number) {
@@ -182,6 +191,16 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
         ? `<span class="alias-name">別名: <b>${esc(alias)}</b></span><button class="btn xs" data-act="alias-edit" data-set="${i}">編集</button>`
         : `<button class="btn xs" data-act="alias-edit" data-set="${i}">別名を編集</button>`;
     }
+  }
+  /** 見出しの要約(案件 27): サーキット名と A〜D の割り当て。走行ログが無ければ「—」 */
+  function renderSum(i: number, w: WorkSet) {
+    const host = setEls[i].querySelector<HTMLElement>('.set-sum')!;
+    if (!w.logs.length) { host.innerHTML = '<span class="sum-muted">—</span>'; return; }
+    const c = session.setCircuitOf(i);
+    const assigned = SLOTS.filter((s) => w.assignment[s]);
+    host.innerHTML = `<span class="sum-circ${c ? '' : ' sum-muted'}">${c ? esc(c.name) : 'サーキット未判定'}</span>` + (assigned.length
+      ? `<span class="sum-slots">${assigned.map((s) => `<i class="s${s.toLowerCase()}">${s}</i>`).join('')}割り当て ${assigned.length}</span>`
+      : '<span class="sum-muted">割り当てなし</span>');
   }
   function commitAlias(i: number) {
     const inp = setEls[i].querySelector<HTMLInputElement>('.alias-input');
@@ -221,7 +240,7 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
       const pen = r && !editing ? `<button class="btn xs slot-pen" data-act="slot-alias-edit" data-slot="${s}" aria-label="${s} のカード名を編集" title="カード名を編集">✎</button>` : '';
       return `<div class="slot slot-${s.toLowerCase()}"><span class="chip s${s.toLowerCase()}">${s}</span><div class="slot-main">${body}</div>${pen}</div>`;
     }).join('') + `<button class="btn pri" data-act="goto-compare" data-fk="goto-compare"${editingCircuit() ? ' disabled title="サーキットの登録・編集中です。登録かキャンセルをしてください"' : SLOTS.some((s) => session.assignment[s]) ? '' : ' disabled title="A〜D にラップを割り当ててください"'}>比較画面へ ▶</button>`;
-    slotsEl.innerHTML = `<div class="slots-title">表示中: <b>${esc(session.setName(session.activeIndex))}</b>${session.aliasOf(session.activeIndex) ? ` <span class="sub">(${session.setLabel(session.activeIndex)})</span>` : ''}</div><div class="slots-row">${cards}</div>`;
+    slotsEl.innerHTML = `<div class="slots-title">${SHOWN_MARK}<b>${esc(session.setName(session.activeIndex))}</b>${session.aliasOf(session.activeIndex) ? ` <span class="sub">(${session.setLabel(session.activeIndex)})</span>` : ''}</div><div class="slots-row">${cards}</div>`;
     const inp = slotsEl.querySelector<HTMLInputElement>('.slot-alias-input');
     if (inp && draftText !== undefined && draft) { inp.value = draftText; inp.focus(); inp.setSelectionRange(draftText.length, draftText.length); }
   }
@@ -469,16 +488,21 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
       const el = setEls[i];
       renderSetBars(i, w);
       renderAlias(i);
+      renderSum(i, w);
       const badge = el.querySelector<HTMLElement>('.set-badge')!;
       badge.textContent = `${w.logs.length} 本`;
       badge.classList.toggle('has-logs', w.logs.length > 0);           // 走行ログの入った比較セットは、閉じていても分かるように緑(案件 26)
-      const radio = el.querySelector<HTMLInputElement>('[data-active-set]')!;
-      radio.checked = i === session.activeIndex;
-      radio.disabled = w.logs.length === 0;
-      radio.title = w.logs.length === 0 ? '走行ログを追加すると選べます' : '';
+      // 表示セット(比較画面に出す比較セット)は「表示中」の印、ほかは「表示中にする」ボタン(案件 27。走行ログが無い比較セットは選べない)
+      const shownHost = el.querySelector<HTMLElement>('.set-shown')!;
+      const shownKey = i === session.activeIndex ? 'on' : w.logs.length ? 'can' : 'empty';
+      if (shownHost.dataset.k !== shownKey) {
+        shownHost.dataset.k = shownKey;
+        shownHost.innerHTML = shownKey === 'on' ? SHOWN_MARK
+          : `<button type="button" class="btn xs" data-act="set-active" data-set="${i}"${shownKey === 'empty' ? ' disabled title="走行ログを追加すると選べます"' : ' title="この比較セットを比較画面に出します"'}>表示中にする</button>`;
+      }
       el.classList.toggle('set-active', i === session.activeIndex);
       // 最初のログが入ったセットは、開いて見せる
-      if (w.logs.length && !openedBefore[i]) el.open = true;
+      if (w.logs.length && !openedBefore[i]) openSet(i);
       openedBefore[i] = w.logs.length > 0;
       renderSetExtras(i, w);
       el.querySelector('.files')!.innerHTML = w.logs.map((l) => renderFile(l, i, w)).join('');
@@ -487,6 +511,7 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
         if (sc) sc.scrollLeft = scrolls.get(`${i}:${f.dataset.id}`) ?? 0;
       });
     });
+    renderSetTabs();
     if (focusKey) {
       const el = Array.from(root.querySelectorAll<HTMLElement>('[data-fk]')).find((e) => e.dataset.fk === focusKey);
       el?.focus({ preventScroll: true });
@@ -525,6 +550,9 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
         break;
       case 'register': void registerCircuit(); break;
       case 'goto-compare': opts.onCompare?.(); break;
+      case 'sets-view': setView(d.view as SetsView); break;
+      case 'set-tab': showTab(Number(d.set)); break;
+      case 'set-active': session.setActive(Number(d.set)); break;
       case 'drop-pick': addTarget = Number(d.set ?? 0); vboInput.click(); break;
       case 'auto-assign': autoAssign(Number(d.set ?? 0)); break;
       case 'circ-map': openMapRegister(Number(d.set ?? 0), d.log); break;
@@ -562,6 +590,7 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
   root.addEventListener('keyup', (e) => { if ((e.target as HTMLElement).closest('.alias-input')) e.stopPropagation(); });
   root.addEventListener('click', (e) => {         // 見出しの別名の操作では、折りたたみを開閉しない
     if ((e.target as HTMLElement).closest('.set-alias')) e.preventDefault();
+    if (asTabs() && (e.target as HTMLElement).closest('.set-sec > summary') && !(e.target as HTMLElement).closest('input,button')) e.preventDefault();   // タブでは閉じない
   });
   root.addEventListener('keydown', (e) => {
     const box = (e.target as HTMLElement).closest<HTMLElement>('.dropbox');
@@ -640,11 +669,51 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
     if (p && session.circuits.length > p.circuits) session.setCircuit(session.circuits[session.circuits.length - 1].id, p.set);
   }
 
+  // ---------- 比較セットの並べ方(案件 27): タブ(初期)/ 一覧。選んだ並べ方は保存する(ui.setsView) ----------
+  const groupEl = $('sets-group'), tabsEl = groupEl.querySelector<HTMLElement>('.sets-tabs')!;
+  let setsView: SetsView = session.getSetting<string>('setsView', 'tabs') === 'list' ? 'list' : 'tabs';
+  let tabSet = session.activeIndex;        // タブで中身を出している比較セット
+  /** 一覧のときの開閉。タブにしている間も覚えておき、一覧に戻したら元に戻す */
+  const listOpen = setEls.map((el) => el.open);
+  const asTabs = () => setsView === 'tabs';
+  setEls.forEach((el, i) => el.addEventListener('toggle', () => { if (!asTabs()) listOpen[i] = el.open; }));
+  function setView(v: SetsView) {
+    if (v === setsView) return;
+    setsView = v;
+    session.setSetting('setsView', v);
+    if (v === 'list') setEls.forEach((el, i) => { el.open = listOpen[i]; });
+    renderSetTabs();
+  }
+  /** 比較セットを開く(タブでは、一覧に戻したときに開いているようにしておく) */
+  function openSet(i: number) { if (asTabs()) listOpen[i] = true; else setEls[i].open = true; }
+  function renderSetTabs() {
+    groupEl.classList.toggle('as-tabs', asTabs());
+    tabsEl.hidden = !asTabs();
+    groupEl.querySelector('.sets-group-sub')!.textContent = asTabs()
+      ? 'タブで比較セットを切り替えます。「表示中」の比較セットが「比較」タブに出ます'
+      : '見出しを押すと開きます。「表示中」の比較セットが「比較」タブに出ます';
+    root.querySelectorAll<HTMLElement>('[data-act="sets-view"]').forEach((b) => {
+      const on = b.dataset.view === setsView;
+      b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on));
+    });
+    setEls.forEach((el, i) => el.classList.toggle('tab-on', asTabs() && i === tabSet));
+    if (!asTabs()) return;
+    setEls[tabSet].open = true;
+    tabsEl.innerHTML = session.sets.map((w, i) => {
+      const n = w.logs.length, on = i === tabSet, shown = i === session.activeIndex, alias = session.aliasOf(i);
+      // 別名があればタブには別名だけを出す(比較セットの番号は、マウスを乗せたときの説明に)
+      return `<button type="button" role="tab" class="set-tab${on ? ' on' : ''}" aria-selected="${on}" data-act="set-tab" data-set="${i}"` +
+        ` title="${session.setLabel(i)}${shown ? '(表示セット)' : ''}">${shown ? SHOWN_MARK : ''}${esc(alias || session.setLabel(i))}` +
+        `<span class="badge set-badge${n ? ' has-logs' : ''}">${n} 本</span></button>`;
+    }).join('');
+  }
+  function showTab(set: number) { tabSet = set; renderSetTabs(); }
+
   /** 比較セットが、スクロールする領域の一番上に来るようにする(上の固定部分の下) */
   function scrollToSet(set: number) {
     const sec = setEls[set];
     if (!sec) return;
-    sec.open = true;
+    if (asTabs()) { listOpen[set] = true; showTab(set); } else sec.open = true;
     sec.scrollIntoView?.({ block: 'start' });
   }
   /** 速いものから自動で割り当てて、そのセットが見えるようにする */
@@ -660,7 +729,7 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
   }
   function focusCircuitSelect(set: number) {
     const sec = setEls[set];
-    sec.open = true;
+    if (asTabs()) { listOpen[set] = true; showTab(set); } else sec.open = true;
     const sel = sec.querySelector<HTMLSelectElement>('.circuit-select');
     sel?.scrollIntoView?.({ block: 'center' });
     sel?.focus();
@@ -689,7 +758,6 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
         openMapRegister(i);
       } else session.setCircuit(sel.value || null, i);
     }
-    if (t.dataset.activeSet !== undefined && (t as HTMLInputElement).checked) session.setActive(Number(t.dataset.activeSet));
     if (t.dataset.act === 'lap-end') {                    // 「終端の調整」のチェック: 入れたときは今の終端のまま、スライドバーを出す
       const id = t.dataset.log!, n = Number(t.dataset.lap);
       const lap = session.sets[Number(t.dataset.set)]?.logs.find((x) => x.id === id)?.laps.find((x) => x.number === n);
@@ -832,7 +900,10 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
     isEditing: editingCircuit,
     needsLeaveConfirm: () => work === 'correct' && !!correct?.isDirty(),
     confirmLeave: () => (work === 'correct' && correct ? correct.confirmLeave() : Promise.resolve(true)),
-    closeSets() { setEls.forEach((el) => { el.open = false; }); },
+    closeSets() {           // 一覧はすべて閉じ、タブは表示セットを出す
+      listOpen.fill(false);
+      if (asTabs()) showTab(session.activeIndex); else setEls.forEach((el) => { el.open = false; });
+    },
     /** 比較画面から: サーキットを編集する(終わったら比較に戻る) */
     editCircuit(id: string) { openWork('circuit', id, undefined, undefined, true); backToCompare = work === 'circuit'; },
   };
