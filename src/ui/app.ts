@@ -137,8 +137,10 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
   const native = window.rllNative;
   if (native && prefs.autoLoad) {
     // 読み込めたら、表示セットに割り当てがあるとき、そのまま「比較」を開く
+    // 割り当てが無ければ「データ管理」のまま、比較セットは閉じた状態で始める(一覧ではすべて閉じ、タブは表示中の比較セット。案件 26)
     void session.restoreLast((p) => native.readTextFile(p)).then(() => {
-      if (current === 'import' && SLOTS.some((s) => session.assignment[s])) navigate('compare');
+      if (current !== 'import') return;
+      if (SLOTS.some((s) => session.assignment[s])) navigate('compare'); else importApi?.closeSets();
     });
   }
 
