@@ -263,7 +263,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   function renderSetSelect() {
     const sel = root.querySelector<HTMLSelectElement>('#cmp-set')!;
     sel.innerHTML = session.sets.map((w, i) =>
-      `<option value="${i}"${w.logs.length ? '' : ' disabled'}${i === session.activeIndex ? ' selected' : ''}>${esc(`${session.setName(i)}(${w.logs.length}本)`)}</option>`).join('');
+      `<option value="${i}"${session.canShow(i) ? '' : ' disabled'}${i === session.activeIndex ? ' selected' : ''}>${esc(`${session.setName(i)}(${w.logs.length}本)`)}</option>`).join('');
   }
   root.querySelector('#cmp-set')!.addEventListener('change', (e) => session.setActive(Number((e.target as HTMLSelectElement).value)));
 

@@ -99,25 +99,15 @@ describe('比較セットの並べ方: タブ / 一覧(案件 27)', () => {
   beforeEach(() => { store2 = new MemoryStore(); remount(); });
   const tabs = () => Array.from(root.querySelectorAll<HTMLElement>('.set-tab'));
 
-  it('初めはタブ。表示セットのタブを出す。表示セットのタブには「表示中」の印。別名があればタブは別名だけ', () => {
+  it('初めはタブで、比較セット1を出す。割り当てが無ければ「表示中」の印はどこにも無い。別名があればタブは別名だけ', () => {
     expect(root.querySelector('#sets-group')!.classList.contains('as-tabs')).toBe(true);
     expect(tabs().map((t) => t.getAttribute('aria-selected'))).toEqual(['true', 'false', 'false', 'false', 'false']);
-    expect(tabs()[0].querySelector('.shown-mark')).not.toBeNull();
+    expect(root.querySelector('.set-tab .shown-mark')).toBeNull();
     session.addLog(tiny(), 'a', 2);
-    session.setActive(2);
     session.setAlias(2, 'AP');
-    expect(tabs()[2].textContent).toBe('表示中AP1 本');                                // 「比較セット3」は出さない
-    expect(tabs()[2].title).toBe('比較セット3(表示セット)');
+    expect(tabs()[2].textContent).toBe('AP1 本');                                       // 「比較セット3」は出さない
+    expect(tabs()[2].title).toBe('比較セット3');
     expect(tabs()[0].textContent).toBe('比較セット10 本');
-    expect(tabs()[0].querySelector('.shown-mark')).toBeNull();
-  });
-
-  it('タブでは、表示中の比較セットの中の見出しに「表示中」の印を重ねて出さない(ほかは「表示中にする」)', () => {
-    session.addLog(tiny(), 'a', 0);
-    session.addLog(tiny(), 'b', 1);
-    expect(root.querySelector<HTMLElement>('#sec-set-0 .set-shown')!.dataset.k).toBe('on');      // CSS で隠す(as-tabs のとき)
-    tabs()[1].click();
-    expect(root.querySelector('#sec-set-1 .set-shown [data-act="set-active"]')).not.toBeNull();
   });
 
   it('タブを押すと、その比較セットだけを出す。見出しを押しても閉じない', () => {

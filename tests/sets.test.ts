@@ -40,66 +40,80 @@ const $ = <T extends HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
 const log = () => parseVbo(vbo, 'u.vbo');
 
 describe('比較セット 1〜5', () => {
-  it('5 つの枠があり、表示セット(初期は比較セット1)の見出しにだけ「表示中」の印。ほかは「表示中にする」(案件 27)', () => {
+  it('5 つの枠がある。割り当てが無いうちは「表示中」の印は無く、「表示中にする」も押せない(案件 28)', () => {
     expect(SET_COUNT).toBe(5);
     expect(Array.from(root.querySelectorAll('.set-sec h2')).map((h) => h.textContent)).toEqual(['比較セット1', '比較セット2', '比較セット3', '比較セット4', '比較セット5']);
-    const shown = Array.from(root.querySelectorAll<HTMLElement>('.set-sec .set-shown')).map((e) => e.textContent);
-    expect(shown).toEqual(['表示中', '表示中にする', '表示中にする', '表示中にする', '表示中にする']);
-    expect($('#sec-set-0 .set-shown .shown-mark')).not.toBeNull();
+    expect(Array.from(root.querySelectorAll<HTMLElement>('.set-sec .set-shown')).map((e) => e.textContent)).toEqual(Array(5).fill('表示中にする'));
+    expect(Array.from(root.querySelectorAll<HTMLButtonElement>('[data-act="set-active"]')).every((b) => b.disabled)).toBe(true);
+    expect(session.shownIndex).toBeNull();
+    expect($('#slots .slots-title').textContent).toBe('表示中の比較セットはありません(ラップを A〜D に割り当てると表示されます)');
+    expect($('#guide').textContent).toContain('表示予定のセット(比較セット1)');
   });
 
-  it('上部のカードに「表示中」の印と比較セットの名前の題が付く。「表示中にする」で切り替わる', () => {
+  it('割り当てた比較セットが表示中になり、印・題・はじめかたに出る。割り当てのある別の比較セットは「表示中にする」で切り替わる', () => {
+    session.registerCircuit('オートポリス', cln, sci);
+    session.addLog(log(), 'u', 0);
+    session.addLog(log(), 'u', 2);
+    expect(session.activeIndex).toBe(2);                                                   // 表示中が無いあいだは、最後に走行ログを入れた比較セットが「表示予定」
+    session.toggleAssignment('A', { logId: 'u', lap: 1 }, 0);
+    expect(session.shownIndex).toBe(0);
+    expect($('#sec-set-0 .set-shown .shown-mark')).not.toBeNull();
     expect($('#slots .slots-title').textContent).toBe('表示中比較セット1');
     expect($('#slots .slots-title .shown-mark')).not.toBeNull();
-    session.addLog(log(), 'u', 2);
-    $<HTMLButtonElement>('#sec-set-2 [data-act="set-active"]').click();
-    expect(session.activeIndex).toBe(2);
-    expect($('#slots .slots-title').textContent).toBe('表示中比較セット3');
-    expect($('#sec-set-2 .set-shown .shown-mark')).not.toBeNull();
-    expect($('#sec-set-0 [data-act="set-active"]')).not.toBeNull();
+    expect($('#guide').textContent).toContain('表示中のセット(比較セット1)');
+    expect($<HTMLButtonElement>('#sec-set-2 [data-act="set-active"]').disabled).toBe(true);   // 割り当てが無いので押せない
+    session.toggleAssignment('B', { logId: 'u', lap: 1 }, 2);                                 // 割り当てると、その比較セットが表示中
+    expect(session.shownIndex).toBe(2);
+    $<HTMLButtonElement>('#sec-set-0 [data-act="set-active"]').click();
+    expect(session.shownIndex).toBe(0);
+    expect($('#slots .slots-title').textContent).toBe('表示中比較セット1');
+    session.toggleAssignment('A', { logId: 'u', lap: 1 }, 0);                                 // 割り当てを外すと、表示中が無い状態に戻る
+    expect(session.shownIndex).toBeNull();
+    expect($('#slots .slots-title').textContent).toContain('表示中の比較セットはありません');
   });
+});
 
-  it('一覧のとき: 最初のログが入ったセットは自動で開く。空のセットは閉じたまま(比較セット1だけ初期は開いている)', () => {
-    $<HTMLButtonElement>('[data-act="sets-view"][data-view="list"]').click();
-    expect(root.querySelector<HTMLDetailsElement>('#sec-set-0')!.open).toBe(true);
-    expect(root.querySelector<HTMLDetailsElement>('#sec-set-1')!.open).toBe(false);
+describe('タブの「表示中」の印(案件 27・28)', () => {
+  it('表示中の比較セットのタブにだけ印。中の見出しの印は CSS で隠す(data-k="on")', () => {
     session.registerCircuit('オートポリス', cln, sci);
+    session.addLog(log(), 'u', 0);
     session.addLog(log(), 'u', 1);
-    expect(root.querySelector<HTMLDetailsElement>('#sec-set-1')!.open).toBe(true);
-    expect($('#sec-set-1 .set-badge').textContent).toBe('1 本');
-    expect($('#sec-set-2 .set-badge').textContent).toBe('0 本');
-  });
-
-  it('「走行ログを追加」は、押したセットに入る', async () => {
-    session.registerCircuit('オートポリス', cln, sci);
-    $<HTMLButtonElement>('#sec-set-3 [data-act="add"]').click();
-    const input = $<HTMLInputElement>('#vbo-input');
-    Object.defineProperty(input, 'files', { value: [file('a.vbo', vbo)], configurable: true });
-    input.dispatchEvent(new Event('change', { bubbles: true }));
-    await flush();
-    expect(session.sets.map((w) => w.logs.length)).toEqual([0, 0, 0, 1, 0]);
+    session.toggleAssignment('A', { logId: 'u', lap: 1 }, 1);
+    const tabs = Array.from(root.querySelectorAll<HTMLElement>('.set-tab'));
+    expect(tabs.map((t) => !!t.querySelector('.shown-mark'))).toEqual([false, true, false, false, false]);
+    expect(tabs[1].title).toBe('比較セット2(表示セット)');
+    expect($<HTMLElement>('#sec-set-1 .set-shown').dataset.k).toBe('on');
   });
 });
 
 describe('ログが 0 件のセット / 比較画面のセット選択 / 地図で新規登録', () => {
-  it('0 件のセットの「表示中にする」は押せない。ログが入ると押せる。session も切り替えを受け付けない', () => {
+  it('「表示中にする」は、割り当てがある比較セットでだけ押せる。session は 0 件の比較セットへの切り替えを受け付けない', () => {
     const btns = () => [1, 2, 3, 4].map((i) => root.querySelector<HTMLButtonElement>(`#sec-set-${i} [data-act="set-active"]`)!.disabled);
     expect(btns()).toEqual([true, true, true, true]);
     session.setActive(3);
     expect(session.activeIndex).toBe(0);
+    session.registerCircuit('オートポリス', cln, sci);
+    session.addLog(log(), 'u', 0);
     session.addLog(log(), 'u', 3);
+    session.toggleAssignment('A', { logId: 'u', lap: 1 }, 0);
+    expect(btns()).toEqual([true, true, true, true]);                                       // 比較セット4は走行ログだけで、割り当てが無い
+    expect($('#sec-set-3 [data-act="set-active"]').getAttribute('title')).toBe('ラップを A〜D に割り当てると選べます');
+    session.toggleAssignment('B', { logId: 'u', lap: 1 }, 3);
+    session.setActive(0);
     expect(btns()).toEqual([true, true, false, true]);
-    session.setActive(3);
-    expect(session.activeIndex).toBe(3);
   });
 
-  it('比較画面の上部に、表示セットのプルダウンがある。0 件のセットは選べず、選ぶと切り替わる', () => {
+  it('比較画面の上部に、表示中のプルダウンがある。割り当てが無い比較セットは選べず、選ぶと切り替わる(案件 28)', () => {
+    session.registerCircuit('オートポリス', cln, sci);
     session.addLog(log(), 'u', 0);
+    session.addLog(log(), 'u', 1);
     session.addLog(log(), 'u', 2);
+    session.toggleAssignment('A', { logId: 'u', lap: 1 }, 2);
+    session.toggleAssignment('A', { logId: 'u', lap: 1 }, 0);
     $<HTMLButtonElement>('[data-act="nav"][data-view="compare"]').click();
     const sel = $<HTMLSelectElement>('#cmp-set');
     expect(Array.from(sel.options).map((o) => [o.textContent, o.disabled])).toEqual([
-      ['比較セット1(1本)', false], ['比較セット2(0本)', true], ['比較セット3(1本)', false], ['比較セット4(0本)', true], ['比較セット5(0本)', true]]);
+      ['比較セット1(1本)', false], ['比較セット2(1本)', true], ['比較セット3(1本)', false], ['比較セット4(0本)', true], ['比較セット5(0本)', true]]);
     sel.value = '2';
     sel.dispatchEvent(new Event('change', { bubbles: true }));
     expect(session.activeIndex).toBe(2);
@@ -153,8 +167,9 @@ describe('セットは独立している(位置補正だけが共通)', () => {
     expect(session.sets[1].assignment.B).toEqual({ logId: 'u', lap: 1 });
   });
 
-  it('表示していないセットで割り当てを押すと、そのセットが「表示セット」になる', () => {
-    expect(session.activeIndex).toBe(0);
+  it('表示していないセットで割り当てを押すと、そのセットが表示中になる', () => {
+    session.toggleAssignment('A', { logId: 'u', lap: 1 }, 0);
+    expect(session.shownIndex).toBe(0);
     $<HTMLButtonElement>('#sec-set-1 [data-act="assign"][data-slot="C"]').click();
     expect(session.activeIndex).toBe(1);
     expect(session.assignment.C).toEqual({ logId: 'u', lap: 1 });
@@ -278,7 +293,8 @@ describe('前回の状態の保存と自動読み込み(セット)', () => {
     boot(true);
     await flush();
     expect($<HTMLElement>('#view-import').hidden).toBe(false);
-    expect(session.logs).toHaveLength(0);                            // 表示セット(1 番目)は空
+    expect(session.activeIndex).toBe(1);                             // 表示中が無いので、走行ログを入れた比較セット2が「表示予定」のまま
+    expect(session.shownIndex).toBeNull();
     expect(session.sets[1].logs).toHaveLength(1);
   });
 

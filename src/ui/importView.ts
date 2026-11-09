@@ -240,7 +240,11 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
       const pen = r && !editing ? `<button class="btn xs slot-pen" data-act="slot-alias-edit" data-slot="${s}" aria-label="${s} のカード名を編集" title="カード名を編集">✎</button>` : '';
       return `<div class="slot slot-${s.toLowerCase()}"><span class="chip s${s.toLowerCase()}">${s}</span><div class="slot-main">${body}</div>${pen}</div>`;
     }).join('') + `<button class="btn pri" data-act="goto-compare" data-fk="goto-compare"${editingCircuit() ? ' disabled title="サーキットの登録・編集中です。登録かキャンセルをしてください"' : SLOTS.some((s) => session.assignment[s]) ? '' : ' disabled title="A〜D にラップを割り当ててください"'}>比較画面へ ▶</button>`;
-    slotsEl.innerHTML = `<div class="slots-title">${SHOWN_MARK}<b>${esc(session.setName(session.activeIndex))}</b>${session.aliasOf(session.activeIndex) ? ` <span class="sub">(${session.setLabel(session.activeIndex)})</span>` : ''}</div><div class="slots-row">${cards}</div>`;
+    const shownI = session.shownIndex;
+    const title = shownI === null
+      ? '表示中の比較セットはありません(ラップを A〜D に割り当てると表示されます)'          // 案件 28
+      : `${SHOWN_MARK}<b>${esc(session.setName(shownI))}</b>${session.aliasOf(shownI) ? ` <span class="sub">(${session.setLabel(shownI)})</span>` : ''}`;
+    slotsEl.innerHTML = `<div class="slots-title">${title}</div><div class="slots-row">${cards}</div>`;
     const inp = slotsEl.querySelector<HTMLInputElement>('.slot-alias-input');
     if (inp && draftText !== undefined && draft) { inp.value = draftText; inp.focus(); inp.setSelectionRange(draftText.length, draftText.length); }
   }
@@ -461,7 +465,7 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
         b: btn('guide-compare', '比較画面へ ▶') },
     ];
     el.innerHTML = `<section class="guide" aria-label="はじめかた">
-      <div class="gh"><b>はじめかた</b><span class="sub">表示セット(${esc(session.setName(session.activeIndex))})の状態に合わせて、次の操作を案内します</span>
+      <div class="gh"><b>はじめかた</b><span class="sub">${session.shownIndex === null ? '表示予定' : '表示中'}のセット(${esc(session.setName(session.activeIndex))})の状態に合わせて、次の操作を案内します</span>
         <button class="linkbtn" data-act="guide-close" data-fk="guide-close">閉じる ×</button></div>
       <div class="gsteps">${steps.map((s, k) => `
         <div class="gstep${k < cur ? ' done' : k === cur ? ' cur' : ''}">
@@ -494,13 +498,14 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
       badge.classList.toggle('has-logs', w.logs.length > 0);           // 走行ログの入った比較セットは、閉じていても分かるように緑(案件 26)
       // 表示セット(比較画面に出す比較セット)は「表示中」の印、ほかは「表示中にする」ボタン(案件 27。走行ログが無い比較セットは選べない)
       const shownHost = el.querySelector<HTMLElement>('.set-shown')!;
-      const shownKey = i === session.activeIndex ? 'on' : w.logs.length ? 'can' : 'empty';
+      // 表示中にできるのは、A〜D に割り当てがある比較セットだけ(案件 28)
+      const shownKey = i === session.shownIndex ? 'on' : session.canShow(i) ? 'can' : 'empty';
       if (shownHost.dataset.k !== shownKey) {
         shownHost.dataset.k = shownKey;
         shownHost.innerHTML = shownKey === 'on' ? SHOWN_MARK
-          : `<button type="button" class="btn xs" data-act="set-active" data-set="${i}"${shownKey === 'empty' ? ' disabled title="走行ログを追加すると選べます"' : ' title="この比較セットを比較画面に出します"'}>表示中にする</button>`;
+          : `<button type="button" class="btn xs" data-act="set-active" data-set="${i}"${shownKey === 'empty' ? ' disabled title="ラップを A〜D に割り当てると選べます"' : ' title="この比較セットを比較画面に出します"'}>表示中にする</button>`;
       }
-      el.classList.toggle('set-active', i === session.activeIndex);
+      el.classList.toggle('set-active', i === session.shownIndex);
       // 最初のログが入ったセットは、開いて見せる
       if (w.logs.length && !openedBefore[i]) openSet(i);
       openedBefore[i] = w.logs.length > 0;
@@ -552,7 +557,7 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
       case 'goto-compare': opts.onCompare?.(); break;
       case 'sets-view': setView(d.view as SetsView); break;
       case 'set-tab': showTab(Number(d.set)); break;
-      case 'set-active': session.setActive(Number(d.set)); break;
+      case 'set-active': if (session.canShow(Number(d.set))) session.setActive(Number(d.set)); break;
       case 'drop-pick': addTarget = Number(d.set ?? 0); vboInput.click(); break;
       case 'auto-assign': autoAssign(Number(d.set ?? 0)); break;
       case 'circ-map': openMapRegister(Number(d.set ?? 0), d.log); break;
@@ -700,7 +705,7 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
     if (!asTabs()) return;
     setEls[tabSet].open = true;
     tabsEl.innerHTML = session.sets.map((w, i) => {
-      const n = w.logs.length, on = i === tabSet, shown = i === session.activeIndex, alias = session.aliasOf(i);
+      const n = w.logs.length, on = i === tabSet, shown = i === session.shownIndex, alias = session.aliasOf(i);
       // 別名があればタブには別名だけを出す(比較セットの番号は、マウスを乗せたときの説明に)
       return `<button type="button" role="tab" class="set-tab${on ? ' on' : ''}" aria-selected="${on}" data-act="set-tab" data-set="${i}"` +
         ` title="${session.setLabel(i)}${shown ? '(表示セット)' : ''}">${shown ? SHOWN_MARK : ''}${esc(alias || session.setLabel(i))}` +

@@ -156,6 +156,14 @@ export class Session {
 
   private ws(i?: number): WorkSet { return this.sets[i ?? this.activeIndex] ?? this.active; }
 
+  /** 比較セット i に A〜D の割り当てがあるか(比較画面に出せるのは、割り当てがある比較セットだけ。案件 28) */
+  canShow(i: number): boolean { const w = this.sets[i]; return !!w && SLOTS.some((s) => w.assignment[s]); }
+  /**
+   * 表示中の比較セット。activeIndex の比較セットに割り当てがあるときだけ。無ければ null。
+   * 表示中が無いあいだ、activeIndex は「表示予定のセット」(最後に走行ログを入れた比較セット)を指す
+   */
+  get shownIndex(): number | null { return this.canShow(this.activeIndex) ? this.activeIndex : null; }
+
   /** セット i の走行ログの位置(logId を渡せばそのログ、無ければ最初のログ)の中央付近。ログが無ければ null */
   logCenter(i: number, logId?: string): { lat: number; lon: number } | null {
     const w = this.sets[i];
@@ -299,6 +307,8 @@ export class Session {
   markGuideSeen(): void { if (!this.getSetting<boolean>('guideSeen', false)) this.setSetting('guideSeen', true); }
 
   addLog(log: TrackLog, id: string, set?: number): void {
+    // 表示中が無いあいだは、走行ログを入れた比較セットを「表示予定のセット」にする(案件 28)
+    if (set !== undefined && this.sets[set] && this.shownIndex === null) this.activeIndex = set;
     const w = this.ws(set);
     if (w.logs.some((l) => l.id === id)) {
       this.message = `${log.fileName} は読み込み済みです。`;
