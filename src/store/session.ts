@@ -70,6 +70,17 @@ export class WorkSet {
   nextNo = 1;
 }
 
+/** Web 版の一時保存(案件 30)の、小さな状態 */
+export interface ResumeState {
+  v: 1;
+  active: number;
+  sets: {
+    logs: { id: string; no: number }[]; nextNo?: number;
+    assignment?: Partial<Record<Slot, LapRef | null>>; circuitId?: string | null;
+    sort?: SortState; showSectors?: boolean; sectorMode?: 'split' | 'cumulative';
+  }[];
+}
+
 /** セットの別名の長さの上限(文字数) */
 export const ALIAS_MAX = 15;
 
@@ -98,6 +109,8 @@ export class Session {
   /** 読み込んだファイルの場所(Electron のみ分かる)。次回の自動読み込みに使う */
   private paths = new Map<string, string>();
   private restoring = false;
+  /** Web 版の一時保存(案件 30): 走行ログを新しく入れた・どの比較セットからも外したときに知らせる */
+  logHooks: { added(id: string, log: TrackLog): void; removed(id: string): void } | null = null;
   private offsets: Record<string, Offset>;
   /** 「終端の調整」の値(ファイル → ラップ番号 → ラップ開始からの秒) */
   private lapEnds: Record<string, Record<string, number>>;
@@ -242,6 +255,57 @@ export class Session {
     this.emit();
   }
 
+  /**
+   * Web 版の一時保存(案件 30)の、小さな状態: 比較セットごとの走行ログ(id と Run 番号)・割り当て・設定と、表示中の比較セット。
+   * 走行ログの中身は含めない(logHooks で別に保存する)
+   */
+  resumeState(): ResumeState {
+    return {
+      v: 1, active: this.activeIndex,
+      sets: this.sets.map((w) => ({
+        logs: w.logs.map((l) => ({ id: l.id, no: l.no })), nextNo: w.nextNo,
+        assignment: w.assignment, circuitId: w.selectedCircuitId, sort: w.sort, showSectors: w.showSectors, sectorMode: w.sectorMode,
+      })),
+    };
+  }
+
+  /**
+   * 一時保存から元に戻す(案件 30)。logs は id → 走行ログ(読み込んだときの中身)。中身が無い走行ログは飛ばす。
+   * 走行ログがすでに入っているときは何もしない。戻した走行ログの数を返す
+   */
+  restoreResume(saved: unknown, logs: Map<string, TrackLog>): number {
+    const st = saved as Partial<ResumeState> | null;
+    if (!st || st.v !== 1 || !Array.isArray(st.sets) || this.sets.some((w) => w.logs.length)) return 0;
+    let n = 0;
+    this.restoring = true;
+    try {
+      st.sets.slice(0, SET_COUNT).forEach((sv, si) => {
+        const w = this.sets[si];
+        if (sv.circuitId && this.circuits.some((c) => c.id === sv.circuitId)) w.selectedCircuitId = sv.circuitId;
+        if (sv.sort && (sv.sort.key === 'lap' || sv.sort.key === 'time') && (sv.sort.dir === 1 || sv.sort.dir === -1)) w.sort = sv.sort;
+        w.showSectors = sv.showSectors === true;
+        w.sectorMode = sv.sectorMode === 'cumulative' ? 'cumulative' : 'split';
+        for (const r of sv.logs ?? []) {
+          const log = logs.get(r.id);
+          if (!log) continue;
+          this.addEntry(w, log, r.id);
+          const e = w.logs[w.logs.length - 1];
+          if (e?.id === r.id && Number.isInteger(r.no)) e.no = r.no;
+          n++;
+        }
+        if (Number.isInteger(sv.nextNo)) w.nextNo = Math.max(w.nextNo, sv.nextNo!);
+        for (const s of SLOTS) {
+          const ref = sv.assignment?.[s] ?? null;
+          if (ref && this.resolveRef(ref, si)) w.assignment = { ...w.assignment, [s]: { logId: ref.logId, lap: ref.lap } };
+        }
+      });
+      if (typeof st.active === 'number' && st.active >= 0 && st.active < SET_COUNT) this.activeIndex = st.active;
+      if (n) this.message = '前の画面の状態を元に戻しました。';
+    } finally { this.restoring = false; this.loading = ''; }
+    this.emit();
+    return n;
+  }
+
   // ---- 走行ログ ----
   /** どこかのセットに読み込み済みのファイルなら、その中身(同じファイルを別のセットに入れるとき、読み直さない) */
   private knownLog(id: string): TrackLog | null {
@@ -297,6 +361,8 @@ export class Session {
 
   /** 画面に出す案内文(読み込み失敗などと同じ場所) */
   say(text: string): void { this.message = text; this.emit(); }
+  /** 読み込み中の案内(空文字で消す)。一時保存から元に戻す間など(案件 30) */
+  setLoading(text: string): void { this.loading = text; this.notify(); }
 
   /** 「はじめかた」を閉じているか。未設定なら、一度でも比較を開いた後は閉じた状態で始まる */
   get guideClosed(): boolean {
@@ -315,7 +381,9 @@ export class Session {
       this.emit();
       return;
     }
+    const isNew = !this.knownEntry(id);
     this.addEntry(w, log, id);
+    if (isNew) this.logHooks?.added(id, log);
     this.message = '';
     this.emit();
   }
@@ -357,7 +425,7 @@ export class Session {
     const w = this.ws(set);
     w.logs = w.logs.filter((l) => l.id !== id);
     w.assignment = clearLog(w.assignment, id);
-    if (!this.sets.some((x) => x.logs.some((l) => l.id === id))) this.paths.delete(id);
+    if (!this.sets.some((x) => x.logs.some((l) => l.id === id))) { this.paths.delete(id); this.logHooks?.removed(id); }
     this.resolveSet(w);                                           // 比較セットのサーキットが変わることがある
     this.emit();
   }
