@@ -10,6 +10,7 @@ import { logoSvg } from './logo';
 import { showAbout } from './aboutView';
 import { mountHelpView } from './helpView';
 import { applyAnalytics } from '../io/analytics';
+import { openResumeStore, type ResumeStore } from '../io/resume';
 
 const esc = (s: string) =>
   s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
@@ -20,7 +21,14 @@ export type ViewName = 'help' | 'import' | 'compare' | 'settings';
 const INFO_ICON = '<svg class="ico" width="11" height="11" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 7.2v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="4.9" r=".95" fill="currentColor"/></svg>';
 
 /** アプリ全体の枠: 上部バー(画面の切り替え・サーキット名・テーマ)と、使い方 / データ管理 / 比較 / 設定の 4 画面。 */
-export function mountApp(root: HTMLElement, session: Session, theme: ThemeController, mapFactory: MapFactory, opts: { reload?: () => void } = {}): { dispose(): void } {
+/** 一時保存(案件 30)に失敗したときの案内 */
+export const RESUME_SAVE_FAILED = '走行ログが大きいため、一時保存できませんでした(読み込み直されると元に戻りません)。';
+
+/**
+ * opts.resume: Web 版の一時保存の保存先(案件 30)。省略すると IndexedDB(使えなければ無し)。null で使わない。
+ * デスクトップ版(window.rllNative がある)では使わない
+ */
+export function mountApp(root: HTMLElement, session: Session, theme: ThemeController, mapFactory: MapFactory, opts: { reload?: () => void; resume?: ResumeStore | null } = {}): { dispose(): void } {
   root.innerHTML = `
     <header class="top">
       <div class="brand">${logoSvg(36)}<div class="brand-txt"><div class="ttl">Racing Line Lab</div><div class="subttl">シンプル走行ライン比較ツール</div></div></div>
@@ -49,7 +57,7 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
 
   function navigate(v: ViewName) {
     if (v !== current && importApi?.isEditing()) return;     // サーキットの登録・編集中は、保存かキャンセルするまで移れない
-    if (v === 'import' && current !== 'import') importApi?.openActiveSet();     // ほかのタブから戻ったら、表示セットだけを開く
+    if (v === 'import' && current !== 'import') importApi?.closeSets();     // ほかのタブから戻ったら、比較セットはすべて閉じる(案件 26)
     current = v;
     if (v === 'help' && !helpEl.firstChild) mountHelpView(helpEl);     // 開いたときに 1 回だけ作る
     helpEl.hidden = v !== 'help';
@@ -128,18 +136,50 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
     if (key === 'theme') { if (!prefs.get('theme').remember) theme.set(prefs.get('theme').value); }
     else if (key === 'analytics') applyAnalytics(prefs.analytics);
     else if (key !== 'autoLoad') compare?.applyPref(key);
-  }, () => {            // 「アプリを初期状態に戻す」: 保存したものをすべて消して、画面を読み直す
+  }, () => {            // 「アプリを初期状態に戻す」: 保存したものをすべて消して、画面を読み直す(一時保存も消し、元に戻さない)
     session.factoryReset();
-    (opts.reload ?? (() => window.location.reload()))();
+    const reload = opts.reload ?? (() => window.location.reload());
+    if (!resume) { reload(); return; }
+    forgotten = true;
+    void resume.forget().catch(() => { /* 消せなくても読み直す */ }).finally(reload);
   });
 
   // 前回の走行データの自動読み込み(Electron のみ。ファイルの場所を覚えているので読み直せる)
   const native = window.rllNative;
+  // Web 版の一時保存(案件 30)。同じタブの中の読み直し(スリープ・アプリの切り替え・手での再読み込み)で元に戻す
+  const resume: ResumeStore | null = native ? null : opts.resume !== undefined ? opts.resume : openResumeStore();
+  let forgotten = false;
+  let unhook = () => {};
   if (native && prefs.autoLoad) {
     // 読み込めたら、表示セットに割り当てがあるとき、そのまま「比較」を開く
+    // 割り当てが無ければ「データ管理」のまま、比較セットは閉じた状態で始める(一覧ではすべて閉じ、タブは表示中の比較セット。案件 26)
     void session.restoreLast((p) => native.readTextFile(p)).then(() => {
-      if (current === 'import' && SLOTS.some((s) => session.assignment[s])) navigate('compare');
+      if (current !== 'import') return;
+      if (SLOTS.some((s) => session.assignment[s])) navigate('compare'); else importApi?.closeSets();
     });
+  }
+
+  if (resume) {
+    // 走行ログ本体は、読み込んだときにそのつど保存する
+    session.logHooks = {
+      added: (id, log) => { void resume.putLog(id, log).catch(() => session.say(RESUME_SAVE_FAILED)); },
+      removed: (id) => { void resume.deleteLog(id).catch(() => { /* 残っても、元に戻すときに使われない */ }); },
+    };
+    // 割り当てなどの小さな状態と開いている画面は、画面が隠れるときに保存する
+    const saveState = () => { if (!forgotten) void resume.putState({ ...session.resumeState(), view: current }).catch(() => { /* 次の機会に */ }); };
+    const onVisibility = () => { if (document.visibilityState === 'hidden') saveState(); };
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pagehide', saveState);
+    unhook = () => { document.removeEventListener('visibilitychange', onVisibility); window.removeEventListener('pagehide', saveState); session.logHooks = null; };
+    if (resume.resumed) {
+      session.setLoading('前の画面の状態を元に戻しています…');
+      void resume.load().then((saved) => {
+        if (!saved) return;
+        session.restoreResume(saved.state, saved.logs);
+        const v = (saved.state as { view?: unknown } | null)?.view;
+        if (current === 'import' && (v === 'compare' || v === 'help' || v === 'settings')) navigate(v);
+      }).catch(() => { /* 戻せなければ初期状態のまま */ }).finally(() => { if (session.loading) session.setLoading(''); });
+    }
   }
 
   importApi = mountImportView(importEl, session, { onCompare: () => void leaveTo('compare'), onWorkChange: renderNav, mapFactory, theme, zoom: () => prefs.get('zoom').value as number });
@@ -152,5 +192,5 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
   window.addEventListener('dragover', stopDrop);
   window.addEventListener('drop', stopDrop);
   /** 画面を作り直す前に呼ぶ。キー操作の受付(document への登録)を外す。 */
-  return { dispose: () => { compare?.hide(); importApi?.closeWork(); window.removeEventListener('dragover', stopDrop); window.removeEventListener('drop', stopDrop); } };
+  return { dispose: () => { unhook(); compare?.hide(); importApi?.closeWork(); window.removeEventListener('dragover', stopDrop); window.removeEventListener('drop', stopDrop); } };
 }

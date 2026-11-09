@@ -37,6 +37,18 @@ beforeEach(() => { store = new MemoryStore(); disk = new Map([['/data/a.vbo', vb
 afterEach(() => { delete (window as { rllNative?: NativeBridge }).rllNative; });
 
 describe('最後の走行データの自動読み込み', () => {
+  it('A〜D の割り当てが無ければ「データ管理」のまま、比較セットはすべて閉じた状態で始める(一覧のとき。案件 26)', async () => {
+    const s1 = boot(true);
+    s1.registerCircuit('オートポリス', cln, sci);
+    await s1.addVboFile(file('a.vbo', vbo), '/data/a.vbo');
+    s1.setSetting('setsView', 'list');
+    const s2 = boot(true);
+    await flush();
+    expect(s2.logs).toHaveLength(1);
+    expect(root.querySelector<HTMLElement>('#view-import')!.hidden).toBe(false);
+    expect(Array.from(root.querySelectorAll<HTMLDetailsElement>('.set-sec')).map((d) => d.open)).toEqual([false, false, false, false, false]);
+  });
+
   async function firstRun() {
     const s = boot(true);
     s.registerCircuit('オートポリス', cln, sci);

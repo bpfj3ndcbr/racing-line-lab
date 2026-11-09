@@ -126,7 +126,9 @@ describe('読み込み画面', () => {
 describe('レイアウトとセクター表示', () => {
   it('「サーキット」「比較セット」のグループ見出しがあり、登録項目は前者に入る', () => {
     const h = Array.from(root.querySelectorAll('h2')).map((e) => e.textContent);
-    expect(h).toEqual(['サーキット', '走行ライン補正データ管理', '比較セット1', '比較セット2', '比較セット3', '比較セット4', '比較セット5']);
+    expect(h).toEqual(['サーキット', '走行ライン補正データ管理', '比較セット', '比較セット1', '比較セット2', '比較セット3', '比較セット4', '比較セット5']);
+    const group = root.querySelector('#sets-group')!;                                   // 比較セット1〜5は 1 つの枠にまとめる(案件 27)
+    expect(Array.from(group.querySelectorAll('.set-sec')).map((e) => e.id)).toEqual(['sec-set-0', 'sec-set-1', 'sec-set-2', 'sec-set-3', 'sec-set-4']);
     const circuitSec = root.querySelector('#sec-circuit')!;
     expect(circuitSec.textContent).toContain('ファイルによる登録');
     expect(circuitSec.textContent).toContain('地図による登録');
@@ -136,10 +138,31 @@ describe('レイアウトとセクター表示', () => {
     expect(logSec.textContent).toContain('セクタータイムを表示');
   });
 
+  it('比較セットの見出しの要約: サーキット名と A〜D の割り当て(案件 27)', () => {
+    const sum = (i: number) => root.querySelector(`#sec-set-${i} .set-sum`)!;
+    expect(sum(0).textContent).toBe('—');
+    session.registerCircuit('オートポリス', cln, sci);
+    session.addLog(utc(), 'u');
+    expect(sum(0).textContent).toBe('オートポリス割り当てなし');
+    session.toggleAssignment('B', { logId: 'u', lap: 1 });
+    expect(sum(0).textContent).toBe('オートポリスB割り当て 1');
+    expect(sum(0).querySelector('.sum-slots i')!.className).toBe('sb');
+    expect(sum(1).textContent).toBe('—');
+  });
+
   it('ラップ一覧は横スクロール領域に入っている', () => {
     session.registerCircuit('オートポリス', cln, sci);
     session.addLog(utc(), 'u');
     expect(root.querySelector('.file .scroll[tabindex="0"] .tbl')).not.toBeNull();
+  });
+
+  it('ラップ一覧の行は、パソコンの列(--cols)と、狭い幅の列(--cols-m: ラップ・タイム・割り当てを先に)を持つ(案件 1)', () => {
+    session.registerCircuit('オートポリス', cln, sci);
+    session.addLog(utc(), 'u');
+    const row = root.querySelector<HTMLElement>('.file .row:not(.hd)')!;
+    expect(row.style.getPropertyValue('--cols')).toBe('90px 110px 110px minmax(160px,1fr) 200px');
+    expect(row.style.getPropertyValue('--cols-m')).toBe('66px 72px 168px 90px minmax(140px,1fr)');
+    expect(row.lastElementChild!.classList.contains('pk')).toBe(true);           // DOM の並びは変えない(並べ替えは CSS の order)
   });
 
   it.skipIf(!existsSync(bigPath))('各セクターの最速セルだけが紫になる(区間タイム/通過時刻の両方)', () => {
@@ -174,13 +197,28 @@ describe('枠・開閉・タブ・テーマ', () => {
     }
   });
 
-  it('サーキットは3つのタブ: 初期は「ファイルによる登録」が選ばれている', () => {
+  it('サーキットは3つのタブ: 先頭は「登録済みサーキット」で、初期はこれが選ばれている(案件 25)', () => {
     const tabs = Array.from(root.querySelectorAll<HTMLElement>('#sec-circuit [role="tab"]'));
-    expect(tabs.map((t) => t.textContent)).toEqual(['ファイルによる登録', '地図による登録', '登録済みサーキット']);
+    expect(tabs.map((t) => t.textContent)).toEqual(['登録済みサーキット', 'ファイルによる登録', '地図による登録']);
     expect(tabs.map((t) => t.getAttribute('aria-selected'))).toEqual(['true', 'false', 'false']);
-    expect(root.querySelector<HTMLElement>('#panel-reg')!.hidden).toBe(false);
-    expect(root.querySelector<HTMLElement>('#panel-list')!.hidden).toBe(true);
+    expect(tabs.map((t) => t.tabIndex)).toEqual([0, -1, -1]);
+    expect(root.querySelector<HTMLElement>('#panel-list')!.hidden).toBe(false);
+    expect(root.querySelector<HTMLElement>('#panel-reg')!.hidden).toBe(true);
+    expect(root.querySelector<HTMLElement>('#panel-map')!.hidden).toBe(true);
+    expect(root.querySelector('#circuit-list')!.textContent).toContain('登録済みのサーキットはありません');   // 無くても一覧のタブ。登録のタブへの案内が出る
     expect(root.querySelector('#circuit-badge')!.textContent).toBe('未登録');
+  });
+
+  it('サーキットのタブのキー操作は、新しい並びの順(→ / ← / Home / End)', () => {
+    const key = (k: string) => root.querySelector<HTMLElement>('#sec-circuit [role="tab"][aria-selected="true"]')!
+      .dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
+    const selected = () => root.querySelector<HTMLElement>('#sec-circuit [role="tab"][aria-selected="true"]')!.textContent;
+    key('ArrowRight'); expect(selected()).toBe('ファイルによる登録');
+    key('ArrowRight'); expect(selected()).toBe('地図による登録');
+    key('ArrowRight'); expect(selected()).toBe('登録済みサーキット');
+    key('ArrowLeft'); expect(selected()).toBe('地図による登録');
+    key('Home'); expect(selected()).toBe('登録済みサーキット');
+    key('End'); expect(selected()).toBe('地図による登録');
   });
 
   it('件数バッジと、上部のサーキット名', () => {

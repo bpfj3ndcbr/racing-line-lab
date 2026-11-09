@@ -357,7 +357,13 @@ export function loadDialog(plan: LoadPlan, deps: LoadDialogDeps = {}, host: HTML
       const src = cur.candidate.source === 'loop' ? '計算した計測ライン' : `ファイル内の計測ライン${cur.candidate.name ? `「${esc(cur.candidate.name)}」` : ''}`;
       fixEl.innerHTML = `<div class="ld-fix-h">計測ライン・セクターの修正<span>${src}(${esc(cur.log.log.fileName)})・登録前</span></div>
         <div class="ld-fix-body">
-          <div class="ld-fix-map"><div class="map"></div></div>
+          <div class="ld-fix-map"><div class="map"></div>
+            <div class="map-ov corr-pad-map" role="group" aria-label="矢印で動かす(地図の上)">
+              <button type="button" class="ib" data-fix="nudge" data-dir="N" aria-label="北へ" title="北へ">↑</button>
+              <button type="button" class="ib" data-fix="nudge" data-dir="W" aria-label="西へ" title="西へ">←</button>
+              <button type="button" class="ib" data-fix="nudge" data-dir="E" aria-label="東へ" title="東へ">→</button>
+              <button type="button" class="ib" data-fix="nudge" data-dir="S" aria-label="南へ" title="南へ">↓</button>
+            </div></div>
           <div class="ld-fix-side">
             <div class="ld-fix-g ld-fix-lines"><div class="ld-fix-gh">ライン</div>
               <div class="ld-fix-list" role="list" aria-label="計測ラインとセクター"></div>
@@ -564,6 +570,11 @@ export function loadDialog(plan: LoadPlan, deps: LoadDialogDeps = {}, host: HTML
       } else if (act === 'draw') setDrawing(!fixing.drawing);
       else if (act === 'reset') setFixLine(selLine().before);
       else if (act === 'dec' || act === 'inc') setBearing(lineBearing(selLine().line) + (act === 'inc' ? 0.1 : -0.1));
+      else if (act === 'nudge') {                // スマホの幅で地図の右下に出す矢印(案件 1)。矢印キーと同じく 0.1 m ずつ
+        const k = FIX_STEP_M;
+        const d = ({ N: [0, k], S: [0, -k], E: [k, 0], W: [-k, 0] } as Record<string, [number, number]>)[b.dataset.dir ?? ''];
+        if (d) setFixLine(shiftLine(selLine().line, d[0], d[1]));
+      }
     });
     box.addEventListener('keydown', (e) => {
       if (!fixing) return;

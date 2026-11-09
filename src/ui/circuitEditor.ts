@@ -45,6 +45,12 @@ export function mountCircuitEditor(root: HTMLElement, session: Session, deps: Ci
           <button class="btn" id="ce-cancel" data-act="ce-cancel">キャンセル</button>
         </div>
         <div class="map" id="ce-map"></div>
+        <div class="map-ov corr-pad-map" id="ce-pad-map" role="group" aria-label="矢印で動かす(地図の上)" hidden>
+          <button class="ib" data-act="ce-nudge" data-dir="N" aria-label="北へ" title="北へ">↑</button>
+          <button class="ib" data-act="ce-nudge" data-dir="W" aria-label="西へ" title="西へ">←</button>
+          <button class="ib" data-act="ce-nudge" data-dir="E" aria-label="東へ" title="東へ">→</button>
+          <button class="ib" data-act="ce-nudge" data-dir="S" aria-label="南へ" title="南へ">↓</button>
+        </div>
         <form class="geo" id="ce-geo" role="search" autocomplete="off">
           <input id="ce-geo-q" type="search" placeholder="住所で検索..." aria-label="住所で検索" enterkeyhint="search">
           <div class="geo-res" id="ce-geo-res" role="listbox" aria-label="検索結果" hidden></div>
@@ -242,6 +248,7 @@ export function mountCircuitEditor(root: HTMLElement, session: Session, deps: Ci
     $('ce-lines').textContent = control ? `計測ライン あり ・ セクター ${sectors.length} 本` : '計測ライン: 未設定';
     const l = cur();
     $('ce-fine').hidden = !l;
+    $('ce-pad-map').hidden = !l;                    // スマホの幅では、地図の右下にも矢印を出す(案件 1)
     $('ce-fine-empty').hidden = !!l;
     if (l) {
       const len = distanceM(l.a, l.b);

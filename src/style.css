@@ -24,6 +24,8 @@
   --warn: #8a5a00;
   --focus: #1f6fd1;
   --row-assigned: #e2edfb;
+  --set-open-head: color-mix(in srgb, var(--accent) 14%, var(--surface));   /* 開いた比較セットの見出しの行(案件 27。% で濃さを調整) */
+  --set-open-bg: color-mix(in srgb, var(--accent) 6%, var(--sec-head));      /* 開いた比較セットの、中身の枠の外側 */
   /* ボタン(うっすら立体) */
   --btn-top: #fafbfc; --btn-bottom: #dfe3e9; --btn-border: #a3acb9;
   --btn-shadow: 0 1px 0 rgba(255,255,255,.9) inset, 0 1px 2px rgba(20,30,50,.25);
@@ -58,6 +60,8 @@
   --warn: #ffc83d;
   --focus: #6cb6ff;
   --row-assigned: #2f3b4a;
+  --set-open-head: color-mix(in srgb, var(--accent) 30%, var(--surface));
+  --set-open-bg: color-mix(in srgb, var(--accent) 6%, var(--sec-head));
   --btn-top: #474d53; --btn-bottom: #353a3f; --btn-border: #171a1d;
   --btn-shadow: 0 1px 0 rgba(255,255,255,.12) inset, 0 2px 3px rgba(0,0,0,.5);
   --btn-pressed: 0 2px 4px rgba(0,0,0,.6) inset;
@@ -146,8 +150,8 @@ select{min-height:44px;padding:0 10px;background:var(--surface);border:1px solid
 .circ-form input[type=text]{min-height:44px;padding:0 10px;background:var(--surface-2);border:1px solid var(--btn-border);border-radius:var(--r-s)}
 
 /* 走行データ(ファイルごとのカード+表) */
-.file{border:1px solid var(--border-strong);border-radius:var(--r-l);background:var(--surface);overflow:hidden;margin-bottom:16px}
-.fh{display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--surface-2);border-bottom:1px solid var(--border);flex-wrap:wrap}
+.file{border:2px solid var(--border-strong);border-radius:var(--r-l);background:var(--surface);overflow:hidden;margin-bottom:16px}
+.fh{display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--surface-2);border-bottom:2px solid var(--border-strong);flex-wrap:wrap}
 .fno{font-weight:800;font-size:14px}
 .fn{flex:1;min-width:200px}
 .tag{font-size:11px;padding:2px 8px;border-radius:var(--r-l);border:1px solid var(--border-strong);color:var(--muted)}
@@ -155,7 +159,7 @@ select{min-height:44px;padding:0 10px;background:var(--surface);border:1px solid
 .scroll{overflow-x:auto}
 .scroll:focus-visible{outline-offset:-2px}
 .tbl{display:grid;min-width:100%;width:max-content}
-.row{display:grid;align-items:stretch;min-height:44px;border-bottom:1px solid var(--cell-line)}
+.row{display:grid;grid-template-columns:var(--cols);align-items:stretch;min-height:44px;border-bottom:1px solid var(--cell-line)}
 .row:last-child{border-bottom:0}
 .row>div{display:flex;align-items:center;padding:0 12px;border-right:1px solid var(--cell-line);min-width:0}
 .row>div:last-child{border-right:0}
@@ -324,6 +328,9 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .map-ov{position:absolute;z-index:1100}
 .map-ov.tl{left:10px;top:10px}
 .map-ov.tr{right:10px;top:10px}
+.map-secs{display:none}
+.cmp-view-menu{display:none}
+.corr-pad-map{display:none}
 .map-legend{position:absolute;z-index:1100;right:10px;bottom:34px;display:flex;align-items:center;gap:8px;padding:4px 10px;
   font-size:11px;font-weight:700;color:var(--text);background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r-s)}
 .map-legend[hidden]{display:none}
@@ -549,15 +556,49 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 
 /* 比較セット 1〜5 */
 .slots{flex-direction:column;align-items:stretch;gap:8px}
-.slots-title{font-size:12px;color:var(--muted)}
+.slots-title{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
 .slots-title b{color:var(--text);font-size:13px}
 .slots-row{display:flex;gap:12px;align-items:center}
 .sets-head{display:flex;flex-direction:column;gap:8px}
 .set-sec .badge{margin-left:4px}
-.set-radio{display:inline-flex;align-items:center;gap:6px;margin-left:16px;font-size:11px;font-weight:600;cursor:pointer;padding:2px 8px;border:1px solid var(--border);border-radius:var(--r-s);background:var(--surface)}
+.set-shown{display:inline-flex;align-items:center;min-width:88px;margin-left:16px}
+.set-badge.has-logs{color:var(--good);border-color:var(--good);font-weight:700}
 .set-sec.set-active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
-.set-sec.set-active .set-radio{background:var(--accent);color:var(--accent-on);border-color:var(--accent)}
 .set-sec .toolbar.set-circuit{padding-bottom:0}
+/* 比較セット1〜5を 1 つの枠にまとめる(案件 27): 行は交互に色分け、表示セットは左端に帯、開いたら見出しを目立たせて中身を一段下げる */
+.sets-group{flex:none;border:1px solid var(--border-strong);border-radius:var(--r-l);background:var(--sec-bg);box-shadow:var(--sec-shadow);overflow:hidden}
+.sets-group-h{display:flex;align-items:center;gap:12px;min-height:40px;padding:0 16px;background:var(--sec-head);border-bottom:1px solid var(--border-strong)}
+.sets-group-h h2{font-size:14px}
+.sets-group-sub{font-size:11px;color:var(--muted)}
+.sets-group .set-sec{border:0;border-radius:0;box-shadow:none;border-top:1px solid var(--border)}
+.sets-group .set-sec:first-of-type{border-top:0}
+.sets-group .set-sec>.sec-h{border-radius:0;min-height:44px;background:var(--surface)}
+.sets-group .set-sec:nth-of-type(even)>.sec-h{background:var(--surface-2)}
+.sets-group .set-sec>.sec-h h2{font-size:15px}
+.sets-group .set-sec.set-active{border-color:var(--border);box-shadow:inset 4px 0 0 var(--accent)}
+.sets-group .set-sec.set-active>.sec-h{box-shadow:inset 4px 0 0 var(--accent)}
+.sets-group .set-sec[open]{background:var(--set-open-bg)}
+.sets-group .set-sec[open]>.sec-h{min-height:52px;background:var(--set-open-head);border-bottom:2px solid var(--accent);border-radius:0}
+.sets-group .set-sec[open]>.sec-h h2{font-size:17px}
+.sets-group .set-sec[open]>.sec-body{margin:12px 16px 16px 40px;border:1px solid var(--border-strong);border-radius:var(--r-m);background:var(--sec-bg)}
+.set-sum{display:inline-flex;align-items:center;gap:16px;margin-left:12px;font-size:12px}
+.set-sum .sum-muted{color:var(--muted)}
+.set-sum .sum-slots{display:inline-flex;align-items:center;gap:3px}
+.set-sum .sum-slots i{display:inline-block;min-width:18px;height:18px;line-height:18px;border-radius:var(--r-s);text-align:center;font-size:11px;font-weight:700;font-style:normal}
+.set-sum .sum-slots i:last-of-type{margin-right:4px}
+/* 比較セットのタブ(案件 27。「タブ / 一覧」で切り替える) */
+.sets-view{margin-left:auto}
+.sets-tabs{display:flex;flex-wrap:wrap;align-items:flex-end;gap:4px;padding:10px 12px 0 16px;background:var(--sec-head);border-bottom:2px solid var(--accent)}
+.set-tab{display:flex;align-items:center;gap:8px;padding:8px 14px;border:1px solid var(--border-strong);border-bottom:0;border-radius:var(--r-m) var(--r-m) 0 0;background:var(--surface-2);color:var(--muted);font:inherit;font-weight:700;cursor:pointer}
+.set-tab.on{border:2px solid var(--accent);border-bottom:0;margin-bottom:-2px;padding-bottom:10px;background:var(--set-open-head);color:var(--text)}
+/* 「表示中」の印(比較セットのタブ・比較画面) */
+.shown-mark{display:inline-flex;align-items:center;gap:3px;flex:none;padding:0 6px;height:18px;border:1px solid var(--accent);border-radius:9px;background:var(--surface);color:var(--accent);font-size:10px;font-weight:700;line-height:1}
+.sets-group.as-tabs .set-sec:not(.tab-on){display:none}
+.sets-group.as-tabs .set-sec.tab-on{box-shadow:inset 4px 0 0 var(--accent)}
+.sets-group.as-tabs .set-sec.tab-on>.sec-h{border-bottom-width:1px;box-shadow:inset 4px 0 0 var(--accent)}
+.sets-group.as-tabs .set-sec.tab-on>.sec-h{cursor:default}
+.sets-group.as-tabs .set-sec.tab-on>.sec-h :is(.chev,h2,.set-badge,.sec-hint,.set-sum){display:none}
+.sets-group.as-tabs .set-shown[data-k="on"]{display:none}   /* タブに「表示中」があるので、中の見出しには出さない */
 /* 比較セットの「使用するサーキット」とボタン: 小さめにして、幅があれば 1 列に並べる */
 .set-tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
 .set-tools .toolbar{gap:8px}
@@ -730,3 +771,149 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .reset-row{justify-content:space-between}
 .wipe-btn{margin-left:auto}
 .btn.danger{color:var(--warn);border-color:var(--warn)}
+
+/* ==========================================================================
+   タブレットなど中くらいの幅(案件 1): 上部バーを詰める。ラップ一覧は割り当てを先に並べる
+   ========================================================================== */
+@media (max-width:1023px){
+  .top{gap:12px;padding:6px 12px}
+  .brand-txt{display:none}
+  .navtabs{gap:4px}
+  .navtab{padding:0 10px;white-space:nowrap}
+  .top>.grow{display:none}
+  .top-right{flex:1;justify-content:flex-end;gap:8px;min-width:0}
+  .top-right .cur{min-width:0;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .top-right .seg{flex:none}
+  .ttl{white-space:nowrap}
+  /* ラップ一覧: ラップ・タイム・割り当て(A〜D)を先に(列の幅は --cols-m)。Delta から右は横にスクロール */
+  .row{grid-template-columns:var(--cols-m,var(--cols))}
+  .row>*{order:3}
+  .row>:nth-child(1){order:0;padding-inline:8px}
+  .row>:nth-child(2){order:1;padding-inline:8px}
+  .row>:last-child{order:2}
+  /* 見出し・カード・タブの文字を折り返さない */
+  .sec-h h2{white-space:nowrap}
+  .sec-hint{display:none}
+  .slot{min-width:0}
+  .slot-main{min-width:0}
+  .slot .st,.slot .sub,.slot .mut{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sets-tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+  .set-tab{white-space:nowrap}
+  /* Run の見出し: 1 行目に Run 番号と「位置補正」「削除」、2 行目にファイル名(長いことが多い)、3 行目にベストとサーキット */
+  .fh>*{order:3}
+  .fh>.fno{order:0}
+  .fh>.btn{order:1}
+  .fh>.btn[data-act="correct"]{margin-left:auto}
+  .fh>.fn{order:2;flex-basis:100%;min-width:0;word-break:break-all}
+}
+
+/* ==========================================================================
+   スマホ(縦向き)や、幅の狭いウィンドウ(767px まで。案件 1)。パソコンの幅の見た目は変えない
+   ========================================================================== */
+@media (max-width:767px){
+  /* 上部バー: 1 行目にロゴ・テーマ・About、2 行目にタブ(折り返さない)。サーキット名は出さない */
+  .top{flex-wrap:wrap;gap:6px 8px;padding:6px 10px;min-height:0}
+  .brand-txt{display:none}
+  .navtabs{order:3;width:100%;gap:4px}
+  .navtab{flex:1;justify-content:center;padding:0 4px;min-height:38px;font-size:12px;white-space:nowrap}
+  .top-right{gap:8px}
+  .top-right .cur{display:none}
+
+  /* データ管理: 上の固定をやめ、ページ全体をスクロール */
+  #view-import{height:auto;overflow:visible}
+  #view-import>.body{overflow:visible;padding:8px;gap:14px}
+  .guide-wrap{max-height:none;padding:8px 12px}
+  .slots{flex-direction:column;align-items:stretch;padding:10px 12px;gap:8px}
+  .slots-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%}
+  .slots-row>.btn{grid-column:1/-1;min-height:44px}
+  .slot{min-height:48px;padding:6px 10px}
+  .slot .sub{display:none}
+  .sec-h{flex-wrap:wrap;padding:6px 10px;gap:6px 10px}
+  .sec-hint{display:none}
+  .tablist .tab{padding:6px 8px;font-size:12px;white-space:nowrap}
+  .sets-group-sub{display:none}
+  .sets-tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding:8px 8px 0}
+  .set-tab{white-space:nowrap;padding:8px 10px}
+  .set-shown{margin-left:0}
+  .set-sum{margin-left:0;flex-basis:100%}
+  .sets-group .set-sec[open]>.sec-body{margin:6px 4px 8px 8px;padding:8px}
+  .set-tools{flex-direction:column;align-items:stretch}
+  .set-tools .toolbar{flex-wrap:wrap}
+  .set-tools select{max-width:none;width:100%}
+  .fh{padding:8px 10px;gap:6px 10px}
+  .pk{gap:4px}
+  .pk button{width:34px}
+
+  /* 使い方: ページ全体をスクロール(上部バーが 2 行になるため、高さを決めない) */
+  #view-help{height:auto;overflow:visible}
+
+  /* 位置補正・サーキットの登録/編集: 地図を上、操作の欄を下に。登録の見出しの帯は 2 行に */
+  .corr{flex-direction:column;height:auto;min-height:0}
+  .corr-map-wrap{flex:none;height:60vh;height:60dvh}
+  .corr-side{width:auto;overflow:visible;border-left:0;border-top:1px solid var(--border-strong)}
+  .corr.ce{--ce-head-h:96px}
+  .ce-head{flex-wrap:wrap;align-content:center;gap:6px 8px;padding:6px 10px}
+  .ce-head-s{display:none}
+  .ce-head-name{order:3;flex-basis:100%}
+  .ce-head-name input{width:auto;flex:1;min-width:0}
+  .ce-head .btn{min-width:0;padding:0 12px}
+
+  /* ダイアログ: 画面に収め、中身はダイアログの中でスクロール(後ろのページは動かさない) */
+  body:has(.modal-back){overflow:hidden}
+  .modal-back{align-items:stretch;padding:8px 0}
+  .modal{width:calc(100vw - 16px);max-height:calc(100dvh - 16px);padding:14px;gap:10px;overflow:hidden;margin:auto 0}
+  .modal.wide,.modal.ld{width:calc(100vw - 16px);max-height:calc(100dvh - 16px)}
+  .modal-body,.modal.ld .ld-main,.modal.ld .ld-fix:not([hidden]){flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+  .modal.ld .ld-main{display:flex;flex-direction:column;gap:10px}
+  .modal.ld .ld-main>*{flex:none}
+  .modal-actions{flex-wrap:wrap}
+  /* 読み込みの確認: 選んでいるもの・プレビュー・候補の行を縦に並べる */
+  .ld-top{flex-direction:column}
+  .ld-prev{width:100%;height:200px}
+  .ld-list{overflow:visible}
+  .ld-row{grid-template-columns:minmax(0,1fr);gap:6px}
+  .ld-name{flex-wrap:wrap}
+  .ld-name input{max-width:none}
+  .ld-fix-body{flex-direction:column}
+  .ld-fix-map{flex:none;height:45vh;height:45dvh;max-height:none;min-height:220px}
+  .ld-fix-side{width:auto}
+
+  /* 位置補正: 矢印のボタンを地図の中(右下)にも出す */
+  .corr-pad-map{display:grid;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(3,44px);gap:2px;right:10px;bottom:28px}
+  .corr-pad-map .ib{width:44px;height:44px;min-height:44px;font-size:18px;box-shadow:0 1px 4px rgba(0,0,0,.4)}
+  .corr-pad-map [data-dir="N"]{grid-area:1/2}
+  .corr-pad-map [data-dir="W"]{grid-area:2/1}
+  .corr-pad-map [data-dir="E"]{grid-area:2/3}
+  .corr-pad-map [data-dir="S"]{grid-area:3/2}
+
+  /* 設定: 項目名・操作・「記憶する」・説明を縦に並べる */
+  .settings{padding:12px}
+  .srow{grid-template-columns:minmax(0,1fr);row-gap:6px}
+  .sname{text-align:left}
+  .sctl{flex-wrap:wrap}
+  .shint{grid-column:1}
+  .reset-row{flex-direction:column;align-items:stretch}
+
+  /* 比較: 地図と再生の操作を上、カード・セクター・速度グラフを下に縦に並べる。セクターは地図の上にも出す */
+  .cmp{height:auto;min-height:0}
+  .cmp-main{flex-direction:column}
+  .cmp-left{flex:none;height:46vh;height:46dvh}
+  .cmp-main>.splitter.v{display:none}
+  .cmp-side{width:auto;overflow:visible;border-left:0;border-top:1px solid var(--border-strong)}
+  .cmp-side .side-upper{flex:none;overflow:visible;height:auto}
+  .cmp-side>.splitter{display:none}
+  .side-graph{height:230px;order:-1;border-bottom:1px solid var(--border-strong)}   /* 速度グラフを地図のすぐ下に(地図と一緒に見られるように) */
+  .cmp-cards{display:grid;grid-template-columns:1fr 1fr}
+  .cmp-cards .card{min-height:48px;padding:4px 8px;gap:8px}
+  /* 地図の上は 1 行: 左に「固定・先頭追従・A〜D」(小さく)、右に「表示 ▾」(押すと走行ラインの表示・ラベルが開く) */
+  .cmp-map .map-ov.tl{left:8px;top:8px}
+  .cmp-map .map-ov.tl .seg.sm button{padding:0 7px;height:30px;min-height:30px}
+  .cmp-map .map-ov.tr{right:8px;top:8px;display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+  .cmp-map .map-ov.tr>.seg{display:none}
+  .cmp-map .map-ov.tr.open>.seg{display:inline-flex}
+  .cmp-map .map-ov.tr .seg.sm button{height:30px;min-height:30px}
+  .cmp-view-menu{display:inline-flex;min-height:30px;height:30px;padding:0 10px;font-size:11px}
+  .map-secs{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end;left:56px;right:8px;bottom:26px}
+  .map-secs .btn.sec{min-height:32px;height:32px;min-width:38px;padding:0 6px;font-size:12px;justify-content:center}
+  .map-secs .btn.sec[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-on);font-weight:700}
+}

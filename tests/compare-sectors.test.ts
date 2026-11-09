@@ -55,7 +55,58 @@ function setupTwo() {
   goCompare();
 }
 
+describe('地図の上の「表示 ▾」(スマホの幅で見える。案件 1)', () => {
+  it('押すと「走行ライン・速度・加減速」「ラベル」の欄が開き、もう一度押すと閉じる', () => {
+    setupOne();
+    const btn = $<HTMLButtonElement>('[data-act="view-menu"]');
+    expect($('#cmp-ov-tr').contains(btn)).toBe(true);
+    btn.click();
+    expect($('#cmp-ov-tr').classList.contains('open')).toBe(true);
+    expect(btn.getAttribute('aria-expanded')).toBe('true');
+    expect(btn.textContent).toBe('表示 ▴');
+    btn.click();
+    expect($('#cmp-ov-tr').classList.contains('open')).toBe(false);
+    expect(btn.textContent).toBe('表示 ▾');
+  });
+});
+
+describe('地図をタップして再生・一時停止(案件 1)', () => {
+  const ptr = (type: string, o: { id?: number; x?: number; y?: number; kind?: string } = {}) => {
+    const e = new MouseEvent(type, { bubbles: true, cancelable: true, clientX: o.x ?? 100, clientY: o.y ?? 100 });
+    Object.defineProperty(e, 'pointerId', { value: o.id ?? 1 });
+    Object.defineProperty(e, 'pointerType', { value: o.kind ?? 'touch' });
+    $('#cmp-map').dispatchEvent(e);
+  };
+  const state = () => $('#cmp-pp').dataset.state;
+  it('指で軽くたたくと切り替わる。動かした・2 本の指・マウスでは切り替わらない', () => {
+    setupOne();
+    expect(state()).toBe('paused');
+    ptr('pointerdown'); ptr('pointerup');
+    expect(state()).toBe('playing');
+    ptr('pointerdown'); ptr('pointerup');
+    expect(state()).toBe('paused');
+    ptr('pointerdown'); ptr('pointerup', { x: 160 });                            // ドラッグ(地図を動かした)
+    expect(state()).toBe('paused');
+    ptr('pointerdown', { id: 1 }); ptr('pointerdown', { id: 2, x: 200 });         // ピンチ(2 本の指)
+    ptr('pointerup', { id: 2, x: 200 }); ptr('pointerup', { id: 1 });
+    expect(state()).toBe('paused');
+    ptr('pointerdown', { kind: 'mouse' }); ptr('pointerup', { kind: 'mouse' });  // マウスのクリックは対象外
+    expect(state()).toBe('paused');
+  });
+});
+
 describe('セクターボタンの動作の切り替え', () => {
+  it('セクターのボタンは、地図の上(#cmp-map-secs、狭い幅のときだけ見える)にも同じものが出て、押した状態もそろう(案件 1)', () => {
+    setupOne();
+    const side = Array.from(root.querySelectorAll('#cmp-sectors [data-act="sector"]')).map((b) => b.textContent);
+    const onMap = Array.from(root.querySelectorAll('#cmp-map-secs [data-act="sector"]')).map((b) => b.textContent);
+    expect(onMap).toEqual(side);
+    expect(onMap.length).toBeGreaterThan(0);
+    root.querySelector<HTMLButtonElement>('#cmp-map-secs [data-k="1"]')!.click();
+    expect(root.querySelector('#cmp-sectors [data-k="1"]')!.getAttribute('aria-pressed')).toBe('true');
+    expect(root.querySelector('#cmp-map-secs [data-k="1"]')!.getAttribute('aria-pressed')).toBe('true');
+  });
+
   it('「先頭車両」「全車一致」と「解除」が 1 つの切り替えにまとまる。初期は全車一致', () => {
     setupOne();
     expect(Array.from(root.querySelectorAll('[data-act="syncmode"]')).map((b) => b.textContent)).toEqual(['先頭車両', '全車一致']);

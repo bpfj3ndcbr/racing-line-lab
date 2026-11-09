@@ -8,6 +8,7 @@ import { SpeedGraph, ZOOM_MAX, type XKind } from './speedGraph';
 import { clamp, makeSplitter } from './splitter';
 import type { HeatRun, MapFactory, TrackMap } from './mapTypes';
 import type { ThemeController } from './theme';
+import { SHOWN_MARK } from './marks';
 
 /**
  * series: ラップの時系列(距離は速度の積み上げ)。
@@ -75,7 +76,8 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
                 ${SLOTS.map((s) => `<button data-act="follow" data-follow="${s}" aria-pressed="false">${s}</button>`).join('')}
               </span>
             </div>
-            <div class="map-ov tr">
+            <div class="map-ov tr" id="cmp-ov-tr">
+              <button class="btn sm cmp-view-menu" data-act="view-menu" aria-expanded="false" aria-controls="cmp-ov-tr" title="走行ラインの表示とラベルを切り替えます">表示 ▾</button>
               <span class="seg sm" role="group" aria-label="走行ラインの表示">
                 <button data-act="mapmode" data-mode="line" aria-pressed="true" class="on">走行ライン</button>
                 <button data-act="mapmode" data-mode="speed" aria-pressed="false" title="速度で色分け(全車共通の色)">速度</button>
@@ -85,6 +87,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
                 <button data-act="carlabel" id="cmp-carlabel" aria-pressed="false" title="車から引き出す線の表示を切り替えます(非表示 → 速度・差 → カード名)">ラベル: 非表示</button>
               </span>
             </div>
+            <div class="map-ov map-secs" id="cmp-map-secs" aria-label="セクター(地図の上)"></div>
             <div class="map-legend" id="cmp-legend" hidden>
               <span id="cmp-leg-lo"></span><i class="legend-bar" id="cmp-leg-bar" aria-hidden="true"></i><span id="cmp-leg-hi"></span>
             </div>
@@ -106,7 +109,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
         <aside class="cmp-side" id="cmp-side" aria-label="走行データ">
           <div class="side-upper" id="cmp-upper">
             <div class="side-upper-in" id="cmp-upper-in">
-              <label class="sel cmp-set" id="cmp-set-wrap">表示中 <select id="cmp-set" data-fk="cmp-set"></select></label>
+              <label class="sel cmp-set" id="cmp-set-wrap">${SHOWN_MARK}<select id="cmp-set" data-fk="cmp-set" aria-label="表示中の比較セット"></select></label>
               <div id="cmp-cards" class="cmp-cards"></div>
               <div class="sec-block" id="cmp-sec-block">
                 <div class="h sec-h-row" id="cmp-sec-h"><span>セクター</span><button class="btn xs" id="cmp-edit-circuit" data-act="edit-circuit" hidden title="このサーキットのセクターを追加・編集します(終わったら比較に戻ります)">セクターを追加・編集…</button></div>
@@ -262,7 +265,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   function renderSetSelect() {
     const sel = root.querySelector<HTMLSelectElement>('#cmp-set')!;
     sel.innerHTML = session.sets.map((w, i) =>
-      `<option value="${i}"${w.logs.length ? '' : ' disabled'}${i === session.activeIndex ? ' selected' : ''}>${esc(`${session.setName(i)}(${w.logs.length}本)`)}</option>`).join('');
+      `<option value="${i}"${session.canShow(i) ? '' : ' disabled'}${i === session.activeIndex ? ' selected' : ''}>${esc(`${session.setName(i)}(${w.logs.length}本)`)}</option>`).join('');
   }
   root.querySelector('#cmp-set')!.addEventListener('change', (e) => session.setActive(Number((e.target as HTMLSelectElement).value)));
 
@@ -344,6 +347,35 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
       prefs.saveLast('zoom', Math.min(hi, Math.max(lo, Math.round(z))));
     });
     map.onUserDrag(() => setFollow('fixed'));   // 地図を手で動かしたら追従をやめる
+    watchMapTap($('cmp-map'));
+  }
+
+  /**
+   * 指で地図を軽くたたく(タップ)と、再生と一時停止を切り替える(案件 1)。マウスのクリックでは切り替えない。
+   * 動かした(ドラッグ)・2 本の指(ピンチで拡大・縮小)・長押し・地図の上のボタンや拡大縮小のボタンは、タップとみなさない
+   */
+  function watchMapTap(el: HTMLElement) {
+    const TAP_MS = 350, TAP_PX = 10;
+    const down = new Map<number, { x: number; y: number; t: number }>();
+    let multi = false;
+    el.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse') return;
+      down.set(e.pointerId, { x: e.clientX, y: e.clientY, t: performance.now() });
+      if (down.size > 1) multi = true;
+    });
+    const end = (e: PointerEvent, cancel: boolean) => {
+      const d = down.get(e.pointerId);
+      if (!d) return;
+      down.delete(e.pointerId);
+      const wasMulti = multi;
+      if (down.size === 0) multi = false;
+      if (cancel || wasMulti) return;
+      if (performance.now() - d.t > TAP_MS || Math.hypot(e.clientX - d.x, e.clientY - d.y) > TAP_PX) return;
+      if ((e.target as HTMLElement | null)?.closest?.('.leaflet-control, .leaflet-marker-icon, button, a')) return;
+      engine.toggle();
+    };
+    el.addEventListener('pointerup', (e) => end(e, false));
+    el.addEventListener('pointercancel', (e) => end(e, true));
   }
 
   function pushMap() {
@@ -463,14 +495,17 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
     $('cmp-sync').hidden = n === 0;
     if (n === 0) {
       $('cmp-sectors').innerHTML = '<div class="sub no-sector">セクター設定無し</div>';
+      $('cmp-map-secs').innerHTML = '';
       renderSyncStatus();
       return;
     }
-    $('cmp-sectors').innerHTML = Array.from({ length: n }, (_, i) => {
+    const btns = Array.from({ length: n }, (_, i) => {
       const any = cars.some((c) => c.lap.sectorTimes[i] != null);
       return `<button class="btn sec" data-act="sector" data-k="${i}" ${any ? '' : 'disabled title="このラップは通過していません"'}
         aria-pressed="${activeSector === i}" aria-label="セクター S${i + 1} へ移動">S${i + 1}</button>`;
     }).join('');
+    $('cmp-sectors').innerHTML = btns;
+    $('cmp-map-secs').innerHTML = btns;            // スマホの幅では、地図の上にも出す(よく使うため。案件 1)
     syncModeUi();
     renderSyncStatus();
   }
@@ -701,6 +736,13 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
     switch (d.act) {
       case 'to-start': engine.seek(0); break;
       case 'toggle': engine.toggle(); break;
+      case 'view-menu': {                 // スマホの幅: 「走行ライン・速度・加減速」「ラベル」を開閉する(案件 1)
+        const box = $('cmp-ov-tr'), open = !box.classList.contains('open');
+        box.classList.toggle('open', open);
+        el.setAttribute('aria-expanded', String(open));
+        el.textContent = open ? '表示 ▴' : '表示 ▾';
+        break;
+      }
       case 'frame-back': if (!engine.playing) engine.step(-1); break;
       case 'frame-fwd': if (!engine.playing) engine.step(1); break;
       case 'rate':

@@ -334,6 +334,15 @@ describe('計測ラインの修正(案件 15)', () => {
     expect(val('ld-fix-mv')).toBe('0.9 m');
   });
 
+  it('地図の上の矢印(スマホの幅で見える)でも、矢印キーと同じく 0.1 m ずつ動かせる(案件 1)', async () => {
+    await openFix();
+    const btn = (d: string) => $<HTMLButtonElement>(`.ld-fix-map .corr-pad-map [data-fix="nudge"][data-dir="${d}"]`);
+    btn('N').click(); btn('N').click(); btn('E').click();
+    expect(val('ld-fix-mv')).toBe('0.2 m');
+    btn('S').click(); btn('S').click();
+    expect(val('ld-fix-mv')).toBe('0.1 m');
+  });
+
   it('「この位置にする」で元の画面に戻り、直した線でプレビュー・登録する', async () => {
     await openFix();
     setNum(4);
