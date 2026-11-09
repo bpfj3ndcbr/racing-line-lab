@@ -259,7 +259,9 @@ describe('画面の構成: 枠で囲んだ 3 つのグループ', () => {
     expect($('.work-circuit').querySelector('details')).toBeNull();
     expect($('#ce-g1').closest('.ce-group')!.contains($('#ce-draw-control'))).toBe(true);
     expect($('#ce-g1').closest('.ce-group')!.contains($('#ce-list'))).toBe(true);
-    expect($('#ce-g2').closest('.ce-group')!.contains($('[data-act="ce-nudge"]'))).toBe(true);
+    expect($('#ce-g2').closest('.ce-group')!.contains($('.corr-pad [data-act="ce-nudge"]'))).toBe(true);
+    expect($('#ce-pad-map').closest('.corr-map-wrap')).not.toBeNull();             // スマホの幅で地図の右下に出す矢印(案件 1)。ラインを選ぶまでは隠す
+    expect($('#ce-pad-map').hidden).toBe(true);
     expect($('#ce-g3').closest('.ce-group')!.contains($('#ce-cln'))).toBe(true);
     expect($('#ce-g3').closest('.ce-group')!.contains($('#ce-export-sci'))).toBe(true);
   });

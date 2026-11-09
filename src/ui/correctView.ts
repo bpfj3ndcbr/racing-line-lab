@@ -50,6 +50,12 @@ export function mountCorrectView(root: HTMLElement, session: Session, deps: Corr
     <div class="corr">
       <div class="corr-map-wrap">
         <div class="map" id="cor-map"></div>
+        <div class="map-ov corr-pad-map" role="group" aria-label="矢印で動かす(地図の上)">
+          <button class="ib" data-act="nudge" data-dir="N" aria-label="北へ" title="北へ">↑</button>
+          <button class="ib" data-act="nudge" data-dir="W" aria-label="西へ" title="西へ">←</button>
+          <button class="ib" data-act="nudge" data-dir="E" aria-label="東へ" title="東へ">→</button>
+          <button class="ib" data-act="nudge" data-dir="S" aria-label="南へ" title="南へ">↓</button>
+        </div>
         <div class="map-ov tl">
           <span class="seg sm" role="group" aria-label="地図の上のドラッグ">
             <button data-act="cor-mode" data-mode="line" aria-pressed="false" title="ドラッグでラインを動かします">ラインを動かす</button>

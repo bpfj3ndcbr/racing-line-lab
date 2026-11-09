@@ -156,6 +156,15 @@ describe('レイアウトとセクター表示', () => {
     expect(root.querySelector('.file .scroll[tabindex="0"] .tbl')).not.toBeNull();
   });
 
+  it('ラップ一覧の行は、パソコンの列(--cols)と、狭い幅の列(--cols-m: ラップ・タイム・割り当てを先に)を持つ(案件 1)', () => {
+    session.registerCircuit('オートポリス', cln, sci);
+    session.addLog(utc(), 'u');
+    const row = root.querySelector<HTMLElement>('.file .row:not(.hd)')!;
+    expect(row.style.getPropertyValue('--cols')).toBe('90px 110px 110px minmax(160px,1fr) 200px');
+    expect(row.style.getPropertyValue('--cols-m')).toBe('66px 72px 168px 90px minmax(140px,1fr)');
+    expect(row.lastElementChild!.classList.contains('pk')).toBe(true);           // DOM の並びは変えない(並べ替えは CSS の order)
+  });
+
   it.skipIf(!existsSync(bigPath))('各セクターの最速セルだけが紫になる(区間タイム/通過時刻の両方)', () => {
     session.registerCircuit('オートポリス', cln, sci);
     session.addLog(parseVbo(readFileSync(bigPath, 'utf8'), 'big.vbo'), 'big');

@@ -338,6 +338,9 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
     const ns = l.circuit?.sectors.length ?? 0;
     const showSec = w.showSectors && ns > 0;
     const cols = `90px 110px 110px ${showSec ? `repeat(${ns},76px) ` : ''}minmax(160px,1fr) 200px`;
+    // スマホの幅では、ラップ・タイム・割り当て(A〜D)を先に並べる(CSS の order で並べ替え、列の幅はこちら。案件 1)
+    const colsM = `66px 72px 168px 90px ${showSec ? `repeat(${ns},70px) ` : ''}minmax(140px,1fr)`;
+    const grid = `--cols:${cols};--cols-m:${colsM}`;
     const best = bestDuration(l);
     const { key, dir } = w.sort;
     const laps = [...l.laps].sort((a, b) =>
@@ -374,7 +377,7 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
       rows = '<div class="empty">ラップを検出できませんでした(コントロールラインを通過していません)。</div>';
     } else {
       const head = l.hasHead
-        ? `<div class="row ex head" style="grid-template-columns:${cols}"><div class="num">—</div><div></div><div></div>${showSec ? '<div></div>'.repeat(ns) : ''}<div class="sub">始点が無いので非表示</div><div></div></div>`
+        ? `<div class="row ex head" style="${grid}"><div class="num">—</div><div></div><div></div>${showSec ? '<div></div>'.repeat(ns) : ''}<div class="sub">始点が無いので非表示</div><div></div></div>`
         : '';
       rows = head + laps.map((lap) => {
         const d = lap.duration - best;
@@ -389,7 +392,7 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
           return `<button class="${on ? 'on ' : ''}${s.toLowerCase()}" data-act="assign" data-set="${i}" data-slot="${s}" data-log="${esc(l.id)}" data-lap="${lap.number}"
             data-fk="s${i}-a-${esc(l.id)}-${lap.number}-${s}" aria-pressed="${on}" aria-label="Run ${l.no} LAP${lap.number} を ${s} に${on ? 'の割り当てを解除' : '割り当て'}">${s}</button>`;
         }).join('');
-        return `<div class="row${ex ? ' ex' : ''}${assigned ? ' as' : ''}" style="grid-template-columns:${cols}">
+        return `<div class="row${ex ? ' ex' : ''}${assigned ? ' as' : ''}" style="${grid}">
           <div class="num">${lap.number}</div>
           <div class="num${d === 0 ? ' best' : ''}">${formatLapTime(lap.duration)}</div>
           <div class="num${d === 0 ? ' best' : ''}">${d === 0 ? 'ベスト' : fmtDelta(d)}</div>
@@ -411,7 +414,7 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
       </div>
       <div class="scroll" tabindex="0" role="region" aria-label="Run ${l.no} のラップ一覧(横にスクロールできます)">
         <div class="tbl">
-          <div class="row hd" style="grid-template-columns:${cols}">
+          <div class="row hd" style="${grid}">
             <div><button class="hbtn" data-act="sort" data-set="${i}" data-key="lap" data-fk="s${i}-sort-lap" aria-sort="${sortAttr('lap')}">ラップ ${arrow('lap')}</button></div>
             <div><button class="hbtn" data-act="sort" data-set="${i}" data-key="time" data-fk="s${i}-sort-time" aria-sort="${sortAttr('time')}">タイム ${arrow('time')}</button></div>
             <div>Delta</div>${secHead}<div></div><div>割り当て</div>
