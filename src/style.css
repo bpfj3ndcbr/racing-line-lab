@@ -446,6 +446,11 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .edit-handle{background:none;border:0}
 .edit-handle span{display:block;width:14px;height:14px;border-radius:50%;background:#00e5ff;border:2px solid #fff;box-shadow:0 0 2px rgba(0,0,0,.8);cursor:grab}
 .edit-handle.mid span{border-radius:2px;transform:rotate(45deg);width:12px;height:12px;margin:1px}
+/* 指で操作する端末では、つまみを大きくする(つかみやすく。案件 29。どの画面のつまみも同じ) */
+@media (pointer:coarse){.edit-handle span{width:26px;height:26px;margin:-5px}.edit-handle.mid span{width:22px;height:22px;margin:-3px}}
+/* ラインを引く・ラインを動かすときは、1 本の指のなぞりを地図の操作に使う(ブラウザに画面を動かさせない)。
+   Leaflet の .leaflet-container.leaflet-touch-zoom(pan-x pan-y)より強くするため、.map も付ける */
+.map.leaflet-container:is(.draw-mode,.edit-drag){touch-action:none}
 
 /* hidden 属性は、他の display 指定より常に優先する(未確定の枠が出っぱなしになる不具合の対策) */
 [hidden]{display:none!important}
@@ -558,8 +563,6 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .area-ed-goto{display:flex;align-items:center;gap:8px;color:var(--muted)}
 .area-ed-goto select{min-height:32px;color:var(--text);background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:0 8px}
 .area-ed-map{position:relative;height:min(56vh,520px);border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface-2)}
-/* 指で操作する端末では、四角のつまみを大きくする(つかみやすく) */
-@media (pointer:coarse){.area-ed .edit-handle span{width:26px;height:26px;margin:-5px}.area-ed .edit-handle.mid span{width:22px;height:22px;margin:-3px}}
 .area-ed-hint,.area-ed-info{margin:0;font-size:11.5px}
 .modal .area-ed-info{color:var(--text)}
 .modal .area-ed-warn{margin:0;color:var(--warn);font-size:12px}

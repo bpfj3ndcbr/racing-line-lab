@@ -5,6 +5,7 @@ import {
 import type { LoadedLog, Session } from '../store/session';
 import { alertDialog, confirmDialog } from './dialog';
 import { downloadText } from './download';
+import { hasExt, wrongExtMessage } from './fileKind';
 import type { MapFactory, TrackMap } from './mapTypes';
 import type { ThemeController } from './theme';
 
@@ -379,8 +380,10 @@ export function mountCircuitEditor(root: HTMLElement, session: Session, deps: Ci
     if (t.id !== 'ce-cln' && t.id !== 'ce-sci') return;
     const f = t.files?.[0];
     if (!f) return;
-    const text = await f.text();
     t.blur();
+    const ext = t.id === 'ce-cln' ? '.cln' : '.sci';
+    if (!hasExt(f.name, ext)) { t.value = ''; msg(wrongExtMessage(f.name, ext)); return; }   // 種類の違うファイル(案件 29)
+    const text = await f.text();
     if (t.id === 'ce-cln') {
       const line = parseCln(text)[0];
       if (!line) { msg('.cln からコントロールラインを読み取れませんでした。'); return; }

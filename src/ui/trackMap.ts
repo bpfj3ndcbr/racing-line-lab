@@ -3,6 +3,7 @@ import 'leaflet/dist/leaflet.css';
 import type { MapCar, MapFactory, MapGuide, MapLine, MapTrack, TrackMap } from './mapTypes';
 import type { Slot } from '../core';
 import { labelOffset } from './labelDir';
+import { attachSinglePointer } from './mapPointer';
 
 /** 国土地理院「シームレス空中写真」。実画像は Z18 まで。Z19〜20 は Z18 を拡大して表示する(デジタルズーム)。 */
 const GSI_PHOTO = 'https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg';
@@ -59,18 +60,12 @@ export const createLeafletMap: MapFactory = (el): TrackMap => {
   const labelIcon = (text: string, cls: string) =>
     L.divIcon({ className: `map-label ${cls}`, html: `<span>${text}</span>`, iconSize: [0, 0] });
 
+  // マウス・指でなぞる操作(案件 29)。位置補正でラインを動かす・ラインを引く、のどちらかで使う
+  const toLatLng = (e: PointerEvent) => map.mouseEventToLatLng(e as unknown as MouseEvent);
+
   // 位置補正: ドラッグでラインを動かす(地図は動かさない)
   let editCb: ((dLat: number, dLon: number) => void) | null = null;
   let lastPos: L.LatLng | null = null;
-  const stopDrag = () => { lastPos = null; };
-  map.on('mousedown', (e) => { if (editCb) lastPos = e.latlng; });
-  map.on('mousemove', (e) => {
-    if (!editCb || !lastPos) return;
-    editCb(e.latlng.lat - lastPos.lat, e.latlng.lng - lastPos.lng);
-    lastPos = e.latlng;
-  });
-  map.on('mouseup', stopDrag);
-  window.addEventListener('mouseup', stopDrag);
 
   // ラインを引く(ドラッグで始点〜終点)
   let drawCb: ((a: { lat: number; lon: number }, b: { lat: number; lon: number }) => void) | null = null;
@@ -78,20 +73,33 @@ export const createLeafletMap: MapFactory = (el): TrackMap => {
   let drawTo: L.LatLng | null = null;
   let rubber: L.Polyline | null = null;
   const clearRubber = () => { rubber?.remove(); rubber = null; drawFrom = null; drawTo = null; };
-  map.on('mousedown', (e) => { if (drawCb) { drawFrom = e.latlng; drawTo = e.latlng; } });
-  map.on('mousemove', (e) => {
-    if (!drawCb || !drawFrom) return;
-    drawTo = e.latlng;
-    if (rubber) rubber.setLatLngs([drawFrom, drawTo]);
-    else rubber = L.polyline([drawFrom, drawTo], { color: '#00e5ff', weight: 3, dashArray: '6 4', interactive: false }).addTo(map);
+
+  const detachPointer = attachSinglePointer(el, {
+    enabled: () => !!(drawCb || editCb),
+    start(e) {
+      const p = toLatLng(e);
+      if (drawCb) { drawFrom = p; drawTo = p; } else lastPos = p;
+    },
+    move(e) {
+      const p = toLatLng(e);
+      if (drawCb && drawFrom) {
+        drawTo = p;
+        if (rubber) rubber.setLatLngs([drawFrom, drawTo]);
+        else rubber = L.polyline([drawFrom, drawTo], { color: '#00e5ff', weight: 3, dashArray: '6 4', interactive: false }).addTo(map);
+      } else if (editCb && lastPos) {
+        editCb(p.lat - lastPos.lat, p.lng - lastPos.lng);
+        lastPos = p;
+      }
+    },
+    end() {
+      lastPos = null;
+      const a = drawFrom, b = drawTo, cb = drawCb;
+      clearRubber();
+      // 1m 未満(クリック・タップだけ)は、ラインとして扱わない
+      if (cb && a && b && a.distanceTo(b) >= 1) cb({ lat: a.lat, lon: a.lng }, { lat: b.lat, lon: b.lng });
+    },
+    cancel() { lastPos = null; clearRubber(); },
   });
-  map.on('mouseup', () => {
-    const a = drawFrom, b = drawTo, cb = drawCb;
-    clearRubber();
-    // 1m 未満(クリックだけ)は、ラインとして扱わない
-    if (cb && a && b && a.distanceTo(b) >= 1) cb({ lat: a.lat, lon: a.lng }, { lat: b.lat, lon: b.lng });
-  });
-  window.addEventListener('mouseup', clearRubber);
 
   // 編集用のつまみ(端点・線の中心)
   const handleLayer = L.layerGroup().addTo(map);
@@ -112,7 +120,7 @@ export const createLeafletMap: MapFactory = (el): TrackMap => {
       }
     },
     setEditDrag(cb) {
-      editCb = cb; lastPos = null;
+      editCb = cb; lastPos = null; clearRubber();
       if (cb) map.dragging.disable(); else map.dragging.enable();
       el.classList.toggle('edit-drag', !!cb);
     },
@@ -214,6 +222,6 @@ export const createLeafletMap: MapFactory = (el): TrackMap => {
       }
     },
     invalidate() { map.invalidateSize(); },
-    destroy() { window.removeEventListener('mouseup', stopDrag); window.removeEventListener('mouseup', clearRubber); map.remove(); },
+    destroy() { detachPointer(); map.remove(); },
   };
 };

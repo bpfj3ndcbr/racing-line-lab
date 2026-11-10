@@ -14,6 +14,7 @@ import { openResumeStore, type ResumeStore } from '../io/resume';
 import { openTileStore, type TileStore } from '../io/tileStore';
 import { applyAreas } from '../io/mapSave';
 import { MapAreas } from '../store/mapAreas';
+import { installAppleFilePicker } from './fileKind';
 
 const esc = (s: string) =>
   s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
@@ -55,6 +56,7 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
   const settingsEl = root.querySelector<HTMLElement>('#view-settings')!;
   const topRight = root.querySelector<HTMLElement>('#top-right')!;
   let current: ViewName = 'import';
+  const unApple = installAppleFilePicker(document, navigator);     // iPhone・iPad でファイルが選べるように(案件 29)
   let compare: CompareView | null = null;
   let importApi: ImportApi | null = null;
   let settingsApi: { refresh(): void } | null = null;
@@ -210,5 +212,5 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
   window.addEventListener('dragover', stopDrop);
   window.addEventListener('drop', stopDrop);
   /** 画面を作り直す前に呼ぶ。キー操作の受付(document への登録)を外す。 */
-  return { dispose: () => { unhook(); compare?.hide(); importApi?.closeWork(); window.removeEventListener('dragover', stopDrop); window.removeEventListener('drop', stopDrop); } };
+  return { dispose: () => { unhook(); unApple(); compare?.hide(); importApi?.closeWork(); window.removeEventListener('dragover', stopDrop); window.removeEventListener('drop', stopDrop); } };
 }
