@@ -1,4 +1,11 @@
 import { Prefs, RATE_CHOICES, SPEED_RANGE, ZOOM_CHOICES, type PrefKey, type PrefValues } from '../store/prefs';
+import { type Circuit, type SaveArea, type TileId, tileInRect } from '../core';
+import type { MapAreas } from '../store/mapAreas';
+import type { TileStore } from '../io/tileStore';
+import { applyAreas } from '../io/mapSave';
+import { openAreaEditor } from './areaEditor';
+import { confirmDialog } from './dialog';
+import type { MapFactory } from './mapTypes';
 
 const ZOOM_STOPS = [0, ...ZOOM_CHOICES];   // スライダーの位置 → 倍率(0 = サーキット全体)
 const zoomText = (z: number) => (z === 0 ? 'サーキット全体' : `Z${z}`);
@@ -9,7 +16,7 @@ const rangeText = (lo: number, hi: number) => (hi >= SPEED_RANGE.max ? `${lo} km
 const rangePos = (v: number) => (v - SPEED_RANGE.min) / (SPEED_RANGE.max - SPEED_RANGE.min);
 
 type Opt = { v: string; label: string };
-type Plain = { name: string; kind: 'yrange' | 'startpos' | 'autoload' | 'analytics'; hint?: string };
+type Plain = { name: string; kind: 'yrange' | 'startpos' | 'autoload' | 'analytics' | 'mapAreas' | 'mapPrefetch' | 'mapPersist'; hint?: string };
 type Row =
   | { key: PrefKey; name: string; kind: 'seg'; opts: Opt[]; hint?: string }
   | { key: PrefKey; name: string; kind: 'switch'; on: string; off: string; hint?: string }
@@ -26,6 +33,11 @@ const GROUPS: { title: string; rows: (Row | Plain)[] }[] = [
     { name: '初期位置', kind: 'startpos', hint: '地図を開いたときの中心です。「地図の中心」は、登録した表示位置(無ければ走行ライン全体)の中心、「コントロールライン」はその線の中心です。' },
     { key: 'follow', name: '追従', kind: 'seg', opts: [{ v: 'fixed', label: '固定' }, { v: 'leader', label: '先頭追従' }, { v: 'A', label: 'A' }, { v: 'B', label: 'B' }, { v: 'C', label: 'C' }, { v: 'D', label: 'D' }],
       hint: '割り当ての無い枠を選んだときは「固定」になります。' },
+  ] },
+  { title: '地図の保存', rows: [
+    { name: '保存範囲', kind: 'mapAreas', hint: '範囲の中で表示した地図(倍率 15〜18)を、この端末に保存し、ネットが無いときにも表示します。範囲を追加したら、ネットのある所で一度、その範囲を見ておいてください。Web 版のみ使えます。' },
+    { name: '概略の地図は表示前に保存する', kind: 'mapPrefetch', hint: '概略の地図(倍率 15・16。サーキット全体を見るときの粗い航空写真)を、保存範囲を追加・変更したときに、表示する前にまとめて保存します。無効のときは、ほかの倍率と同じく、表示したときに保存します。' },
+    { name: '保存したデータを消されにくくする', kind: 'mapPersist', hint: '端末の空きが少ないときに、ブラウザが保存したデータ(アプリと地図)を消さないよう頼みます(地図の保存範囲があるときだけ)。一度認められると、アプリからは取り消せません(ブラウザの設定で、このサイトのデータを消すと元に戻ります)。' },
   ] },
   { title: '速度グラフ', rows: [
     { name: '速度レンジ', kind: 'yrange', hint: '縦軸の範囲です。左のつまみで最低速度、右のつまみで最高速度を決めます。最高速度を右端にすると「自動」(走行データに合わせて決まります)。' },
@@ -50,9 +62,70 @@ const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
  * 設定タブ。各項目は「最初の状態」を選ぶ。「最後の状態を記憶する」にチェックすると、その項目は前回の状態で始まるので、
  * 選ぶ部分は押せなくなる。
  */
-export function mountSettingsView(root: HTMLElement, prefs: Prefs, onChange: (key: PrefKey | 'yRange' | 'startPos' | 'autoLoad' | 'analytics') => void, onFactoryReset: () => void = () => {}): { refresh(): void } {
+/** 地図の保存(案件 31)に使うもの。store が null(デスクトップ版・使えない環境)なら、項目は押せない */
+export interface MapSaveDeps { store: TileStore | null; areas: MapAreas; mapFactory: MapFactory; circuits: () => Circuit[] }
+
+const mb = (bytes: number) => (bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`);
+
+export function mountSettingsView(root: HTMLElement, prefs: Prefs, onChange: (key: PrefKey | 'yRange' | 'startPos' | 'autoLoad' | 'analytics') => void, onFactoryReset: () => void = () => {}, mapSave?: MapSaveDeps): { refresh(): void } {
   let resetArmed = false;
   let wipeArmed = false;
+  const tiles = mapSave?.store ?? null;
+  /** 保存範囲ごとの、保存したタイルの枚数と容量(集計中は null) */
+  let stats: Map<string, { n: number; bytes: number }> | null = null;
+  /** 地図の保存の結果などの案内 */
+  let mapMsg = '';
+  let busy = false;
+
+  async function refreshStats() {
+    if (!tiles || !mapSave) return;
+    const list = await tiles.list().catch(() => [] as (TileId & { bytes: number })[]);
+    const next = new Map<string, { n: number; bytes: number }>();
+    for (const a of mapSave.areas.list()) {
+      let n = 0, bytes = 0;
+      for (const t of list) if (tileInRect(t, a)) { n++; bytes += t.bytes; }
+      next.set(a.id, { n, bytes });
+    }
+    stats = next;
+    render();
+  }
+
+  /** 保存範囲が変わったとき・設定を変えたとき: service worker に渡し、範囲の外を消し、必要なら概略の地図を保存する */
+  async function sync(o: { prune?: boolean; prefetch?: boolean; viewed?: TileId[] }) {
+    if (!tiles || !mapSave) return;
+    busy = true; render();
+    try {
+      // 範囲を決める画面で見えていた地図(表示した地図)を保存する。表示したばかりなので、ほとんどはブラウザの手元から取れる
+      if (o.viewed?.length) await tiles.prefetch(o.viewed).catch(() => null);
+      const r = await applyAreas(tiles, mapSave.areas.list(), { prune: o.prune, prefetch: (o.prefetch ?? true) && prefs.mapPrefetch, persist: prefs.mapPersist });
+      if (r) mapMsg = r.failed ? `概略の地図のうち ${r.failed} 枚を保存できませんでした(ネットにつながっているときに、もう一度開くと保存します)。` : r.saved ? `概略の地図を保存しました(${r.saved} 枚)。` : '';
+    } catch { mapMsg = '地図の保存の設定を反映できませんでした。'; }
+    busy = false;
+    await refreshStats();
+  }
+
+  async function editArea(area?: SaveArea) {
+    if (!mapSave) return;
+    const r = await openAreaEditor({ mapFactory: mapSave.mapFactory, circuits: mapSave.circuits(), area, defaultName: mapSave.areas.defaultName() });
+    if (!r) return;
+    if (area) mapSave.areas.update(area.id, r.name, r.rect); else mapSave.areas.add(r.name, r.rect);
+    mapMsg = '';
+    await sync({ prune: !!area, viewed: r.viewed });
+  }
+
+  function areasHtml(): string {
+    if (!mapSave) return '';
+    const list = mapSave.areas.list();
+    if (!list.length) return `<div class="map-areas"><div class="map-areas-empty">保存範囲はまだありません。</div></div>`;
+    const dis = tiles && !busy ? '' : ' disabled';
+    return `<div class="map-areas">${list.map((a) => {
+      const st = stats?.get(a.id);
+      const size = !tiles ? '' : !st ? '集計中…' : st.n ? `${mb(st.bytes)}(${st.n} 枚)` : 'まだ保存なし';
+      return `<div class="marea" data-area="${esc(a.id)}"><span class="marea-name">${esc(a.name)}</span><span class="marea-size">${size}</span>
+        <span class="marea-btns"><button type="button" class="btn" data-area-edit="${esc(a.id)}"${dis}>変更</button><button type="button" class="btn" data-area-del="${esc(a.id)}"${dis}>削除</button></span></div>`;
+    }).join('')}
+      <div class="map-areas-foot"><button type="button" class="btn" data-area-clear${dis}>保存した地図をすべて消す</button></div></div>`;
+  }
 
   function control(r: Row, value: unknown, disabled: boolean): string {
     const dis = disabled ? ' disabled' : '';
@@ -89,6 +162,17 @@ export function mountSettingsView(root: HTMLElement, prefs: Prefs, onChange: (ke
           const can = !window.rllNative, on = prefs.analytics && can;      // デスクトップ版は「オフ」のまま変えられない
           return `<div class="srow"><div class="sname">${r.name}</div><div class="sctl"><button type="button" role="switch" class="switch${on ? ' on' : ''}" data-analytics aria-checked="${on}" aria-label="${r.name}"${can ? '' : ' disabled'}><i></i></button>`
             + `<span class="swl">${on ? '送信する' : '送信しない'}${can ? '' : '(デスクトップ版では送りません)'}</span></div><div class="srem"></div>${r.hint ? `<div class="shint">${r.hint}</div>` : ''}</div>`;
+        }
+        if (r.kind === 'mapAreas') {
+          const can = !!tiles && !busy;
+          return `<div class="srow"><div class="sname">${r.name}</div><div class="sctl"><button type="button" class="btn" data-area-add${can ? '' : ' disabled'}>＋ 範囲を追加</button>`
+            + `${tiles ? '' : '<span class="swl">(Web 版のみ)</span>'}</div><div class="srem"></div>${r.hint ? `<div class="shint">${r.hint}</div>` : ''}${areasHtml()}`
+            + `${mapMsg ? `<div class="shint" data-map-msg>${esc(mapMsg)}</div>` : ''}</div>`;
+        }
+        if (r.kind === 'mapPrefetch' || r.kind === 'mapPersist') {
+          const can = !!tiles && !busy, on = (r.kind === 'mapPrefetch' ? prefs.mapPrefetch : prefs.mapPersist) && !!tiles;
+          return `<div class="srow"><div class="sname">${r.name}</div><div class="sctl"><button type="button" role="switch" class="switch${on ? ' on' : ''}" data-${r.kind === 'mapPrefetch' ? 'map-prefetch' : 'map-persist'} aria-checked="${on}" aria-label="${r.name}"${can ? '' : ' disabled'}><i></i></button>`
+            + `<span class="swl">${on ? '有効' : '無効'}${tiles ? '' : '(Web 版のみ)'}</span></div><div class="srem"></div>${r.hint ? `<div class="shint">${r.hint}</div>` : ''}</div>`;
         }
         if (r.kind === 'yrange') {
           const { min, max, step } = SPEED_RANGE, lo = prefs.yMin, hi = prefs.yMax ?? max;
@@ -129,6 +213,33 @@ export function mountSettingsView(root: HTMLElement, prefs: Prefs, onChange: (ke
     if (al && !al.disabled) { resetArmed = false; prefs.setAutoLoad(!prefs.autoLoad); onChange('autoLoad'); render(); return; }
     const an = t.closest<HTMLButtonElement>('[data-analytics]');
     if (an && !an.disabled) { resetArmed = false; prefs.setAnalytics(!prefs.analytics); onChange('analytics'); render(); return; }
+    if (mapSave && tiles && !busy) {
+      if (t.closest('[data-area-add]:not([disabled])')) { resetArmed = false; void editArea(); return; }
+      const ed = t.closest<HTMLButtonElement>('[data-area-edit]:not([disabled])');
+      if (ed) { const a = mapSave.areas.get(ed.dataset.areaEdit!); if (a) void editArea(a); return; }
+      const del = t.closest<HTMLButtonElement>('[data-area-del]:not([disabled])');
+      if (del) {
+        const a = mapSave.areas.get(del.dataset.areaDel!);
+        if (a) void confirmDialog({ title: `保存範囲「${a.name}」を削除しますか?`, detail: 'この範囲で保存した地図も消します(ほかの保存範囲と重なる部分は残します)。', ok: '削除する', cancel: 'キャンセル' })
+          .then((ok) => { if (ok) { mapSave.areas.remove(a.id); mapMsg = ''; void sync({ prune: true, prefetch: false }); } });
+        return;
+      }
+      if (t.closest('[data-area-clear]:not([disabled])')) {
+        void confirmDialog({ title: '保存した地図をすべて消しますか?', detail: '保存範囲は残ります。保存範囲の地図は、次に表示したときに、また保存します。', ok: 'すべて消す', cancel: 'キャンセル' })
+          .then(async (ok) => { if (ok) { await tiles.clear(); mapMsg = '保存した地図をすべて消しました。'; await refreshStats(); } });
+        return;
+      }
+      if (t.closest('[data-map-prefetch]:not([disabled])')) {
+        resetArmed = false; prefs.setMapPrefetch(!prefs.mapPrefetch); mapMsg = ''; render();
+        if (prefs.mapPrefetch) void sync({});
+        return;
+      }
+      if (t.closest('[data-map-persist]:not([disabled])')) {
+        resetArmed = false; prefs.setMapPersist(!prefs.mapPersist); render();
+        if (prefs.mapPersist && mapSave.areas.list().length) void tiles.persist();
+        return;
+      }
+    }
     const sw = t.closest<HTMLButtonElement>('[data-switch]');
     if (sw && !sw.disabled) {
       resetArmed = false;
@@ -191,5 +302,6 @@ export function mountSettingsView(root: HTMLElement, prefs: Prefs, onChange: (ke
   });
 
   render();
-  return { refresh: render };
+  void refreshStats();
+  return { refresh: () => { render(); void refreshStats(); } };
 }

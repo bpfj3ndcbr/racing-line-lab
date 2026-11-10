@@ -63,7 +63,7 @@ const clean: { [K in PrefKey]: (v: unknown) => PrefValues[K] | null } = {
 };
 
 export type StartPos = 'center' | 'control';
-interface Saved { items?: Partial<Record<PrefKey, { remember?: unknown; value?: unknown }>>; yMin?: unknown; yMax?: unknown; startPos?: unknown; autoLoad?: unknown; analytics?: unknown }
+interface Saved { items?: Partial<Record<PrefKey, { remember?: unknown; value?: unknown }>>; yMin?: unknown; yMax?: unknown; startPos?: unknown; autoLoad?: unknown; analytics?: unknown; mapPrefetch?: unknown; mapPersist?: unknown }
 
 export class Prefs {
   constructor(private s: PrefStore) {}
@@ -119,6 +119,14 @@ export class Prefs {
   /** 利用状況の送信(Google アナリティクス。Web 版のみ)。初期値はオン */
   get analytics(): boolean { return this.saved().analytics !== false; }
   setAnalytics(v: boolean) { this.write({ ...this.saved(), analytics: v }); }
+
+  /** 地図の保存(案件 31。Web 版のみ): 概略の地図(Z15・Z16)は、表示する前に、保存範囲の分をまとめて保存する。初期値は無効 */
+  get mapPrefetch(): boolean { return this.saved().mapPrefetch === true; }
+  setMapPrefetch(v: boolean) { this.write({ ...this.saved(), mapPrefetch: v }); }
+
+  /** 保存したデータ(アプリと地図)を、ブラウザに消されにくくするよう頼む(案件 31。Web 版のみ)。初期値は有効 */
+  get mapPersist(): boolean { return this.saved().mapPersist !== false; }
+  setMapPersist(v: boolean) { this.write({ ...this.saved(), mapPersist: v }); }
 
   /** 前回の状態(保存が無い・読めないときは null) */
   last<K extends PrefKey>(k: K): PrefValues[K] | null {

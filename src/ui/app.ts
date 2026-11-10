@@ -11,6 +11,9 @@ import { showAbout } from './aboutView';
 import { mountHelpView } from './helpView';
 import { applyAnalytics } from '../io/analytics';
 import { openResumeStore, type ResumeStore } from '../io/resume';
+import { openTileStore, type TileStore } from '../io/tileStore';
+import { applyAreas } from '../io/mapSave';
+import { MapAreas } from '../store/mapAreas';
 
 const esc = (s: string) =>
   s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
@@ -28,7 +31,7 @@ export const RESUME_SAVE_FAILED = '走行ログが大きいため、一時保存
  * opts.resume: Web 版の一時保存の保存先(案件 30)。省略すると IndexedDB(使えなければ無し)。null で使わない。
  * デスクトップ版(window.rllNative がある)では使わない
  */
-export function mountApp(root: HTMLElement, session: Session, theme: ThemeController, mapFactory: MapFactory, opts: { reload?: () => void; resume?: ResumeStore | null } = {}): { dispose(): void } {
+export function mountApp(root: HTMLElement, session: Session, theme: ThemeController, mapFactory: MapFactory, opts: { reload?: () => void; resume?: ResumeStore | null; tiles?: TileStore | null } = {}): { dispose(): void } {
   root.innerHTML = `
     <header class="top">
       <div class="brand">${logoSvg(36)}<div class="brand-txt"><div class="ttl">Racing Line Lab</div><div class="subttl">シンプル走行ライン比較ツール</div></div></div>
@@ -54,12 +57,15 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
   let current: ViewName = 'import';
   let compare: CompareView | null = null;
   let importApi: ImportApi | null = null;
+  let settingsApi: { refresh(): void } | null = null;
 
   function navigate(v: ViewName) {
     if (v !== current && importApi?.isEditing()) return;     // サーキットの登録・編集中は、保存かキャンセルするまで移れない
     if (v === 'import' && current !== 'import') importApi?.closeSets();     // ほかのタブから戻ったら、比較セットはすべて閉じる(案件 26)
+    const from = current;
     current = v;
     if (v === 'help' && !helpEl.firstChild) mountHelpView(helpEl);     // 開いたときに 1 回だけ作る
+    if (v === 'settings' && from !== 'settings') settingsApi?.refresh();        // 地図の保存の容量を数え直す
     helpEl.hidden = v !== 'help';
     importEl.hidden = v !== 'import';
     compareEl.hidden = v !== 'compare';
@@ -128,24 +134,36 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
     if (el.dataset.act === 'theme') theme.set(el.dataset.theme as Theme);
   });
 
+  // Web 版の地図の保存(案件 31)。保存範囲の中で表示した地図を、service worker が保存する
+  const native = window.rllNative;
+  const tiles: TileStore | null = native ? null : opts.tiles !== undefined ? opts.tiles : openTileStore();
+  const mapAreas = new MapAreas(session);
+
   // 設定タブ: 「記憶しない」項目は、起動時と変更時に初期値を反映する
   const prefs = new Prefs(session);
   if (!prefs.get('theme').remember) theme.set(prefs.get('theme').value);
   applyAnalytics(prefs.analytics);          // 利用状況の送信(Web 版の公開用ビルドで、オンのときだけ)
-  mountSettingsView(settingsEl, prefs, (key) => {
+  settingsApi = mountSettingsView(settingsEl, prefs, (key) => {
     if (key === 'theme') { if (!prefs.get('theme').remember) theme.set(prefs.get('theme').value); }
     else if (key === 'analytics') applyAnalytics(prefs.analytics);
     else if (key !== 'autoLoad') compare?.applyPref(key);
   }, () => {            // 「アプリを初期状態に戻す」: 保存したものをすべて消して、画面を読み直す(一時保存も消し、元に戻さない)
     session.factoryReset();
     const reload = opts.reload ?? (() => window.location.reload());
-    if (!resume) { reload(); return; }
+    if (!resume && !tiles) { reload(); return; }
     forgotten = true;
-    void resume.forget().catch(() => { /* 消せなくても読み直す */ }).finally(reload);
-  });
+    // 一時保存(案件 30)と、保存した地図・保存範囲(案件 31)も消してから読み直す
+    void Promise.all([
+      resume?.forget(),
+      tiles ? tiles.clear().then(() => tiles.setAreas([])) : undefined,
+    ].map((p) => Promise.resolve(p).catch(() => { /* 消せなくても読み直す */ }))).finally(reload);
+  }, { store: tiles, areas: mapAreas, mapFactory, circuits: () => session.circuits });
+  // 起動時: 保存範囲を service worker に渡し直し、概略の地図のうち足りない分を保存する(ネットがあるとき)
+  if (tiles) {
+    void applyAreas(tiles, mapAreas.list(), { prefetch: prefs.mapPrefetch && navigator.onLine !== false, persist: prefs.mapPersist }).catch(() => { /* 次の機会に */ });
+  }
 
   // 前回の走行データの自動読み込み(Electron のみ。ファイルの場所を覚えているので読み直せる)
-  const native = window.rllNative;
   // Web 版の一時保存(案件 30)。同じタブの中の読み直し(スリープ・アプリの切り替え・手での再読み込み)で元に戻す
   const resume: ResumeStore | null = native ? null : opts.resume !== undefined ? opts.resume : openResumeStore();
   let forgotten = false;

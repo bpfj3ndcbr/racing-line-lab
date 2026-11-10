@@ -14,3 +14,4 @@ export * from './playback';
 export * from './heat';
 export * from './correctPreview';
 export * from './align';
+export * from './tiles';

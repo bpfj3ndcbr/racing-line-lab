@@ -85,6 +85,7 @@ npm run build        # 型チェック + ビルド(dist/)
 | `ui.setAliases` / `ui.slotAliases` | 比較セットの別名 / カード(セットごとの A〜D)の別名 |
 | `ui.guideClosed` / `ui.guideSeen` | はじめかたの表示状態 |
 | `ui.setsView` | 「データ管理」の比較セットの並べ方(`tabs` / `list`) |
+| `ui.mapAreas` | 地図の保存範囲(Web 版のみ。Z18 のタイルの区切りにそろえた四角 `x0`〜`x1`・`y0`〜`y1` と名前) |
 
 保存の形式を変えるときは、古い形式を読み替える処理を足すか、版を上げて初期値に戻してください。
 
@@ -102,6 +103,16 @@ npm run build        # 型チェック + ビルド(dist/)
 - 走行ログは読み込んだときに保存し、どの比較セットからも外したら消します。小さな状態は、画面が隠れるとき(`visibilitychange` の hidden・`pagehide`)に保存します。
 - ページを閉じる・読み直す瞬間に始めた IndexedDB の書き込みは中止されることがあるため、小さな状態は同期的に書ける sessionStorage にも写し、元に戻すときはこちらを優先します。
 - ほかのタブの保存は、1 日より古ければ起動時に消します。「アプリを初期状態に戻す」では、このタブの一時保存も消します。
+
+### Web 版の PWA と地図の保存
+
+Web 版は PWA です(`public/manifest.webmanifest`、`src/sw/sw.ts`、`src/io/pwa.ts`)。デスクトップ版・開発中(`npm run dev`)・テストでは service worker を登録しません。
+
+- **アプリのファイル**: `npm run build` のあと、`vite.config.ts` の `swPlugin` が `dist` のファイルの一覧を `__PRECACHE__` として埋め込み、`src/sw/sw.ts` を 1 つの `dist/sw.js` にまとめます(アプリ本体とは部品を共有しない。依存パッケージは使わない)。service worker は、入れたときに一覧のファイルを Cache Storage `rll-app-<印>` に保存し、保存したものを返します。新しい版は、ネットがあるときに取得され、アプリを閉じて次に起動したときから使われます。
+- **型チェック**: service worker は画面側と型の種類(WebWorker)が違うので、`tsconfig.sw.json` で別に確かめます(`npm run typecheck` と `npm run build` は両方を行う)。
+- **地図の保存**: service worker は、保存範囲(`ui.mapAreas`。画面が Cache Storage `rll-tiles-meta` の `rll-areas.json` に写して渡す)の中の地理院タイル(Z15〜Z18)を、表示したときに Cache Storage `rll-tiles` に保存し、次からは保存したものを返します。範囲の外は今までどおりネットから取ります。タイルの計算は `src/core/tiles.ts`、画面からの操作(一覧・削除・概略の地図の先読み・消されにくくする依頼)は `src/io/tileStore.ts` と `src/io/mapSave.ts` です。
+- 同じ画面の中では、一度表示した地図をブラウザが使い回し、service worker を通らないことがあります。そのため、範囲を決める画面(`src/ui/areaEditor.ts`)で見えていた地図は、範囲を追加したときに画面から保存します。
+- 保存したタイルには、容量の表示のため、見出し `x-rll-bytes` を付けています。保存した応答は `Vary: Origin` が付いていても返せるよう、`cache.match` に `ignoreVary` を付けています。
 
 ## 比較画面の再生
 

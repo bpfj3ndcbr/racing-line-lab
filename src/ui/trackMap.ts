@@ -1,6 +1,6 @@
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import type { MapCar, MapFactory, MapLine, MapTrack, TrackMap } from './mapTypes';
+import type { MapCar, MapFactory, MapGuide, MapLine, MapTrack, TrackMap } from './mapTypes';
 import type { Slot } from '../core';
 import { labelOffset } from './labelDir';
 
@@ -45,6 +45,7 @@ export const createLeafletMap: MapFactory = (el): TrackMap => {
   L.tileLayer(GSI_PHOTO, { maxNativeZoom: 18, maxZoom: 20, attribution: GSI_ATTRIBUTION }).addTo(map);
 
   const trackLayer = L.layerGroup().addTo(map);
+  const guideLayer = L.layerGroup().addTo(map);
   const lineLayer = L.layerGroup().addTo(map);
   const cars = new Map<Slot, L.Marker>();
   const labels = new Map<Slot, L.Marker>();
@@ -196,6 +197,22 @@ export const createLeafletMap: MapFactory = (el): TrackMap => {
     setView(lat, lon, zoom) { map.setView([lat, lon], zoom, { animate: false }); },
     getView() { const c = map.getCenter(); return { lat: c.lat, lon: c.lng, zoom: map.getZoom() }; },
     onZoomChange(cb: (zoom: number) => void) { map.on('zoomend', () => cb(map.getZoom())); },
+    onViewChange(cb: () => void) { map.on('move', cb); map.on('zoomend', cb); map.on('resize', cb); },
+    containerToLatLon(x, y) { const p = map.containerPointToLatLng([x, y]); return { lat: p.lat, lon: p.lng }; },
+    fitBox(b, padding) {
+      const sz = map.getSize();
+      map.fitBounds([[b.south, b.west], [b.north, b.east]], { padding: [sz.x * padding, sz.y * padding], animate: false });
+    },
+    setGuide(g: MapGuide | null) {
+      guideLayer.clearLayers();
+      if (!g) return;
+      for (const ln of g.grid) L.polyline(ln, { color: '#ffffff', weight: 1, opacity: 0.45, interactive: false }).addTo(guideLayer);
+      if (g.box) {
+        const r: L.LatLngBoundsExpression = [[g.box.south, g.box.west], [g.box.north, g.box.east]];
+        L.rectangle(r, { color: '#000', weight: 5, opacity: 0.35, fill: false, interactive: false }).addTo(guideLayer);
+        L.rectangle(r, { color: '#ffd400', weight: 3, opacity: 1, fillColor: '#ffd400', fillOpacity: 0.08, interactive: false }).addTo(guideLayer);
+      }
+    },
     invalidate() { map.invalidateSize(); },
     destroy() { window.removeEventListener('mouseup', stopDrag); window.removeEventListener('mouseup', clearRubber); map.remove(); },
   };

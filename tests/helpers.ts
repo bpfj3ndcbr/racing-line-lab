@@ -1,5 +1,6 @@
 import type { TrackLog } from '../src/core';
-import type { MapCar, MapLine, MapTrack, TrackMap } from '../src/ui/mapTypes';
+import type { MapCar, MapGuide, MapLine, MapTrack, TrackMap } from '../src/ui/mapTypes';
+import { type GeoBox, latToTileY, lonToTileX, tileXToLon, tileYToLat } from '../src/core';
 
 /**
  * ログの先頭から ratio の割合だけを取り出す。始点と終点が離れるので、1 周分のログ(輪)としては扱われない。
@@ -53,6 +54,21 @@ export class FakeMap implements TrackMap {
   onZoomChange(cb: (zoom: number) => void) { this.zoomCb = cb; }
   /** 利用者が地図を拡大・縮小した、を再現する */
   userZooms(z: number) { this.zoomCb?.(z); }
+  /** 地図の表示領域の大きさ(containerToLatLon の計算に使う) */
+  size = { w: 800, h: 600 };
+  viewCb: (() => void) | null = null;
+  onViewChange(cb: () => void) { this.viewCb = cb; }
+  /** 利用者が地図を動かした・拡大縮小した、を再現する */
+  userMoves(lat: number, lon: number, zoom = this.view.zoom) { this.view = { lat, lon, zoom }; this.viewCb?.(); }
+  containerToLatLon(x: number, y: number) {
+    const { lat, lon, zoom } = this.view;
+    const px = lonToTileX(lon, zoom) * 256 + (x - this.size.w / 2), py = latToTileY(lat, zoom) * 256 + (y - this.size.h / 2);
+    return { lat: tileYToLat(py / 256, zoom), lon: tileXToLon(px / 256, zoom) };
+  }
+  boxesFitted: GeoBox[] = [];
+  fitBox(b: GeoBox) { this.boxesFitted.push(b); this.view = { ...this.view, lat: (b.north + b.south) / 2, lon: (b.east + b.west) / 2 }; }
+  guide: MapGuide | null = null;
+  setGuide(g: MapGuide | null) { this.guide = g; }
   invalidate() { this.invalidated++; }
   destroy() { this.destroyed = true; }
 }

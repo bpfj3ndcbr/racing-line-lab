@@ -1,4 +1,4 @@
-import type { GeoLine, Slot } from '../core';
+import type { GeoBox, GeoLine, Slot } from '../core';
 
 /** 地図に引く走行ライン。色は呼び出し側が CSS 変数から読んで渡す(地図の線は CSS で色を変えられないため)。 */
 /** ヒートマップ用の色分け区間(points の from〜to 番目を color で描く) */
@@ -45,9 +45,20 @@ export interface TrackMap {
   fit(): void;
   /** 地図の拡大率が変わったとき(利用者の操作も、プログラムからの変更も通知される) */
   onZoomChange(cb: (zoom: number) => void): void;
+  /** 地図の表示位置が変わったとき(動かしている途中も、拡大・縮小も通知される。地図の保存範囲の枠用) */
+  onViewChange(cb: () => void): void;
+  /** 地図の表示領域の中の位置(左上からのピクセル)→ 緯度・経度 */
+  containerToLatLon(x: number, y: number): { lat: number; lon: number };
+  /** 四角が入るように表示を合わせる(padding: 四角の周りに空ける割合。0.1 = 表示領域の幅・高さの 1 割ずつ) */
+  fitBox(box: GeoBox, padding: number): void;
+  /** 地図の保存範囲の目安: 区切り線(細い線)と、保存範囲の四角(太い線)を描く。null で消す */
+  setGuide(guide: MapGuide | null): void;
   /** 表示領域の大きさが変わったとき(非表示から表示に戻したときなど)に呼ぶ */
   invalidate(): void;
   destroy(): void;
 }
+
+/** 地図の保存範囲の目安(案件 31) */
+export interface MapGuide { grid: [number, number][][]; box: GeoBox | null }
 
 export type MapFactory = (el: HTMLElement) => TrackMap;

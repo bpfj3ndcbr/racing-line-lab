@@ -299,8 +299,8 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
           <div class="cact">
             <button class="btn sm" data-act="edit-circuit" data-id="${esc(c.id)}" data-fk="edt-${esc(c.id)}" title="大きな画面で、地図を見ながら編集します">編集(地図)…</button>
             <button class="btn sm" data-act="rename-circuit" data-id="${esc(c.id)}" data-fk="ren-${esc(c.id)}">名前を変更</button>
-            <button class="btn sm" data-act="reload-control" data-id="${esc(c.id)}" data-fk="rlc-${esc(c.id)}">コントロールラインの再読み込み</button>
-            <button class="btn sm" data-act="reload-sectors" data-id="${esc(c.id)}" data-fk="rls-${esc(c.id)}">セクターの再読み込み</button>
+            <button class="btn sm" data-act="reload-control" data-id="${esc(c.id)}" data-fk="rlc-${esc(c.id)}">コントロールライン<wbr>の再読み込み</button>
+            <button class="btn sm" data-act="reload-sectors" data-id="${esc(c.id)}" data-fk="rls-${esc(c.id)}">セクター<wbr>の再読み込み</button>
             <button class="btn sm" data-act="del-circuit" data-id="${esc(c.id)}" data-fk="del-${esc(c.id)}">削除</button>
           </div></li>`).join('')}</ul>`
       : '<div class="empty">登録済みのサーキットはありません。「ファイルによる登録」「地図による登録」タブから登録してください。</div>';

@@ -460,7 +460,7 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 
 /* ファイルによる登録: 項目名の列を固定幅にして、入力欄・「ファイルを選択」の先頭をそろえる */
 .circ-form .frow{display:grid;grid-template-columns:220px minmax(0,1fr);align-items:center;gap:12px;text-align:left}
-.circ-form .frow>span:first-child{text-align:right}
+.circ-form .frow>span:first-child{text-align:right;font-weight:700;color:var(--text)}   /* 項目名は太字 */
 .circ-form .frow input[type=text]{width:100%;max-width:320px;box-sizing:border-box}
 
 /* 車から引き出す速度・タイム差(線の先に文字。文字は車の色、背景は半透明の黒で航空写真の上でも読める) */
@@ -543,6 +543,26 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .switch.on{background:var(--accent);border-color:var(--accent)}
 .switch.on i{left:24px;background:var(--accent-on)}
 .srow.remembered .sctl{opacity:.45}
+
+/* 設定: 地図の保存(案件 31。Web 版のみ) */
+.map-areas{grid-column:2 / 4;display:flex;flex-direction:column;gap:6px;margin-top:4px}
+.marea{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:10px;padding:6px 10px;
+  background:var(--surface-2);border:1px solid var(--border);border-radius:6px}
+.marea-name{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.marea-size{color:var(--muted);font-size:11px;white-space:nowrap}
+.marea-btns{display:flex;gap:6px}
+.map-areas-empty{color:var(--muted);font-size:11px}
+.map-areas-foot{display:flex;justify-content:flex-end}
+/* 保存範囲を決める画面: 黄色の四角(保存範囲)を、四隅と真ん中のつまみで動かす */
+.modal.area-ed{width:min(900px,calc(100vw - 32px));max-height:calc(100vh - 32px)}
+.area-ed-goto{display:flex;align-items:center;gap:8px;color:var(--muted)}
+.area-ed-goto select{min-height:32px;color:var(--text);background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:0 8px}
+.area-ed-map{position:relative;height:min(56vh,520px);border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface-2)}
+/* 指で操作する端末では、四角のつまみを大きくする(つかみやすく) */
+@media (pointer:coarse){.area-ed .edit-handle span{width:26px;height:26px;margin:-5px}.area-ed .edit-handle.mid span{width:22px;height:22px;margin:-3px}}
+.area-ed-hint,.area-ed-info{margin:0;font-size:11.5px}
+.modal .area-ed-info{color:var(--text)}
+.modal .area-ed-warn{margin:0;color:var(--warn);font-size:12px}
 .switch:disabled,.slider:disabled,.seg.slide button:disabled{cursor:not-allowed}
 
 /* アプリ名(上)とサブタイトル(下) */
@@ -916,4 +936,23 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
   .map-secs{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end;left:56px;right:8px;bottom:26px}
   .map-secs .btn.sec{min-height:32px;height:32px;min-width:38px;padding:0 6px;font-size:12px;justify-content:center}
   .map-secs .btn.sec[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-on);font-weight:700}
+
+  /* 設定: 地図の保存 */
+  .map-areas{grid-column:1}
+  .marea{grid-template-columns:minmax(0,1fr) auto}
+  .marea-btns{grid-column:1 / 3;justify-content:flex-end}
+  .area-ed-map{height:50vh;height:50dvh}
+
+  /* データ管理 → サーキット: 登録済みサーキットのボタンを、同じ幅の 2 列にそろえる(長い名前は折り返す) */
+  .cact{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%}
+  .cact .btn{justify-content:center;text-align:center;white-space:normal;word-break:keep-all;line-height:1.3;padding:6px 10px}   /* 折り返しは <wbr> の位置で */
+
+  /* データ管理 → サーキット → ファイルによる登録: 項目名を上、入力欄を下に縦に並べ、左にそろえる */
+  .circ-form{align-items:stretch}
+  .circ-form .frow{grid-template-columns:minmax(0,1fr);gap:4px}
+  .circ-form .frow>span:first-child{text-align:left}
+  .circ-form .frow>span:empty{display:none}
+  .circ-form .frow input[type=text]{max-width:none}
+  .circ-form .frow input[type=file]{max-width:100%}
+  .circ-form .btn-row .btn{width:100%;justify-content:center}
 }

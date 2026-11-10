@@ -226,8 +226,10 @@ describe('ファイルによる登録のフォーム', () => {
 });
 
 describe('項目名の右揃え', () => {
-  it('項目名は右揃え', () => {
-    expect(readFileSync('src/style.css', 'utf8')).toMatch(/\.circ-form \.frow>span:first-child\{text-align:right\}/);
+  it('項目名は右揃えで太字(狭い画面では左揃え)', () => {
+    const css = readFileSync('src/style.css', 'utf8');
+    expect(css).toMatch(/\.circ-form \.frow>span:first-child\{text-align:right;font-weight:700[;}]/);
+    expect(css).toMatch(/@media \(max-width:767px\)[\s\S]*\.circ-form \.frow>span:first-child\{text-align:left\}/);
   });
 });
 
