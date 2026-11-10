@@ -11,7 +11,7 @@ import { showAbout } from './aboutView';
 import { mountHelpView } from './helpView';
 import { applyAnalytics } from '../io/analytics';
 import { openResumeStore, type ResumeStore } from '../io/resume';
-import { openTileStore, type TileStore } from '../io/tileStore';
+import { openNativeTileStore, openTileStore, type TileStore } from '../io/tileStore';
 import { applyAreas } from '../io/mapSave';
 import { MapAreas } from '../store/mapAreas';
 import { installAppleFilePicker } from './fileKind';
@@ -136,9 +136,9 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
     if (el.dataset.act === 'theme') theme.set(el.dataset.theme as Theme);
   });
 
-  // Web 版の地図の保存(案件 31)。保存範囲の中で表示した地図を、service worker が保存する
+  // 地図の保存。保存範囲の中で表示した地図を、Web 版は service worker が(案件 31)、デスクトップ版はメイン側が(案件 2)保存する
   const native = window.rllNative;
-  const tiles: TileStore | null = native ? null : opts.tiles !== undefined ? opts.tiles : openTileStore();
+  const tiles: TileStore | null = opts.tiles !== undefined ? opts.tiles : native ? openNativeTileStore(native) : openTileStore();
   const mapAreas = new MapAreas(session);
 
   // 設定タブ: 「記憶しない」項目は、起動時と変更時に初期値を反映する

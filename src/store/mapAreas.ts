@@ -2,7 +2,7 @@ import { type SaveArea, type TileRect, cleanAreas } from '../core';
 import type { PrefStore } from './prefs';
 
 /**
- * 地図の保存範囲(案件 31。Web 版のみ)。「設定」の「地図の保存」で決める。保存先のキーは ui.mapAreas。
+ * 地図の保存範囲(Web 版は案件 31、デスクトップ版は案件 2)。「設定」の「地図の保存」で決める。保存先のキーは ui.mapAreas。
  * 範囲は Z18 のタイルの区切りにそろえた四角(core/tiles.ts の TileRect)。
  */
 export class MapAreas {

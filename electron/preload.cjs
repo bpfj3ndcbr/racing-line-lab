@@ -14,4 +14,11 @@ contextBridge.exposeInMainWorld('rllNative', {
   readTextFile: (p) => ipcRenderer.invoke('file:read-text', p),
   /** 保存ダイアログを出して、文字列をファイルに書く。{ ok, canceled?, path? } */
   saveText: (fileName, text) => ipcRenderer.invoke('file:save-text', fileName, text),
+  /** 地図の保存(案件 2): 地図の画像の URL(保存範囲の中は、メイン側が保存して返す)と、保存した地図の操作 */
+  tileUrl: 'rll-tile://tile/{z}/{x}/{y}.jpg',
+  tilesSetAreas: (areas) => ipcRenderer.invoke('tiles:set-areas', areas),
+  tilesList: () => ipcRenderer.invoke('tiles:list'),
+  tilesRemove: (list) => ipcRenderer.invoke('tiles:remove', list),
+  tilesClear: () => ipcRenderer.invoke('tiles:clear'),
+  tilesPrefetch: (list) => ipcRenderer.invoke('tiles:prefetch', list),
 });

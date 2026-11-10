@@ -38,12 +38,20 @@ const labelIcon2 = (slot: Slot) => L.divIcon({
   iconSize: [0, 0],
 });
 
+/**
+ * 地図の画像の取得先。デスクトップ版で窓口に tileUrl があればそれ(メイン側が保存範囲の中を保存して返す。案件 2)、
+ * 無ければ地理院(Web 版は service worker が保存する。案件 31)
+ */
+export function tileUrlTemplate(native: { tileUrl?: string } | undefined = window.rllNative): string {
+  return native?.tileUrl ?? GSI_PHOTO;
+}
+
 export const createLeafletMap: MapFactory = (el): TrackMap => {
   // keyboard:false … 矢印キー・+/- で地図が動かないようにする(キーは再生の操作に使う)
   const map = L.map(el, { preferCanvas: true, minZoom: 10, maxZoom: 20, zoomControl: false, keyboard: false });
   L.control.zoom({ position: 'bottomleft', zoomInTitle: '拡大', zoomOutTitle: '縮小' }).addTo(map);
   map.setView([33.0385, 130.9735], 15);
-  L.tileLayer(GSI_PHOTO, { maxNativeZoom: 18, maxZoom: 20, attribution: GSI_ATTRIBUTION }).addTo(map);
+  L.tileLayer(tileUrlTemplate(), { maxNativeZoom: 18, maxZoom: 20, attribution: GSI_ATTRIBUTION }).addTo(map);
 
   const trackLayer = L.layerGroup().addTo(map);
   const guideLayer = L.layerGroup().addTo(map);

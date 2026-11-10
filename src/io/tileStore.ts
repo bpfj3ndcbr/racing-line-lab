@@ -1,9 +1,10 @@
+import type { NativeBridge } from './storage';
 import { type SaveArea, type TileId, TILE_AREAS_FILE, TILE_BYTES_HEADER, TILE_CACHE, TILE_META_CACHE, parseTileUrl, tileUrl } from '../core';
 
 /**
  * Web 版の地図の保存先(案件 31)。表示したタイルを保存するのは service worker(src/sw/sw.ts)で、
  * 画面からは、保存範囲を渡す・保存したタイルの一覧と容量・削除・概略の地図の先読み・消されにくくする依頼を行う。
- * 保存先はブラウザの Cache Storage。デスクトップ版では使わない(案件 2 で別に扱う)。
+ * 保存先はブラウザの Cache Storage。デスクトップ版は openNativeTileStore(案件 2)。
  */
 export interface SavedTile extends TileId { bytes: number }
 export interface TileStore {
@@ -19,6 +20,8 @@ export interface TileStore {
   prefetch(tiles: TileId[]): Promise<{ saved: number; failed: number }>;
   /** 端末の空きが少ないときに、ブラウザが保存したデータを消さないよう頼む。認められたら true */
   persist(): Promise<boolean>;
+  /** 消される心配の無い保存先か(デスクトップ版のファイル。「保存したデータを消されにくくする」は要らない) */
+  readonly durable?: boolean;
 }
 
 /** タイルを、容量の見出しを付けて保存する形にする */
@@ -73,6 +76,25 @@ export function openTileStore(): TileStore | null {
     async persist() {
       try { return (await navigator.storage?.persisted?.()) || (await navigator.storage?.persist?.()) || false; } catch { return false; }
     },
+  };
+}
+
+/**
+ * デスクトップ版の保存先(案件 2)。保存するのはメイン側(electron/tileCache.cjs)で、ここからは窓口を呼ぶだけ。
+ * 窓口に地図の保存が無い(古い版・テスト用の窓口)なら null
+ */
+export function openNativeTileStore(native: NativeBridge): TileStore | null {
+  const { tilesSetAreas, tilesList, tilesRemove, tilesClear, tilesPrefetch } = native;
+  if (!native.tileUrl || !tilesSetAreas || !tilesList || !tilesRemove || !tilesClear || !tilesPrefetch) return null;
+  const ids = (list: TileId[]) => list.map((t) => ({ z: t.z, x: t.x, y: t.y }));
+  return {
+    durable: true,
+    async setAreas(areas) { await tilesSetAreas(areas.map((a) => ({ x0: a.x0, y0: a.y0, x1: a.x1, y1: a.y1 }))); },
+    list: () => tilesList(),
+    async remove(match) { return tilesRemove(ids((await tilesList()).filter(match))); },
+    async clear() { await tilesClear(); },
+    prefetch: (list) => tilesPrefetch(ids(list)),
+    async persist() { return true; },
   };
 }
 

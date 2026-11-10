@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeAll, describe, expect, it } from 'vitest';
-import { createLeafletMap } from '../src/ui/trackMap';
+import { createLeafletMap, tileUrlTemplate } from '../src/ui/trackMap';
 
 /** Leaflet 実体の煙試験(jsdom には画面の大きさが無いので、例外なく動くことだけを見る) */
 describe('Leaflet の地図アダプタ', () => {
@@ -52,5 +52,12 @@ describe('地図のキーボード', () => {
     const m = createLeafletMap(el);
     expect(el.getAttribute('tabindex')).toBeNull();          // 有効だと Leaflet が tabindex=0 を付ける
     m.destroy();
+  });
+
+  it('地図の画像の取得先: デスクトップ版で窓口に tileUrl があればメイン側(案件 2)、無ければ地理院', () => {
+    const gsi = 'https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg';
+    expect(tileUrlTemplate(undefined)).toBe(gsi);
+    expect(tileUrlTemplate({})).toBe(gsi);
+    expect(tileUrlTemplate({ tileUrl: 'rll-tile://tile/{z}/{x}/{y}.jpg' })).toBe('rll-tile://tile/{z}/{x}/{y}.jpg');
   });
 });
