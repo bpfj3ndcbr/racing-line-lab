@@ -93,7 +93,7 @@ describe('ラインを引く → 直す → 確定', () => {
     expect($('#ce-lines').textContent).toBe('計測ライン: 未設定');
     expect($<HTMLElement>('#ce-draft').hidden).toBe(false);
     expect($('#ce-draft-text').textContent).toContain('未確定');
-    expect($('#ce-hint').textContent).toContain('右の欄の「確定」');   // 確定ボタンは右の欄にある
+    expect($('#ce-hint').textContent).toContain('直したら「確定」を押してください');   // 確定ボタンの位置は画面の幅で変わるので、場所は言わない
     expect(mapOf().lines).toHaveLength(1);
     expect(mapOf().lines[0]).toMatchObject({ label: '計測ライン(仮)', kind: 'control', selected: true });
     expect(mapOf().handles.map((h) => h.id)).toEqual(['a', 'b', 'm']);

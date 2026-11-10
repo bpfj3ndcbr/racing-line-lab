@@ -35,7 +35,7 @@ const GROUPS: { title: string; rows: (Row | Plain)[] }[] = [
       hint: '割り当ての無い枠を選んだときは「固定」になります。' },
   ] },
   { title: '地図の保存', rows: [
-    { name: '保存範囲', kind: 'mapAreas', hint: '範囲の中で表示した地図(倍率 15〜18)を、この端末に保存し、ネットが無いときにも表示します。範囲を追加したら、ネットのある所で一度、その範囲を見ておいてください。Web 版のみ使えます。' },
+    { name: '保存範囲', kind: 'mapAreas', hint: '範囲の中で表示した地図(倍率 15〜18)を、この端末に保存し、ネットが無いときにも表示します。範囲を追加したら、ネットのある所で一度、その範囲を見ておいてください。' },
     { name: '概略の地図は表示前に保存する', kind: 'mapPrefetch', hint: '概略の地図(倍率 15・16。サーキット全体を見るときの粗い航空写真)を、保存範囲を追加・変更したときに、表示する前にまとめて保存します。無効のときは、ほかの倍率と同じく、表示したときに保存します。' },
     { name: '保存したデータを消されにくくする', kind: 'mapPersist', hint: '端末の空きが少ないときに、ブラウザが保存したデータ(アプリと地図)を消さないよう頼みます(地図の保存範囲があるときだけ)。一度認められると、アプリからは取り消せません(ブラウザの設定で、このサイトのデータを消すと元に戻ります)。' },
   ] },
@@ -62,7 +62,7 @@ const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
  * 設定タブ。各項目は「最初の状態」を選ぶ。「最後の状態を記憶する」にチェックすると、その項目は前回の状態で始まるので、
  * 選ぶ部分は押せなくなる。
  */
-/** 地図の保存(案件 31)に使うもの。store が null(デスクトップ版・使えない環境)なら、項目は押せない */
+/** 地図の保存(Web 版は案件 31、デスクトップ版は案件 2)に使うもの。store が null(使えない環境)なら、項目は押せない */
 export interface MapSaveDeps { store: TileStore | null; areas: MapAreas; mapFactory: MapFactory; circuits: () => Circuit[] }
 
 const mb = (bytes: number) => (bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`);
@@ -170,9 +170,11 @@ export function mountSettingsView(root: HTMLElement, prefs: Prefs, onChange: (ke
             + `${mapMsg ? `<div class="shint" data-map-msg>${esc(mapMsg)}</div>` : ''}</div>`;
         }
         if (r.kind === 'mapPrefetch' || r.kind === 'mapPersist') {
-          const can = !!tiles && !busy, on = (r.kind === 'mapPrefetch' ? prefs.mapPrefetch : prefs.mapPersist) && !!tiles;
+          // 「消されにくくする」は、ブラウザに保存する Web 版だけ(デスクトップ版はファイルに保存するので要らない。案件 2)
+          const usable = !!tiles && !(r.kind === 'mapPersist' && tiles.durable);
+          const can = usable && !busy, on = (r.kind === 'mapPrefetch' ? prefs.mapPrefetch : prefs.mapPersist) && usable;
           return `<div class="srow"><div class="sname">${r.name}</div><div class="sctl"><button type="button" role="switch" class="switch${on ? ' on' : ''}" data-${r.kind === 'mapPrefetch' ? 'map-prefetch' : 'map-persist'} aria-checked="${on}" aria-label="${r.name}"${can ? '' : ' disabled'}><i></i></button>`
-            + `<span class="swl">${on ? '有効' : '無効'}${tiles ? '' : '(Web 版のみ)'}</span></div><div class="srem"></div>${r.hint ? `<div class="shint">${r.hint}</div>` : ''}</div>`;
+            + `<span class="swl">${on ? '有効' : '無効'}${usable ? '' : '(Web 版のみ)'}</span></div><div class="srem"></div>${r.hint ? `<div class="shint">${r.hint}</div>` : ''}</div>`;
         }
         if (r.kind === 'yrange') {
           const { min, max, step } = SPEED_RANGE, lo = prefs.yMin, hi = prefs.yMax ?? max;

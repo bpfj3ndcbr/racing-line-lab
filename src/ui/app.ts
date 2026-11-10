@@ -11,9 +11,10 @@ import { showAbout } from './aboutView';
 import { mountHelpView } from './helpView';
 import { applyAnalytics } from '../io/analytics';
 import { openResumeStore, type ResumeStore } from '../io/resume';
-import { openTileStore, type TileStore } from '../io/tileStore';
+import { openNativeTileStore, openTileStore, type TileStore } from '../io/tileStore';
 import { applyAreas } from '../io/mapSave';
 import { MapAreas } from '../store/mapAreas';
+import { installAppleFilePicker } from './fileKind';
 
 const esc = (s: string) =>
   s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
@@ -55,6 +56,7 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
   const settingsEl = root.querySelector<HTMLElement>('#view-settings')!;
   const topRight = root.querySelector<HTMLElement>('#top-right')!;
   let current: ViewName = 'import';
+  const unApple = installAppleFilePicker(document, navigator);     // iPhone・iPad でファイルが選べるように(案件 29)
   let compare: CompareView | null = null;
   let importApi: ImportApi | null = null;
   let settingsApi: { refresh(): void } | null = null;
@@ -134,9 +136,9 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
     if (el.dataset.act === 'theme') theme.set(el.dataset.theme as Theme);
   });
 
-  // Web 版の地図の保存(案件 31)。保存範囲の中で表示した地図を、service worker が保存する
+  // 地図の保存。保存範囲の中で表示した地図を、Web 版は service worker が(案件 31)、デスクトップ版はメイン側が(案件 2)保存する
   const native = window.rllNative;
-  const tiles: TileStore | null = native ? null : opts.tiles !== undefined ? opts.tiles : openTileStore();
+  const tiles: TileStore | null = opts.tiles !== undefined ? opts.tiles : native ? openNativeTileStore(native) : openTileStore();
   const mapAreas = new MapAreas(session);
 
   // 設定タブ: 「記憶しない」項目は、起動時と変更時に初期値を反映する
@@ -210,5 +212,5 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
   window.addEventListener('dragover', stopDrop);
   window.addEventListener('drop', stopDrop);
   /** 画面を作り直す前に呼ぶ。キー操作の受付(document への登録)を外す。 */
-  return { dispose: () => { unhook(); compare?.hide(); importApi?.closeWork(); window.removeEventListener('dragover', stopDrop); window.removeEventListener('drop', stopDrop); } };
+  return { dispose: () => { unhook(); unApple(); compare?.hide(); importApi?.closeWork(); window.removeEventListener('dragover', stopDrop); window.removeEventListener('drop', stopDrop); } };
 }

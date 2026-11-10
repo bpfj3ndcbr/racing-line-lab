@@ -1,3 +1,5 @@
+import type { TileId, TileRect } from '../core';
+
 /**
  * 保存先の抽象化。ブラウザ版は localStorage、Electron 化したらファイル保存の実装に差し替える。
  * 値は文字列(JSON)で受け渡す。
@@ -37,6 +39,13 @@ export interface NativeBridge {
   /** 場所を指定して、走行ログ(.vbo)の中身を読む。読めなければ null */
   readTextFile(path: string): Promise<string | null>;
   saveText(fileName: string, text: string): Promise<{ ok: boolean; canceled?: boolean; path?: string; error?: string }>;
+  /** 地図の保存(案件 2。古い版の窓口やテスト用の窓口には無いので、どれも任意) */
+  tileUrl?: string;
+  tilesSetAreas?(areas: TileRect[]): Promise<boolean>;
+  tilesList?(): Promise<(TileId & { bytes: number })[]>;
+  tilesRemove?(list: TileId[]): Promise<number>;
+  tilesClear?(): Promise<boolean>;
+  tilesPrefetch?(list: TileId[]): Promise<{ saved: number; failed: number }>;
 }
 declare global { interface Window { rllNative?: NativeBridge } }
 

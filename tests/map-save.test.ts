@@ -15,6 +15,8 @@ import { FakeMap } from './helpers';
 const flush = () => new Promise((r) => setTimeout(r, 30));
 let store: MemoryStore, root: HTMLElement, tiles: MemoryTileStore, maps: FakeMap[], session: Session, reloaded: number;
 let app: { dispose(): void } | null = null;
+/** true なら、保存先は渡さず、窓口(window.rllNative)から作らせる(デスクトップ版) */
+let useNative = false;
 
 function boot() {
   app?.dispose();
@@ -23,7 +25,7 @@ function boot() {
   session = new Session(store);
   maps = [];
   app = mountApp(root, session, new ThemeController(store), () => { const m = new FakeMap(); maps.push(m); return m; },
-    { tiles, resume: null, reload: () => { reloaded++; } });
+    { tiles: useNative ? undefined : tiles, resume: null, reload: () => { reloaded++; } });
   return session;
 }
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
@@ -37,7 +39,7 @@ async function addArea(name?: string) {
   await flush();
 }
 
-beforeEach(() => { store = new MemoryStore(); tiles = new MemoryTileStore(); reloaded = 0; });
+beforeEach(() => { store = new MemoryStore(); tiles = new MemoryTileStore(); reloaded = 0; useNative = false; });
 afterEach(() => { app?.dispose(); app = null; document.body.innerHTML = ''; delete (window as { rllNative?: NativeBridge }).rllNative; });
 
 describe('地図の保存(設定)', () => {
@@ -175,16 +177,52 @@ describe('地図の保存(設定)', () => {
     expect(tiles.prefetched.length).toBe(prefetchTilesOf(tiles.areas).length);
   });
 
-  it('デスクトップ版では使えない: ボタン・スイッチは押せず、「Web 版のみ」と出る', () => {
+  it('窓口に地図の保存が無い(古い版のデスクトップ版)ときは使えない: ボタン・スイッチは押せず、「Web 版のみ」と出る', () => {
     (window as { rllNative?: NativeBridge }).rllNative = {
       storageGet: () => null, storageSet: () => {}, storageClear: () => {}, saveText: async () => ({ ok: true }),
       getPathForFile: () => '', readTextFile: async () => null,
     };
+    useNative = true;
     boot(); nav('settings');
     expect($('[data-area-add]').hasAttribute('disabled')).toBe(true);
     expect($('[data-map-prefetch]').hasAttribute('disabled')).toBe(true);
     expect($('[data-map-persist]').hasAttribute('disabled')).toBe(true);
     expect($('[data-area-add]').closest('.srow')!.textContent).toContain('(Web 版のみ)');
+  });
+});
+
+describe('地図の保存(デスクトップ版。案件 2)', () => {
+  it('窓口に地図の保存があれば使える。「消されにくくする」だけは押せず「Web 版のみ」。範囲の追加・初期状態に戻すは Web 版と同じ', async () => {
+    const saved = new Map<string, { z: number; x: number; y: number; bytes: number }>();
+    let areas: unknown[] = [];
+    (window as { rllNative?: NativeBridge }).rllNative = {
+      storageGet: () => null, storageSet: () => {}, storageClear: () => {}, saveText: async () => ({ ok: true }),
+      getPathForFile: () => '', readTextFile: async () => null,
+      tileUrl: 'rll-tile://tile/{z}/{x}/{y}.jpg',
+      tilesSetAreas: async (a) => { areas = a; return true; },
+      tilesList: async () => [...saved.values()],
+      tilesRemove: async (l) => { l.forEach((t) => saved.delete(`${t.z}/${t.x}/${t.y}`)); return l.length; },
+      tilesClear: async () => { saved.clear(); return true; },
+      tilesPrefetch: async (l) => { l.forEach((t) => saved.set(`${t.z}/${t.x}/${t.y}`, { ...t, bytes: 100 })); return { saved: l.length, failed: 0 }; },
+    };
+    useNative = true;
+    boot(); nav('settings');
+    expect($('[data-area-add]').hasAttribute('disabled')).toBe(false);
+    expect($('[data-area-add]').closest('.srow')!.textContent).not.toContain('Web 版のみ');
+    expect($('[data-map-prefetch]').hasAttribute('disabled')).toBe(false);
+    expect($('[data-map-persist]').hasAttribute('disabled')).toBe(true);
+    expect($('[data-map-persist]').getAttribute('aria-checked')).toBe('false');
+    expect($('[data-map-persist]').closest('.srow')!.textContent).toContain('(Web 版のみ)');
+    await addArea('AP');
+    expect(areas).toHaveLength(1);                                              // メイン側に範囲を渡す
+    expect(Object.keys(areas[0] as object).sort()).toEqual(['x0', 'x1', 'y0', 'y1']);
+    saved.set('18/1/1', { z: 18, x: 1, y: 1, bytes: 100 });
+    // 「アプリを初期状態に戻す」: 保存した地図と範囲も消す
+    $<HTMLButtonElement>('[data-wipe]').click(); $<HTMLButtonElement>('[data-wipe]').click();
+    await flush();
+    expect(saved.size).toBe(0);
+    expect(areas).toEqual([]);
+    expect(reloaded).toBe(1);
   });
 });
 

@@ -31,7 +31,7 @@ src/core      ラップ検出・セクター・速度/加減速の計算など�
 src/store     読み込んだログ・A〜D の割り当て・設定(Session / Prefs)。Session は 5 つの WorkSet(比較セット1〜5)を持ち、activeIndex が比較に出るセット
 src/io        保存先の抽象化(KeyValueStore: localStorage / Electron のファイル)
 src/ui        画面(app / helpView / importView / compareView / settingsView ...)と地図(trackMap)
-electron/     デスクトップ版(main / preload / 設定ファイルの保存)。CommonJS(.cjs)
+electron/     デスクトップ版(main / preload / 設定ファイルと地図の保存)。CommonJS(.cjs)
 tests/        テスト。tests/helpers.ts に、地図の代わりの FakeMap がある
 fixtures/     走行ログ置き場。公開しないので空(.gitkeep と README.md だけ)
 ```

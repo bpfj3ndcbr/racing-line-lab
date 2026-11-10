@@ -1,8 +1,9 @@
 'use strict';
-const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, net, protocol, shell } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const { FileStore } = require('./fileStore.cjs');
+const { TileCache, serveTile, prefetchTiles } = require('./tileCache.cjs');
 
 // 開発時: `npm run dev` で起動した Vite のアドレスを ELECTRON_DEV_URL に入れると、そこを開く
 // 保存先はアプリ名に左右されないよう固定する(開発時と配布版で同じ場所になる)
@@ -11,6 +12,13 @@ app.setPath('userData', path.join(app.getPath('appData'), APP_NAME));
 
 const DEV_URL = process.env.ELECTRON_DEV_URL || '';
 let store;
+let tiles;
+
+// 地図の保存(案件 2): 地図の画像は rll-tile://tile/{z}/{x}/{y}.jpg で受け取り、保存範囲の中なら保存する。
+// 独自の通り道は、app の準備ができる前に登録する
+protocol.registerSchemesAsPrivileged([{ scheme: 'rll-tile', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
+/** 地理院から取る(15 秒で諦める) */
+const fetchUpstream = (url) => net.fetch(url, { signal: AbortSignal.timeout(15000) });
 let win = null;
 
 function createWindow() {
@@ -63,6 +71,18 @@ app.whenReady().then(() => {
       return fs.readFileSync(p, 'utf8');
     } catch { return null; }
   });
+
+  // 地図の保存(案件 2)。保存先はユーザーデータ内の tiles フォルダ
+  tiles = new TileCache(path.join(app.getPath('userData'), 'tiles'));
+  protocol.handle('rll-tile', async (req) => {
+    const r = await serveTile(tiles, fetchUpstream, req.url);
+    return new Response(r.body, { status: r.status, headers: r.body ? { 'content-type': 'image/jpeg', 'cache-control': 'no-store' } : {} });
+  });
+  ipcMain.handle('tiles:set-areas', (_e, areas) => { tiles.setAreas(areas); return true; });
+  ipcMain.handle('tiles:list', () => tiles.list());
+  ipcMain.handle('tiles:remove', (_e, list) => tiles.remove(list));
+  ipcMain.handle('tiles:clear', () => { tiles.clear(); return true; });
+  ipcMain.handle('tiles:prefetch', (_e, list) => prefetchTiles(tiles, fetchUpstream, list));
 
   createWindow();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });

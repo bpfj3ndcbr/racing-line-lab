@@ -85,7 +85,7 @@ npm run build        # 型チェック + ビルド(dist/)
 | `ui.setAliases` / `ui.slotAliases` | 比較セットの別名 / カード(セットごとの A〜D)の別名 |
 | `ui.guideClosed` / `ui.guideSeen` | はじめかたの表示状態 |
 | `ui.setsView` | 「データ管理」の比較セットの並べ方(`tabs` / `list`) |
-| `ui.mapAreas` | 地図の保存範囲(Web 版のみ。Z18 のタイルの区切りにそろえた四角 `x0`〜`x1`・`y0`〜`y1` と名前) |
+| `ui.mapAreas` | 地図の保存範囲(Z18 のタイルの区切りにそろえた四角 `x0`〜`x1`・`y0`〜`y1` と名前) |
 
 保存の形式を変えるときは、古い形式を読み替える処理を足すか、版を上げて初期値に戻してください。
 
@@ -114,6 +114,15 @@ Web 版は PWA です(`public/manifest.webmanifest`、`src/sw/sw.ts`、`src/io/p
 - 同じ画面の中では、一度表示した地図をブラウザが使い回し、service worker を通らないことがあります。そのため、範囲を決める画面(`src/ui/areaEditor.ts`)で見えていた地図は、範囲を追加したときに画面から保存します。
 - 保存したタイルには、容量の表示のため、見出し `x-rll-bytes` を付けています。保存した応答は `Vary: Origin` が付いていても返せるよう、`cache.match` に `ignoreVary` を付けています。
 
+### デスクトップ版の地図の保存
+
+デスクトップ版は service worker を使わず、メイン側で同じ決まり(保存範囲の中の Z15〜Z18 を、表示したときに保存。保存済みを優先)で保存します(`electron/tileCache.cjs`。Electron に依存させず、node のテストで動かします)。
+
+- 画面は、窓口に `window.rllNative.tileUrl`(`rll-tile://tile/{z}/{x}/{y}.jpg`)があれば、地理院の URL の代わりにそれを使います(`src/ui/trackMap.ts` の `tileUrlTemplate`)。メイン側は `protocol.handle('rll-tile', …)` で答え、取得先は地理院に固定です(画面から取得先を指定させない。URL は数字だけを取り出して確かめる)。
+- 保存先は、ユーザーデータの `tiles/{z}/{x}/{y}.jpg` です(一時ファイルに書いてから置き換える)。取れなかったタイル(ネットが無いなど)は保存せず、画面では空白になります。
+- 画面からの操作(保存範囲を渡す・一覧・削除・概略の地図の先読み・すべて削除)は、`src/io/tileStore.ts` の `openNativeTileStore` が窓口(`tilesSetAreas` など。IPC `tiles:*`)を呼びます。設定画面は Web 版と同じものを使い、「保存したデータを消されにくくする」だけは押せません(`TileStore.durable`)。
+- preload は sandbox で動き、自前のファイルを読めないので、`tileUrl` の値は `electron/tileCache.cjs` の `TILE_URL` から書き写しています(同じであることをテストで確かめる)。
+
 ## 比較画面の再生
 
 速度グラフの横軸が「時間」のときは、全車が同じ経過時間の位置に出ます。「距離」のときは、基準の車(いちばん若い枠)の時間で進め、ほかの車は基準の車と同じ距離の位置に出ます(`src/ui/compareView.ts` の `updateFrame`)。
@@ -126,7 +135,7 @@ Web 版は PWA です(`public/manifest.webmanifest`、`src/sw/sw.ts`、`src/io/p
 src/core      ラップ検出・セクター・速度/加減速の計算など(画面に依存しない)
 src/store     読み込んだログ・割り当て・設定の状態(Session は 5 つの比較セットを持つ)
 src/ui        画面(使い方 / データ管理 / 比較 / 設定)と地図
-electron/     デスクトップ版(main / preload / 設定ファイルの保存)
+electron/     デスクトップ版(main / preload / 設定ファイルと地図の保存)
 tests/        テスト(vitest)
 docs/images/  README.md のスクリーンショット
 ```

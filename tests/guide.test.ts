@@ -61,9 +61,15 @@ describe('.vbo のドロップ', () => {
     expect(e1.defaultPrevented && e2.defaultPrevented && e3.defaultPrevented).toBe(true);
   });
 
-  it('.vbo 以外は追加せず、案内を出す', async () => {
+  it('.vbo 以外は追加せず、確認の画面と案内を出す(案件 29)', async () => {
     drop($('#sec-set-0 .dropbox'), [file('a.vbo', vbo), file('memo.txt', 'x')]);
     await flush();
+    const modal = document.querySelector<HTMLElement>('.modal')!;
+    expect(modal.textContent).toContain('読み込めるのは .vbo ファイルだけです');
+    expect(modal.textContent).toContain('「memo.txt」は追加しませんでした。');
+    expect(session.sets[0].logs).toHaveLength(0);                  // 閉じるまでは読み込まない
+    modal.querySelector<HTMLButtonElement>('[data-dialog="ok"]')!.click();
+    await flush(); await flush();
     expect(session.sets[0].logs).toHaveLength(1);
     expect($('#msg').textContent).toContain('1 件は .vbo ではないため追加しませんでした');
   });

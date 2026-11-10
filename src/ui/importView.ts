@@ -6,6 +6,7 @@ import { mountCircuitEditor, type CircuitEditor } from './circuitEditor';
 import { candidateLabel, loadDialog, planLoad } from './loadDialog';
 import { mountCorrectView, type CorrectView } from './correctView';
 import { alertDialog, promptDialog } from './dialog';
+import { hasExt, wrongExtMessage } from './fileKind';
 import type { MapFactory } from './mapTypes';
 import { SHOWN_MARK } from './marks';
 import type { ThemeController } from './theme';
@@ -626,11 +627,16 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
 
   /** .vbo だけを選んで、そのセットに追加する(2 つ以上なら、ベストラップを空き枠に順に割り当てる) */
   async function addFiles(files: File[], set: number) {
-    const vbo = files.filter((f) => /\.vbo$/i.test(f.name));
-    const skipped = files.length - vbo.length;
+    const vbo = files.filter((f) => hasExt(f.name, '.vbo'));
+    const skipped = files.filter((f) => !hasExt(f.name, '.vbo'));
+    // .vbo 以外は、確認の画面で知らせる(スマホの幅では、上の案内欄が画面の外にあって見えないため。案件 29)
+    if (skipped.length) {
+      const names = skipped.slice(0, 5).map((f) => `「${f.name}」`).join('、') + (skipped.length > 5 ? ` ほか ${skipped.length - 5} 件` : '');
+      await alertDialog({ title: '読み込めるのは .vbo ファイルだけです', detail: `${names}は追加しませんでした。` });
+    }
     const before = new Set((session.sets[set]?.logs ?? []).map((l) => l.id));
     if (vbo.length) await session.addVboFiles(vbo.map((file) => ({ file, path: window.rllNative?.getPathForFile(file) || undefined })), set);
-    if (skipped) session.say(`${skipped} 件は .vbo ではないため追加しませんでした。`);
+    if (skipped.length) session.say(`${skipped.length} 件は .vbo ではないため追加しませんでした。`);
     const added = (session.sets[set]?.logs ?? []).filter((l) => !before.has(l.id)).map((l) => l.id);
     if (added.length) await checkLoaded(set, added, before.size === 0, undefined, true);
   }
@@ -774,11 +780,20 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
     if (t.classList.contains('lap-end-range')) {
       session.setLapEnd(t.dataset.log!, Number(t.dataset.lap), endFromStep(Number((t as HTMLInputElement).value), Number(t.dataset.max)));
     }
+    // コントロールライン・セクターの欄: 種類の違うファイルは、選んだ時点で外す(案件 29)
+    if (t.id === 'c-cln' || t.id === 'c-sci') {
+      const f = (t as HTMLInputElement).files?.[0];
+      const ext = t.id === 'c-cln' ? '.cln' : '.sci';
+      if (f && !hasExt(f.name, ext)) { (t as HTMLInputElement).value = ''; $('c-msg').textContent = wrongExtMessage(f.name, ext); }
+      else if (f) $('c-msg').textContent = '';
+    }
     if (t.id === 'reload-input') {
       const f = reloadInput.files?.[0];
       const target = reloadTarget;
       reloadInput.value = '';
-      if (f && target) {
+      const ext = target?.kind === 'control' ? '.cln' : '.sci';
+      if (f && target && !hasExt(f.name, ext)) listMsg.textContent = wrongExtMessage(f.name, ext);
+      else if (f && target) {
         const text = await f.text();
         const r = target.kind === 'control' ? session.reloadControl(target.id, text) : session.reloadSectors(target.id, text);
         listMsg.textContent = r.message;
@@ -787,7 +802,8 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
     if (t.id === 'offsets-input') {
       const f = offsetsInput.files?.[0];
       offsetsInput.value = '';
-      if (f) session.importOffsets(await f.text());
+      if (f && !hasExt(f.name, '.json')) session.say(wrongExtMessage(f.name, '.json'));
+      else if (f) session.importOffsets(await f.text());
     }
     if (t.id === 'vbo-input') {
       const files = Array.from(vboInput.files ?? []);
