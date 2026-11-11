@@ -424,11 +424,14 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   function renderLegend() {
     const lg = $('cmp-legend');
     lg.hidden = mapMode === 'line';
+    // 凡例は地図の左下の細い帯(案件 42)。出ている間は、地図の拡大・縮小のボタンをその上へ上げる
+    root.querySelector('.cmp-map')!.classList.toggle('has-legend', mapMode !== 'line');
     if (mapMode === 'line') return;
     const speed = mapMode === 'speed';
     $('cmp-leg-bar').className = `legend-bar ${speed ? 'speed' : 'accel'}`;
-    $('cmp-leg-lo').textContent = speed ? `低速 ${range.lo}` : '減速';
-    $('cmp-leg-hi').textContent = speed ? `${range.hi} km/h 高速` : '加速';
+    // 狭い幅では「低速」「高速」(さらに狭ければ km/h も)を隠し、出典の表示に重ならないようにする(CSS)
+    $('cmp-leg-lo').innerHTML = speed ? `<span class="lg-word">低速 </span>${range.lo}` : '減速';
+    $('cmp-leg-hi').innerHTML = speed ? `${range.hi}<span class="lg-unit"> km/h</span><span class="lg-word"> 高速</span>` : '加速';
     lg.setAttribute('aria-label', speed ? `速度の色分け(全車共通): ${range.lo} から ${range.hi} km/h` : '加速と減速の色分け(全車共通)');
   }
 

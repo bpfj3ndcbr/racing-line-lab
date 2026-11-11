@@ -167,6 +167,21 @@ describe('走行ライン / ヒートマップ(速度) / 加減速 の切り替�
     expect($<HTMLElement>('#cmp-legend').hidden).toBe(true);
   });
 
+  it('凡例は地図の左下の細い帯(案件 42): 出ている間は地図に印(has-legend。拡大・縮小のボタンを上げる)。狭い幅で隠す語は別の要素', () => {
+    setupOne();
+    const mapEl = $('.cmp-map');
+    expect(mapEl.classList.contains('has-legend')).toBe(false);
+    mode('speed').click();
+    expect(mapEl.classList.contains('has-legend')).toBe(true);
+    expect($('#cmp-leg-lo .lg-word').textContent).toBe('低速 ');
+    expect($('#cmp-leg-hi .lg-unit').textContent).toBe(' km/h');
+    expect($('#cmp-leg-hi .lg-word').textContent).toBe(' 高速');
+    mode('accel').click();
+    expect(mapEl.classList.contains('has-legend')).toBe(true);
+    mode('line').click();
+    expect(mapEl.classList.contains('has-legend')).toBe(false);
+  });
+
   it.skipIf(!existsSync(bigPath))('色は全車で共通: 同じ速度・同じ加速度なら、どの車でも同じ色になる', () => {
     setupTwo();
     for (const m of ['speed', 'accel']) {

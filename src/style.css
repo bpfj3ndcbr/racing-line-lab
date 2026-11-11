@@ -7,6 +7,8 @@
   color-scheme: light;
   --bg: #e8ecf1;           /* ページ背景 */
   --bar: #dde2e9;          /* 上部バー・割り当て欄の背景 */
+  --map-strip-bg: rgba(255,255,255,.8);   /* 地図の下端の細い帯(凡例)。出典(Leaflet)の帯と同じ見た目で、テーマでは変えない */
+  --map-strip-fg: #333;
   --surface: #ffffff;      /* カード・表の背景 */
   --surface-2: #eef1f5;    /* 表の見出し・ファイル見出し */
   --sec-bg: #f4f6f9;       /* セクション枠の中 */
@@ -351,10 +353,13 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .ov-sublist button{padding-left:26px}
 .map-secs{display:none}
 .corr-pad-map{display:none}
-.map-legend{position:absolute;z-index:1100;right:10px;bottom:34px;display:flex;align-items:center;gap:8px;padding:4px 10px;
-  font-size:11px;font-weight:700;color:var(--text);background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r-s)}
+/* 速度・加減速の凡例(案件 42): 地図の左下の細い帯。右下の出典(地理院タイル)の帯と同じ高さ・同じ見た目にして、地図をできるだけ隠さない。
+   出典は消さない・隠さない(AGENTS.md)。狭い幅では文字を減らして、出典の左に収める。万一重なっても出典(Leaflet の部品は 1000)が手前 */
+.map-legend{position:absolute;z-index:900;left:0;bottom:0;display:flex;align-items:center;gap:5px;height:17px;padding:0 6px;
+  font-size:11px;font-weight:700;line-height:1;white-space:nowrap;color:var(--map-strip-fg);background:var(--map-strip-bg);border-radius:0 3px 0 0}
 .map-legend[hidden]{display:none}
-.legend-bar{display:block;width:140px;height:10px;border-radius:2px}
+.legend-bar{display:block;width:64px;height:6px;border-radius:2px}
+.cmp-map.has-legend .leaflet-bottom.leaflet-left .leaflet-control-zoom{margin-bottom:24px}
 .legend-bar.accel{background:linear-gradient(90deg,rgb(255,59,48),rgb(231,137,132) 25%,rgb(208,214,222) 50%,rgb(127,209,164) 75%,rgb(46,204,113))}
 .legend-bar.speed{background:linear-gradient(90deg,rgb(68,1,84),rgb(59,82,139) 25%,rgb(33,145,140) 50%,rgb(94,201,98) 75%,rgb(253,231,37))}
 
@@ -862,6 +867,9 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
    スマホ(縦向き)や、幅の狭いウィンドウ(767px まで。案件 1)。パソコンの幅の見た目は変えない
    ========================================================================== */
 @media (max-width:767px){
+  .map-legend .lg-word{display:none}           /* 凡例は「50 ▬ 180 km/h」だけにして、出典の左に収める(案件 42) */
+  .map-legend{gap:4px;padding:0 4px;font-size:10px}
+  .legend-bar{width:22px}
   /* 上部バー: 1 行目にロゴ・テーマ・About、2 行目にタブ(折り返さない)。サーキット名は出さない */
   .top{flex-wrap:wrap;gap:6px 8px;padding:6px 10px;min-height:0}
   .brand-txt{display:none}
@@ -982,4 +990,11 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
   .circ-form .frow input[type=text]{max-width:none}
   .circ-form .frow input[type=file]{max-width:100%}
   .circ-form .btn-row .btn{width:100%;justify-content:center}
+}
+
+/* さらに狭い幅(320px など): 凡例の km/h も隠す(出典の帯に重ならないように。案件 42) */
+@media (max-width:359px){
+  .map-legend .lg-unit{display:none}
+  .map-legend{gap:3px;padding:0 3px}
+  .legend-bar{width:14px}
 }
