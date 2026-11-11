@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeAll, describe, expect, it } from 'vitest';
-import { createLeafletMap, tileUrlTemplate } from '../src/ui/trackMap';
+import { createLeafletMap, panNeeded, tileUrlTemplate } from '../src/ui/trackMap';
 
 /** Leaflet 実体の煙試験(jsdom には画面の大きさが無いので、例外なく動くことだけを見る) */
 describe('Leaflet の地図アダプタ', () => {
@@ -41,6 +41,33 @@ describe('Leaflet の地図アダプタ', () => {
     m.setTracks([]);
     await new Promise((r) => setTimeout(r, 50));     // Leaflet の再描画(次フレーム)が済んでから片付ける
     m.destroy();
+  });
+
+  it('再生中に向きとラベルが同じなら、三角形・引き出し線・文字を書き直さない(案件 36)', () => {
+    const el = document.createElement('div');
+    document.body.appendChild(el);
+    const m = createLeafletMap(el);
+    const car = { slot: 'A' as const, lat: 33.035, lon: 130.975, heading: 90.2, label: '120kph' };
+    m.setCars([car]);
+    const watched = [el.querySelector('.car-tri')!, el.querySelector('.lbl-line line')!, el.querySelector('.lbl-txt')!];
+    expect(watched.every(Boolean)).toBe(true);
+    const mo = new MutationObserver(() => {});
+    for (const w of watched) mo.observe(w, { attributes: true, characterData: true, childList: true, subtree: true });
+    m.setCars([{ ...car, lat: 33.0351, heading: 89.8 }]);       // 位置は動いたが、向き(整数)とラベルは同じ
+    expect(mo.takeRecords()).toHaveLength(0);
+    m.setCars([{ ...car, heading: 180, label: '121kph' }]);      // 向きとラベルが変われば書く
+    expect(mo.takeRecords().length).toBeGreaterThan(0);
+    mo.disconnect();
+    m.destroy();
+  });
+});
+
+describe('追従で地図を動かすかどうか(案件 36)', () => {
+  it('Leaflet と同じく、ずれを整数に切り捨てて 0 なら動かさない', () => {
+    expect(panNeeded(0, 0)).toBe(false);
+    expect(panNeeded(0.9, -0.9)).toBe(false);
+    expect(panNeeded(1, 0)).toBe(true);
+    expect(panNeeded(0, -1.2)).toBe(true);
   });
 });
 

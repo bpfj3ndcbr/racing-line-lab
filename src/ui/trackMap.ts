@@ -31,6 +31,14 @@ const carIcon = (slot: Slot) => L.divIcon({
   iconAnchor: [CAR_SIZE / 2, CAR_SIZE / 2],
 });
 
+/**
+ * 地図の中心を、画面上で (dx, dy) 画素ずらす必要があるか。Leaflet の panTo は、ずれを整数に切り捨ててから動かす
+ * (1 画素未満は動かない)ので、切り捨てて 0 なら動かさなくても見た目は同じ
+ */
+export function panNeeded(dx: number, dy: number): boolean {
+  return Math.trunc(dx) !== 0 || Math.trunc(dy) !== 0;
+}
+
 /** 引き出し線と文字。向きは進行方向で変わるので、線と文字の位置は setCars のたびに DOM で更新する */
 const labelIcon2 = (slot: Slot) => L.divIcon({
   className: `car-lbl car-lbl-${slot.toLowerCase()}`,
@@ -185,7 +193,9 @@ export const createLeafletMap: MapFactory = (el): TrackMap => {
         }
         // 三角形を進行方向へ向ける
         const tri = m.getElement()?.querySelector<SVGElement>('.car-tri');
-        if (tri) tri.style.transform = `rotate(${Math.round(c.heading)}deg)`;
+        // 再生中は毎コマ呼ばれるので、どれも値が変わったときだけ書く(案件 36)
+        const rot = `rotate(${Math.round(c.heading)}deg)`;
+        if (tri && tri.style.transform !== rot) tri.style.transform = rot;
         // 引き出し線と文字(画面上の位置は車からの一定のずれなので、地図を動かしても付いてくる)
         let lm = labels.get(c.slot);
         if (c.label === undefined) { if (lm) { lm.remove(); labels.delete(c.slot); } continue; }
@@ -199,15 +209,22 @@ export const createLeafletMap: MapFactory = (el): TrackMap => {
         if (txt && txt.textContent !== c.label) txt.textContent = c.label;
         const [dx, dy] = labelOffset(c.slot, c.heading);
         const ln = el?.querySelector<SVGLineElement>('line');
-        if (ln) { ln.setAttribute('x2', String(dx)); ln.setAttribute('y2', String(dy)); }
-        if (txt) {
+        if (ln && (ln.getAttribute('x2') !== String(dx) || ln.getAttribute('y2') !== String(dy))) {
+          ln.setAttribute('x2', String(dx)); ln.setAttribute('y2', String(dy));
+        }
+        if (txt && (txt.style.left !== `${dx}px` || txt.style.top !== `${dy}px`)) {
           txt.style.left = `${dx}px`; txt.style.top = `${dy}px`;
           txt.style.transform = `translate(${dx < -8 ? '-100%' : dx > 8 ? '0' : '-50%'},${Math.abs(dx) <= 8 ? (dy < 0 ? '-100%' : '0') : '-50%'})`;
         }
       }
       for (const [slot, lm] of labels) if (!live.has(slot)) { lm.remove(); labels.delete(slot); }
     },
-    setCenter(lat: number, lon: number) { map.panTo(L.latLng(lat, lon), { animate: false }); },
+    setCenter(lat: number, lon: number) {
+      // 1 画素も動かないときは何もしない(Leaflet は動かなくても moveend を出し、線をすべて描き直すため。案件 36)
+      const p = map.latLngToContainerPoint(L.latLng(lat, lon)), size = map.getSize();
+      if (!panNeeded(p.x - size.x / 2, p.y - size.y / 2)) return;
+      map.panTo(L.latLng(lat, lon), { animate: false });
+    },
     onUserDrag(cb: () => void) { map.on('dragstart', cb); },
     fit() { const b = bounds ?? lineBounds; if (b) map.fitBounds(b, { padding: [32, 32], maxZoom: 18, animate: false }); },
     setView(lat, lon, zoom) { map.setView([lat, lon], zoom, { animate: false }); },
