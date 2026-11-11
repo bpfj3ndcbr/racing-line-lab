@@ -715,10 +715,12 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   function loop(now: number) {
     raf = 0;
     if (!engine.playing) return;
-    const dt = Math.min((now - last) / 1000, 0.1);
+    const dt = Math.min(Math.max(now - last, 0) / 1000, 0.1);
     last = now;
+    // 次のコマを、tick の前に予約する。tick の通知(下の subscribe)で再生の開始と見なされて
+    // last が今の時刻に書き換わると、描画にかかった時間の分だけ再生の時計が遅れるため。
+    raf = requestAnimationFrame(loop);
     engine.tick(dt);
-    if (engine.playing && !raf) raf = requestAnimationFrame(loop);
   }
   engine.subscribe(() => {
     updateFrame();
