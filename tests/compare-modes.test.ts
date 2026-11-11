@@ -141,7 +141,7 @@ describe('走行ライン / ヒートマップ(速度) / 加減速 の切り替�
     expect($('#cmp-leg-bar').classList.contains('speed')).toBe(true);
     expect($('#cmp-leg-lo').textContent).toMatch(/^低速 \d+$/);
     expect($('#cmp-leg-hi').textContent).toMatch(/^\d+ km\/h 高速$/);
-    expect(mode('speed').getAttribute('aria-pressed')).toBe('true');
+    expect(mode('speed').getAttribute('aria-checked')).toBe('true');
   });
 
   it('加減速: 加速・減速で色分け。凡例は「減速 ⇔ 加速」', () => {
@@ -204,7 +204,7 @@ describe('走行ライン / ヒートマップ(速度) / 加減速 の切り替�
     session.toggleAssignment('A', { logId: 'u', lap: 1 });
     goCompare();
     expect(fake.tracks[0].heat).toBeDefined();
-    expect(mode('accel').getAttribute('aria-pressed')).toBe('true');
+    expect(mode('accel').getAttribute('aria-checked')).toBe('true');
   });
 });
 
@@ -213,7 +213,7 @@ describe('地図の追従', () => {
     setupOne();
     seekTo(30);
     expect(fake.centers).toHaveLength(0);
-    expect(followBtn('fixed').getAttribute('aria-pressed')).toBe('true');
+    expect(followBtn('fixed').getAttribute('aria-checked')).toBe('true');
   });
 
   it('割り当てが無い枠(B〜D)への追従は選べない', () => {
@@ -237,7 +237,7 @@ describe('地図の追従', () => {
     setupOne();
     followBtn('A').click();
     fake.userDrags();
-    expect(followBtn('fixed').getAttribute('aria-pressed')).toBe('true');
+    expect(followBtn('fixed').getAttribute('aria-checked')).toBe('true');
     const n = fake.centers.length;
     seekTo(60);
     expect(fake.centers).toHaveLength(n);
@@ -269,6 +269,42 @@ describe('地図の追従', () => {
     }
   });
 
+  it('表示位置はメニュー(案件 41): ボタンには今の表示位置。押すと開き、選ぶと閉じてボタンの文字が変わる', () => {
+    setupOne();
+    const btn = $<HTMLButtonElement>('#cmp-follow-btn'), list = $('#cmp-follow-list');
+    expect(btn.textContent).toBe('表示位置: 固定 ▾');
+    expect(list.hidden).toBe(true);
+    expect(Array.from(list.querySelectorAll('[data-act="follow"]')).map((b) => b.textContent)).toEqual(['固定', '先頭追従', 'AA を追従', 'BB を追従', 'CC を追従', 'DD を追従']);
+    expect(list.querySelectorAll('.ov-ico, .chip')).toHaveLength(6);                // どの行にも同じ幅の印(アイコン / A〜D の丸)があり、文字の頭がそろう
+    btn.click();
+    expect(list.hidden).toBe(false);
+    expect(btn.getAttribute('aria-expanded')).toBe('true');
+    expect(btn.textContent).toBe('表示位置: 固定 ▴');
+    followBtn('A').click();
+    expect(list.hidden).toBe(true);
+    expect(btn.getAttribute('aria-expanded')).toBe('false');
+    expect(btn.textContent).toBe('表示位置: A ▾');
+    expect(followBtn('A').classList.contains('on')).toBe(true);
+    fake.userDrags();                                  // 地図を動かして固定に戻ると、ボタンの文字も戻る
+    expect(btn.textContent).toBe('表示位置: 固定 ▾');
+  });
+
+  it('メニューは、もう一度ボタンを押す・外を押す・Esc で閉じる(選び直しはしない)', () => {
+    setupOne();
+    const btn = $<HTMLButtonElement>('#cmp-follow-btn'), list = $('#cmp-follow-list');
+    btn.click(); btn.click();
+    expect(list.hidden).toBe(true);
+    btn.click();
+    $('#cmp-time').dispatchEvent(new Event('pointerdown', { bubbles: true }));
+    expect(list.hidden).toBe(true);
+    btn.click();
+    list.dispatchEvent(new Event('pointerdown', { bubbles: true }));      // メニューの中を押しても閉じない
+    expect(list.hidden).toBe(false);
+    press(document.body, 'Escape');
+    expect(list.hidden).toBe(true);
+    expect(followBtn('fixed').getAttribute('aria-checked')).toBe('true');
+  });
+
   it('割り当てを外すと、その枠への追従は固定に戻る', () => {
     setupOne();
     followBtn('A').click();
@@ -276,7 +312,7 @@ describe('地図の追従', () => {
     session.toggleAssignment('A', { logId: 'u', lap: 1 });
     session.toggleAssignment('B', { logId: 'u', lap: 1 });
     goCompare();
-    expect(followBtn('fixed').getAttribute('aria-pressed')).toBe('true');
+    expect(followBtn('fixed').getAttribute('aria-checked')).toBe('true');
   });
 });
 

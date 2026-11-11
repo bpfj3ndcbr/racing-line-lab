@@ -328,8 +328,28 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .map-ov{position:absolute;z-index:1100}
 .map-ov.tl{left:10px;top:10px}
 .map-ov.tr{right:10px;top:10px}
+/* 地図の上のメニュー(案件 41。左上「表示位置」・右上「表示」。どの幅でも同じ)。下のセクターボタン(1100)より手前に出す */
+.map-ov.ov-menu{z-index:1150;display:flex;flex-direction:column;gap:4px}
+.map-ov.tl.ov-menu{align-items:flex-start}
+.map-ov.tr.ov-menu{align-items:flex-end}
+.ov-menu-btn{font-weight:700}
+.ov-list{display:flex;flex-direction:column;gap:2px;min-width:170px;padding:4px;background:var(--surface);
+  border:1px solid var(--border-strong);border-radius:var(--r-s);box-shadow:0 4px 14px rgba(0,0,0,.3)}
+.ov-list button{display:flex;align-items:center;gap:8px;width:100%;height:32px;padding:0 10px;border:0;border-radius:var(--r-s);
+  font:inherit;font-size:12px;text-align:left;color:var(--text);background:transparent;cursor:pointer}
+.ov-list button[role="menuitemradio"]::before{content:'✓';width:12px;flex:none;font-weight:700;visibility:hidden}
+.ov-list button.on::before{visibility:visible}
+.ov-list button:hover:not(:disabled){background:var(--surface-2)}
+.ov-list button.on,.ov-list button.on:hover{background:var(--accent);color:var(--accent-on)}
+.ov-list button:disabled{opacity:.45;cursor:default}
+.ov-list .chip,.ov-ico{width:18px;height:18px;font-size:10px}
+.ov-ico{display:inline-flex;align-items:center;justify-content:center;flex:none}
+.ov-sep{height:1px;margin:2px 4px;background:var(--border)}
+.ov-list .ov-sub{justify-content:space-between;padding-left:30px;font-weight:700}
+.ov-sublist{display:flex;flex-direction:column;gap:2px}
+.ov-sublist[hidden]{display:none}
+.ov-sublist button{padding-left:26px}
 .map-secs{display:none}
-.cmp-view-menu{display:none}
 .corr-pad-map{display:none}
 .map-legend{position:absolute;z-index:1100;right:10px;bottom:34px;display:flex;align-items:center;gap:8px;padding:4px 10px;
   font-size:11px;font-weight:700;color:var(--text);background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r-s)}
@@ -936,14 +956,10 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
   .side-graph{height:230px;order:-1;border-bottom:1px solid var(--border-strong)}   /* 速度グラフを地図のすぐ下に(地図と一緒に見られるように) */
   .cmp-cards{display:grid;grid-template-columns:1fr 1fr}
   .cmp-cards .card{min-height:48px;padding:4px 8px;gap:8px}
-  /* 地図の上は 1 行: 左に「固定・先頭追従・A〜D」(小さく)、右に「表示 ▾」(押すと走行ラインの表示・ラベルが開く) */
+  /* 地図の上は 1 行: 左に「表示位置 ▾」、右に「表示 ▾」(案件 41。メニューの作りは広い幅と同じ。ここでは寸法だけ) */
   .cmp-map .map-ov.tl{left:8px;top:8px}
-  .cmp-map .map-ov.tl .seg.sm button{padding:0 7px;height:30px;min-height:30px}
-  .cmp-map .map-ov.tr{right:8px;top:8px;display:flex;flex-direction:column;align-items:flex-end;gap:4px}
-  .cmp-map .map-ov.tr>.seg{display:none}
-  .cmp-map .map-ov.tr.open>.seg{display:inline-flex}
-  .cmp-map .map-ov.tr .seg.sm button{height:30px;min-height:30px}
-  .cmp-view-menu{display:inline-flex;min-height:30px;height:30px;padding:0 10px;font-size:11px}
+  .cmp-map .map-ov.tr{right:8px;top:8px}
+  .cmp-map .ov-menu-btn{min-height:30px;height:30px;padding:0 10px;font-size:11px}
   .map-secs{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end;left:56px;right:8px;bottom:26px}
   .map-secs .btn.sec{min-height:32px;height:32px;min-width:38px;padding:0 6px;font-size:12px;justify-content:center}
   .map-secs .btn.sec[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-on);font-weight:700}
