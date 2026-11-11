@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest';
 import { GRAPH_LEFT, GRAPH_RIGHT, SpeedGraph, labelRows } from '../src/ui/speedGraph';
+import { LONG_PRESS_SCROLL_EVENT } from '../src/ui/longPressScroll';
 
 const X_MAX = 4700;
 const series = (slot: 'A' | 'B', k: number) => {
@@ -248,5 +249,18 @@ describe('非表示にした車は薄く表示する', () => {
     expect(host.querySelector('.g-line[data-slot="A"]')!.classList.contains('muted')).toBe(true);
     g.setMuted(new Set());
     expect(host.querySelector('.g-line[data-slot="A"]')!.classList.contains('muted')).toBe(false);
+  });
+});
+
+describe('長押しで画面のスクロールになったとき(案件 44)', () => {
+  it('触れた瞬間に動かした再生位置を、触れる前(2350m)に戻し、そのあとの指の動きでは動かさない', () => {
+    const svg = host.querySelector('svg.speed-graph')!;
+    pointer(svg, 'pointerdown', GRAPH_LEFT + 10);                     // 1× なので、触れた位置へ動く
+    expect(seeks[seeks.length - 1]).toBeLessThan(1000);
+    svg.dispatchEvent(new Event(LONG_PRESS_SCROLL_EVENT, { bubbles: true }));
+    expect(seeks[seeks.length - 1]).toBe(2350);
+    const n = seeks.length;
+    pointer(svg, 'pointermove', GRAPH_LEFT + 200);
+    expect(seeks).toHaveLength(n);
   });
 });

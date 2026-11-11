@@ -11,6 +11,7 @@ import type { HeatRun, MapFactory, TrackMap } from './mapTypes';
 import type { ThemeController } from './theme';
 import { SHOWN_MARK } from './marks';
 import { nearAnyRect } from './mapPointer';
+import { installLongPressScroll } from './longPressScroll';
 
 /**
  * series: ラップの時系列(距離は速度の積み上げ)。
@@ -260,6 +261,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   });
   const relayout = () => { applyLayout(); sideSplit.refresh(); graphSplit.refresh(); };
 
+  installLongPressScroll(root);   // 長押ししてから縦になぞると、画面をスクロールする(地図・グラフの上でも。案件 44)
   const graph: SpeedGraph = new SpeedGraph($('cmp-graph'), (v) => {
     const r = ref();
     if (!r) return;

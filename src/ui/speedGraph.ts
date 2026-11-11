@@ -1,4 +1,5 @@
 import { type Slot, fmtMinSec } from '../core';
+import { LONG_PRESS_SCROLL_EVENT } from './longPressScroll';
 
 const NS = 'http://www.w3.org/2000/svg';
 export const GRAPH_LEFT = 26, GRAPH_RIGHT = 8;
@@ -67,6 +68,8 @@ export class SpeedGraph {
   private zoomK = 1;
   private viewStart = 0;
   private cursorX: number | null = null;
+  /** 指・マウスで触れる前の再生位置(長押しでスクロールになったときに戻す。案件 44) */
+  private cursorBeforeTouch: number | null = null;
   private lastInside = true;
   private dotsData: CursorDot[] = [];
   private muted = new Set<Slot>();
@@ -98,6 +101,7 @@ export class SpeedGraph {
     // グラフ上: 1× のときはインジケータが動く(押した位置へ、ドラッグで追従)。
     // 拡大中はインジケータが中央に固定され、ドラッグでグラフが動く(再生位置を前後させる)。クリックはその位置へ移動。
     this.svg.addEventListener('pointerdown', ((e: MouseEvent) => {
+      this.cursorBeforeTouch = this.cursorX;
       this.seeking = true;
       this.dragMoved = false;
       this.dragStartX = e.clientX;
@@ -131,6 +135,7 @@ export class SpeedGraph {
 
     // ルーラー: 表示範囲の移動
     this.rulerSvg.addEventListener('pointerdown', ((e: MouseEvent) => {
+      this.cursorBeforeTouch = this.cursorX;
       try { this.rulerSvg.setPointerCapture((e as PointerEvent).pointerId); } catch { /* 無視 */ }
       const px = this.rulerPx(e.clientX);
       const thumbX = this.bx(this.clampStart(this.viewStart)), thumbW = this.plotW / this.zoomK;
@@ -144,6 +149,15 @@ export class SpeedGraph {
     const rup = () => { this.rulerDrag = null; };
     this.rulerSvg.addEventListener('pointerup', rup);
     this.rulerSvg.addEventListener('pointercancel', rup);
+
+    // 長押しのあと縦になぞって画面のスクロールになったら、触れた瞬間に動かした再生位置を戻し、操作をやめる(案件 44)
+    const undoTouch = () => {
+      this.seeking = false;
+      this.rulerDrag = null;
+      if (this.cursorBeforeTouch !== null) this.seekTo(this.cursorBeforeTouch);
+    };
+    this.svg.addEventListener(LONG_PRESS_SCROLL_EVENT, undoTouch);
+    this.rulerSvg.addEventListener(LONG_PRESS_SCROLL_EVENT, undoTouch);
 
     if (typeof ResizeObserver === 'function') {
       this.ro = new ResizeObserver(() => this.resize());
