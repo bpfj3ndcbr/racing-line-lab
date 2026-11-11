@@ -608,8 +608,10 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
 
   // ---------- 1コマごとの更新 ----------
   const fmtPos = (t: number) => `${formatLapTime(t)} / ${formatLapTime(engine.duration)}`;
+  /** 値が変わったときだけ書く(再生中は毎コマ呼ばれる。同じ値でも、書くとブラウザが描き直すことがある。案件 36) */
+  const setText = (e: Element, text: string) => { if (e.textContent !== text) e.textContent = text; };
   const setLive = (key: string, text: string) => {
-    root.querySelectorAll(`[data-live="${key}"]`).forEach((e) => { e.textContent = text; });
+    root.querySelectorAll(`[data-live="${key}"]`).forEach((e) => setText(e, text));
   };
 
   function syncPlayButton() {
@@ -626,15 +628,19 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   function updateFrame() {
     const tau = engine.t;
     const r = ref();
-    $('cmp-time').textContent = fmtPos(tau);
+    const pos = fmtPos(tau);
+    setText($('cmp-time'), pos);
     const seek = $<HTMLInputElement>('cmp-seek');
-    seek.max = String(engine.duration);
+    const max = String(engine.duration);
+    if (seek.max !== max) seek.max = max;
     seek.value = String(tau);
-    seek.setAttribute('aria-valuetext', fmtPos(tau));
+    if (seek.getAttribute('aria-valuetext') !== pos) seek.setAttribute('aria-valuetext', pos);
     syncPlayButton();
     // コマ送りは一時停止中のみ
-    $<HTMLButtonElement>('cmp-fb').disabled = engine.playing;
-    $<HTMLButtonElement>('cmp-ff').disabled = engine.playing;
+    for (const id of ['cmp-fb', 'cmp-ff']) {
+      const b = $<HTMLButtonElement>(id);
+      if (b.disabled !== engine.playing) b.disabled = engine.playing;
+    }
     if (!r) { graph.setCursor(null, []); map?.setCars([]); return; }
 
     // 時間ベース: 全車が同じ経過時間の位置。距離ベース(速度グラフが「距離」): 基準の車と同じ距離の位置(その場所での走行ラインと速度を比べる)。
@@ -669,7 +675,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
         gapText.set(c.slot, g);
       }
     }
-    root.querySelectorAll<HTMLElement>('.c3-gap').forEach((e) => { e.hidden = xKind === 'dist'; });
+    root.querySelectorAll<HTMLElement>('.c3-gap').forEach((e) => { if (e.hidden !== (xKind === 'dist')) e.hidden = xKind === 'dist'; });
     // 地図の車(引き出し線の先に「速度kph/タイム差」。基準の車は速度だけ)
     map?.setCars(onMap.map(({ c, s }) => ({
       slot: c.slot, lat: s.lat, lon: s.lon, heading: s.heading,
@@ -715,10 +721,12 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   function loop(now: number) {
     raf = 0;
     if (!engine.playing) return;
-    const dt = Math.min((now - last) / 1000, 0.1);
+    const dt = Math.min(Math.max(now - last, 0) / 1000, 0.1);
     last = now;
+    // 次のコマを、tick の前に予約する。tick の通知(下の subscribe)で再生の開始と見なされて
+    // last が今の時刻に書き換わると、描画にかかった時間の分だけ再生の時計が遅れるため。
+    raf = requestAnimationFrame(loop);
     engine.tick(dt);
-    if (engine.playing && !raf) raf = requestAnimationFrame(loop);
   }
   engine.subscribe(() => {
     updateFrame();

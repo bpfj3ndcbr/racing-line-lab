@@ -52,6 +52,24 @@ describe('画面側の保存先', () => {
     const s2 = new Session(new NativeStore(b));
     expect(s2.getSetting('compare.labels', 'off')).toBe('speed');
   });
+  it('一度読んだ値は覚えておき、同じキーは通信し直さない。set・clear のあとは新しい値を返す(案件 36)', () => {
+    const b = bridge();
+    b.m.set('rll.a', '1');
+    const get = vi.spyOn(b, 'storageGet');
+    const st = new NativeStore(b);
+    expect(st.get('a')).toBe('1');
+    expect(st.get('a')).toBe('1');
+    expect(st.get('none')).toBeNull();
+    expect(st.get('none')).toBeNull();
+    expect(get).toHaveBeenCalledTimes(2);                  // 'a' と 'none' を 1 回ずつ
+    st.set('a', '2');
+    expect(st.get('a')).toBe('2');
+    expect(b.m.get('rll.a')).toBe('2');                    // 窓口にも書いている
+    st.clear();
+    b.m.set('rll.a', '3');                                 // (消したあとに入った値)
+    expect(st.get('a')).toBe('3');                         // clear のあとは読み直す
+    expect(get).toHaveBeenCalledTimes(3);
+  });
   it('窓口が例外を投げても動作は続く', () => {
     const st = new NativeStore({ storageGet: () => { throw new Error('x'); }, storageSet: () => { throw new Error('x'); }, storageClear: () => { throw new Error('x'); }, getPathForFile: () => '', readTextFile: async () => null, saveText: async () => ({ ok: false }) });
     expect(st.get('a')).toBeNull();
