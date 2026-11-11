@@ -1,7 +1,11 @@
+// @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest';
-import { type GeoLine, type TimingLine, type TrackLog, formatCln, metersPerDegree } from '../src/core';
+import { type GeoLine, type TimingLine, type TrackLog, LINE_DIGITS, formatCln, formatSci, metersPerDegree } from '../src/core';
 import { MemoryStore } from '../src/io/storage';
 import { Session } from '../src/store/session';
+import { mountApp } from '../src/ui/app';
+import { ThemeController } from '../src/ui/theme';
+import { FakeMap } from './helpers';
 
 // 比較セットのサーキットは 1 つ / 計測ラインの候補(案件 3)。走行ログのファイルが無くても動く人工のログで確かめる
 
@@ -101,5 +105,68 @@ describe('計測ラインの候補', () => {
     const c = session.sets[0].logs[0].candidate!;
     session.registerCircuit('サーキットA', formatCln([c.control]), '');
     expect(session.sets[0].logs.map((l) => l.circuit?.name)).toEqual(['サーキットA', 'サーキットA']);
+  });
+});
+
+describe('上部の「サーキット: ○○」は、表示中の比較セットのサーキット(案件 37)', () => {
+  const top = () => document.querySelector('.cur b')!.textContent;
+  beforeEach(() => {
+    document.body.innerHTML = '<div id="app"></div>';
+    const store = new MemoryStore();
+    session = new Session(store);
+    mountApp(document.getElementById('app')!, session, new ThemeController(store), () => new FakeMap());
+  });
+
+  it('未判定なら「未選択」', () => {
+    expect(top()).toBe('未選択');
+    session.registerCircuit('サーキットA', formatCln([northLine(A)]), '');
+    session.addLog(ride(B, 800), 'b');        // どのサーキットも通らない
+    expect(top()).toBe('未選択');
+  });
+
+  it('自動判定なら、最初に判定できたログのサーキット(ほかのサーキットのログがあっても 1 つだけ)', () => {
+    session.registerCircuit('サーキットA', formatCln([northLine(A)]), '');
+    session.registerCircuit('サーキットB', formatCln([northLine(B)]), '');
+    session.addLog(ride(A, 800), 'a');
+    session.addLog(ride(B, 800), 'b');
+    expect(top()).toBe('サーキットA');
+  });
+
+  it('「使用するサーキット」で選んでいれば、そのサーキット', () => {
+    session.registerCircuit('サーキットA', formatCln([northLine(A)]), '');
+    session.registerCircuit('サーキットB', formatCln([northLine(B)]), '');
+    session.addLog(ride(A, 800), 'a');
+    session.setCircuit(session.circuits[1].id);
+    expect(top()).toBe('サーキットB');
+  });
+});
+
+describe('線のまま登録する入口 registerCircuitLines(案件 38)', () => {
+  // 桁の多い線(画面で引いた線は、このように細かい値になる)
+  const ctl: GeoLine = { a: { lat: 33.03886612345, lon: 130.97338798765 }, b: { lat: 33.03850643219, lon: 130.97309876543 } };
+  const sec: GeoLine[] = [
+    { a: { lat: 33.04012345678, lon: 130.98012345678 }, b: { lat: 33.04087654321, lon: 130.98087654321 } },
+    { a: { lat: 33.03512345678, lon: 130.96512345678 }, b: { lat: 33.03587654321, lon: 130.96587654321 } },
+  ];
+
+  it('今までの経路(.cln / .sci の文字列に直して登録)と、同じ値で保存される', () => {
+    const viaText = new MemoryStore(), direct = new MemoryStore();
+    const s1 = new Session(viaText), s2 = new Session(direct);
+    const view = { lat: 33.04, lon: 130.97, zoom: 16 };
+    expect(s1.registerCircuit('X', formatCln([ctl], LINE_DIGITS), formatSci(sec, 1, LINE_DIGITS), view).ok).toBe(true);
+    expect(s2.registerCircuitLines('X', ctl, sec, { view }).ok).toBe(true);
+    const strip = (c: { id: string }) => ({ ...c, id: '' });
+    expect(s2.circuits.map(strip)).toEqual(s1.circuits.map(strip));
+    expect(s2.circuits[0].control).not.toEqual(ctl);                     // 保存の桁に丸めてある
+    expect(JSON.parse(direct.get('circuits')!).map(strip)).toEqual(JSON.parse(viaText.get('circuits')!).map(strip));
+  });
+
+  it('名前の確かめは今までと同じ。announce のときだけ、登録できたことを message で知らせる', () => {
+    expect(session.registerCircuitLines(' ', ctl, sec)).toMatchObject({ ok: false, reason: 'invalid' });
+    expect(session.registerCircuitLines('X', ctl, sec)).toMatchObject({ ok: true, message: '「X」を登録しました(セクター 2 本)。' });
+    expect(session.message).toBe('');
+    expect(session.registerCircuitLines('x', ctl, sec)).toMatchObject({ ok: false, reason: 'duplicate' });
+    expect(session.registerCircuitLines('Y', ctl, [], { announce: true }).ok).toBe(true);
+    expect(session.message).toBe('「Y」を登録しました(セクター 0 本)。');
   });
 });

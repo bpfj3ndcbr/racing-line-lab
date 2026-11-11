@@ -5,7 +5,7 @@ import { MemoryStore } from '../src/io/storage';
 import { Session } from '../src/store/session';
 import { mountApp } from '../src/ui/app';
 import { ThemeController } from '../src/ui/theme';
-import { endFromStep, endSteps, stepFromEnd } from '../src/ui/importView';
+import { endFromStep, endSteps, stepFromEnd } from '../src/core';
 import { FakeMap } from './helpers';
 
 // 半径 300 m の円を反時計回りに走る人工のログ(走行ログのファイルが無くても動く画面のテスト)

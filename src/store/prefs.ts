@@ -9,6 +9,7 @@ export interface PrefStore {
 }
 
 export type ThemeV = 'light' | 'dark';
+/** 地図の表示: line = 車ごとの色の線 / speed = 速度のヒートマップ / accel = 加速・減速のマップ */
 export type MapModeV = 'line' | 'speed' | 'accel';
 export type FollowV = 'fixed' | 'leader' | 'A' | 'B' | 'C' | 'D';
 export type XKindV = 'dist' | 'time';

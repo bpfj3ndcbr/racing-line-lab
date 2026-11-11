@@ -1,5 +1,5 @@
 import {
-  type Circuit, type GeoBox, type SaveArea, type TileId, type TileRect, boxContains, visibleTilesIn, gridLines, rectSizeM, rectToBox, rectWithinLimit, snapBox, tileCounts,
+  type Circuit, type GeoBox, type SaveArea, type TileId, type TileRect, boxContains, visibleTilesIn, gridLines, rectSizeM, rectToBox, rectWithinLimit, snapBox, tileCounts, escapeHtml as esc
 } from '../core';
 import type { EditHandle, MapFactory, TrackMap } from './mapTypes';
 
@@ -31,7 +31,6 @@ export const START_INSET = 0.2;
 /** タイル 1 枚のおよその大きさ(バイト。容量の目安に使う) */
 const TILE_BYTES_GUESS = 20 * 1024;
 
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 const km = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m)} m`);
 const mb = (bytes: number) => (bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`);
 

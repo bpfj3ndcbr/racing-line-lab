@@ -1,15 +1,14 @@
 import { gsiGeocode, type GeoHit, type Geocoder } from '../io/geocode';
 import {
-  type GeoLine, LINE_DIGITS, distanceM, formatCln, formatSci, metersPerDegree, parseCln, parseSci, roundLine, sectorPassTimes, shiftLine,
+  type GeoLine, distanceM, formatCln, formatSci, metersPerDegree, parseCln, parseSci, roundLine, sectorPassTimes, shiftLine, escapeHtml as esc
 } from '../core';
 import type { LoadedLog, Session } from '../store/session';
-import { alertDialog, confirmDialog } from './dialog';
+import { confirmDialog, duplicateNameAlert } from './dialog';
+import { arrowDelta, isTypingTarget, markStep, modalOpen, stepSegHtml } from './nudge';
 import { downloadText } from './download';
 import { hasExt, wrongExtMessage } from './fileKind';
 import type { MapFactory, TrackMap } from './mapTypes';
 import type { ThemeController } from './theme';
-
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
 export interface CircuitEditorDeps {
   mapFactory: MapFactory;
@@ -25,7 +24,6 @@ export interface CircuitEditor { show(id: string | null, near?: { lat: number; l
 
 type Key = 'c' | `s${number}`;
 type Part = 'a' | 'b' | 'm';
-const STEPS = [0.1, 0.5, 1];
 /** コースの幅としては長すぎるライン(m)。ほかの場所を通る周回にも反応してしまう目安 */
 const LONG_LINE_M = 60;
 
@@ -94,8 +92,7 @@ export function mountCircuitEditor(root: HTMLElement, session: Session, deps: Ci
               <button class="ib" data-act="ce-nudge" data-dir="S" aria-label="南へ" title="南へ [↓]">↓</button>
             </div>
             <div class="corr-step"><span class="sub">1回の移動量</span>
-              <span class="seg sm" role="group" aria-label="1回の移動量">${STEPS.map((s) =>
-                `<button data-act="ce-step" data-step="${s}" aria-pressed="${s === 0.1}" class="${s === 0.1 ? 'on' : ''}">${s} m</button>`).join('')}</span>
+              ${stepSegHtml('ce-step', 0.1)}
             </div>
           </div>
         </section>
@@ -327,19 +324,15 @@ export function mountCircuitEditor(root: HTMLElement, session: Session, deps: Ci
     setCur(part === 'a' ? { ...l, a: mv(l.a) } : part === 'b' ? { ...l, b: mv(l.b) } : { a: mv(l.a), b: mv(l.b) });
     pushLines(); pushHandles(); renderInfo();
   }
-  const dirDelta = (dir: string, k = 1): [number, number] =>
-    dir === 'N' ? [0, step * k] : dir === 'S' ? [0, -step * k] : dir === 'E' ? [step * k, 0] : [-step * k, 0];
   const onKey = (e: KeyboardEvent) => {
     if (!visible || e.ctrlKey || e.metaKey || e.altKey || !cur()) return;
     const t = e.target as HTMLElement | null;
-    if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) return;
-    if (document.querySelector('.modal')) return;
+    if (isTypingTarget(t) || modalOpen()) return;
     if (e.key === 'Enter' && draft && t?.tagName !== 'BUTTON') { e.preventDefault(); confirmDraft(); return; }
-    const dir = ({ ArrowUp: 'N', ArrowDown: 'S', ArrowRight: 'E', ArrowLeft: 'W' } as Record<string, string>)[e.key];
-    if (!dir) return;
+    const v = arrowDelta(e.key, step, e.shiftKey);
+    if (!v) return;
     e.preventDefault();
-    const [x, y] = dirDelta(dir, e.shiftKey ? 10 : 1);
-    nudge(x, y);
+    nudge(v[0], v[1]);
   };
 
   // ---------- 住所検索 ----------
@@ -409,7 +402,7 @@ export function mountCircuitEditor(root: HTMLElement, session: Session, deps: Ci
 
   // ---------- 保存 ----------
   async function dupWarn(name: string) {
-    await alertDialog({ title: '既に名前が存在します', detail: `「${name.trim()}」は登録済みです。別の名前にしてください。` });
+    await duplicateNameAlert(name.trim());
     $('ce-name').focus();
   }
   async function save() {
@@ -418,10 +411,9 @@ export function mountCircuitEditor(root: HTMLElement, session: Session, deps: Ci
     if (draft) { msg('引いたラインを「確定」するか「破棄」してください。'); return; }
     if (!control) { msg('計測ラインを引くか、.cln ファイルを読み込んでください。'); return; }
     if (!editId) {
-      const r = session.registerCircuit(name, formatCln([control], LINE_DIGITS), formatSci(sectors, 1, LINE_DIGITS), view);
+      const r = session.registerCircuitLines(name, control, sectors, { view, announce: true });
       if (!r.ok && r.reason === 'duplicate') { msg(''); await dupWarn(name); return; }
       if (!r.ok) { msg(r.message); return; }
-      session.message = r.message;
       deps.onDone();
       return;
     }
@@ -469,12 +461,9 @@ export function mountCircuitEditor(root: HTMLElement, session: Session, deps: Ci
       case 'ce-part': part = d.part as Part; refresh(); break;
       case 'ce-step':
         step = Number(d.step);
-        root.querySelectorAll<HTMLElement>('[data-act="ce-step"]').forEach((b) => {
-          const on = Number(b.dataset.step) === step;
-          b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on));
-        });
+        markStep(root, 'ce-step', step);
         break;
-      case 'ce-nudge': { const [x, y] = dirDelta(d.dir!); nudge(x, y); break; }
+      case 'ce-nudge': { const v = arrowDelta(d.dir ?? '', step); if (v) nudge(v[0], v[1]); break; }
       case 'ce-export': exportFile(d.kind as 'cln' | 'sci'); break;
     }
   });

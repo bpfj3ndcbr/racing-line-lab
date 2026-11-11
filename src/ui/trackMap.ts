@@ -23,6 +23,27 @@ export function lineWidth(zoom: number, base: number): number {
   return Math.max(MIN_LINE_WIDTH, Math.min(base, base * 2 ** (zoom - WIDTH_REF_ZOOM)));
 }
 
+/**
+ * 地図に引く線の色(Leaflet の線は CSS で色を変えられないため、ここでまとめる)。
+ * 航空写真の上で読めるよう、ライト / ダークのテーマでは変えない
+ */
+const COLOR = {
+  /** 選んでいる線・引いている途中の線 */
+  selected: '#00e5ff',
+  /** 計測ライン */
+  control: '#ffd23f',
+  /** セクター */
+  sector: '#ffffff',
+  /** 補正前の線(破線) */
+  before: '#d0d0d0',
+  /** 線の下に敷く影 */
+  shadow: '#000',
+  /** 保存範囲の枠 */
+  area: '#ffd400',
+  /** 保存範囲の方眼 */
+  grid: '#ffffff',
+} as const;
+
 const CAR_SIZE = 16;
 const carIcon = (slot: Slot) => L.divIcon({
   className: `car car-${slot.toLowerCase()}`,
@@ -101,7 +122,7 @@ export const createLeafletMap: MapFactory = (el): TrackMap => {
       if (drawCb && drawFrom) {
         drawTo = p;
         if (rubber) rubber.setLatLngs([drawFrom, drawTo]);
-        else rubber = L.polyline([drawFrom, drawTo], { color: '#00e5ff', weight: 3, dashArray: '6 4', interactive: false }).addTo(map);
+        else rubber = L.polyline([drawFrom, drawTo], { color: COLOR.selected, weight: 3, dashArray: '6 4', interactive: false }).addTo(map);
       } else if (editCb && lastPos) {
         editCb(p.lat - lastPos.lat, p.lng - lastPos.lng);
         lastPos = p;
@@ -170,12 +191,12 @@ export const createLeafletMap: MapFactory = (el): TrackMap => {
         lineBounds = lineBounds ? lineBounds.extend(a).extend(b) : L.latLngBounds([a, b]);
         if (l.before) {
           // 補正前: 灰色の破線(補正後の線の下に描くため、配列の先に置くこと)。名前は出さない
-          L.polyline([a, b], { color: '#000', weight: 5, opacity: 0.35, interactive: false }).addTo(lineLayer);
-          L.polyline([a, b], { color: '#d0d0d0', weight: 3, opacity: 1, dashArray: '6 5', interactive: false }).addTo(lineLayer);
+          L.polyline([a, b], { color: COLOR.shadow, weight: 5, opacity: 0.35, interactive: false }).addTo(lineLayer);
+          L.polyline([a, b], { color: COLOR.before, weight: 3, opacity: 1, dashArray: '6 5', interactive: false }).addTo(lineLayer);
           continue;
         }
-        const color = l.selected ? '#00e5ff' : l.kind === 'control' ? '#ffd23f' : '#ffffff';
-        L.polyline([a, b], { color: '#000', weight: 6, opacity: 0.4, interactive: false }).addTo(lineLayer);
+        const color = l.selected ? COLOR.selected : l.kind === 'control' ? COLOR.control : COLOR.sector;
+        L.polyline([a, b], { color: COLOR.shadow, weight: 6, opacity: 0.4, interactive: false }).addTo(lineLayer);
         L.polyline([a, b], { color, weight: l.selected ? 4 : 3, opacity: 1, interactive: false }).addTo(lineLayer);
         L.marker(b, { icon: labelIcon(l.label, l.kind), interactive: false, keyboard: false }).addTo(lineLayer);
       }
@@ -239,11 +260,11 @@ export const createLeafletMap: MapFactory = (el): TrackMap => {
     setGuide(g: MapGuide | null) {
       guideLayer.clearLayers();
       if (!g) return;
-      for (const ln of g.grid) L.polyline(ln, { color: '#ffffff', weight: 1, opacity: 0.45, interactive: false }).addTo(guideLayer);
+      for (const ln of g.grid) L.polyline(ln, { color: COLOR.grid, weight: 1, opacity: 0.45, interactive: false }).addTo(guideLayer);
       if (g.box) {
         const r: L.LatLngBoundsExpression = [[g.box.south, g.box.west], [g.box.north, g.box.east]];
-        L.rectangle(r, { color: '#000', weight: 5, opacity: 0.35, fill: false, interactive: false }).addTo(guideLayer);
-        L.rectangle(r, { color: '#ffd400', weight: 3, opacity: 1, fillColor: '#ffd400', fillOpacity: 0.08, interactive: false }).addTo(guideLayer);
+        L.rectangle(r, { color: COLOR.shadow, weight: 5, opacity: 0.35, fill: false, interactive: false }).addTo(guideLayer);
+        L.rectangle(r, { color: COLOR.area, weight: 3, opacity: 1, fillColor: COLOR.area, fillOpacity: 0.08, interactive: false }).addTo(guideLayer);
       }
     },
     invalidate() { map.invalidateSize(); },

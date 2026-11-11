@@ -1,6 +1,7 @@
 import { type Lap, type PreviewPick, type PreviewRange, type Slot, SLOTS, detectLaps, findCrossings, formatLapTime, matchLap, metersPerDegree, pickPreviewRanges } from '../core';
 import type { LoadedLog, Session } from '../store/session';
 import { confirmDialog } from './dialog';
+import { arrowDelta, isTypingTarget, markStep, modalOpen, stepSegHtml } from './nudge';
 import type { MapFactory, TrackMap } from './mapTypes';
 import type { ThemeController } from './theme';
 
@@ -19,7 +20,6 @@ export interface CorrectView {
   confirmLeave(): Promise<boolean>;
 }
 
-const STEPS = [0.1, 0.5, 1];
 /** 地図に出す点の数の上限(描く区間が長いときだけ間引く) */
 const MAX_POINTS = 20000;
 const PREVIEW_DELAY_MS = 250;
@@ -84,8 +84,7 @@ export function mountCorrectView(root: HTMLElement, session: Session, deps: Corr
           <button class="ib" data-act="nudge" data-dir="S" aria-label="南へ" title="南へ [↓]">↓</button>
         </div>
         <div class="corr-step"><span class="sub">1回の移動量</span>
-          <span class="seg sm" role="group" aria-label="1回の移動量">${STEPS.map((s) =>
-            `<button data-act="cor-step" data-step="${s}" aria-pressed="${s === 0.5}" class="${s === 0.5 ? 'on' : ''}">${s} m</button>`).join('')}</span>
+          ${stepSegHtml('cor-step', 0.5)}
         </div>
         <div class="corr-laps" id="cor-laps" role="status"></div>
         <div class="sub" id="cor-note"></div>
@@ -231,13 +230,8 @@ export function mountCorrectView(root: HTMLElement, session: Session, deps: Corr
   };
   const setStep = (s: number) => {
     step = s;
-    root.querySelectorAll<HTMLElement>('[data-act="cor-step"]').forEach((b) => {
-      const on = Number(b.dataset.step) === s;
-      b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on));
-    });
+    markStep(root, 'cor-step', s);
   };
-  const dirDelta = (dir: string, k = 1): [number, number] =>
-    dir === 'N' ? [0, step * k] : dir === 'S' ? [0, -step * k] : dir === 'E' ? [step * k, 0] : [-step * k, 0];
 
   root.addEventListener('click', (e) => {
     const el = (e.target as HTMLElement).closest<HTMLElement>('[data-act]');
@@ -246,7 +240,7 @@ export function mountCorrectView(root: HTMLElement, session: Session, deps: Corr
     switch (d.act) {
       case 'cor-mode': setMode(d.mode as 'line' | 'map'); break;
       case 'cor-step': setStep(Number(d.step)); break;
-      case 'nudge': { const [x, y] = dirDelta(d.dir!); nudge(x, y); break; }
+      case 'nudge': { const v = arrowDelta(d.dir ?? '', step); if (v) nudge(v[0], v[1]); break; }
       case 'cor-zero': draft = { east: 0, north: 0 }; changed(); break;
       case 'cor-revert': draft = { ...saved }; changed(); break;
       case 'cor-cancel': void cancelCorrect(); break;
@@ -280,14 +274,11 @@ export function mountCorrectView(root: HTMLElement, session: Session, deps: Corr
   /** 矢印キー: 北・東が正。Shift で 10 倍。数値欄・ダイアログの操作は邪魔しない */
   const onKey = (e: KeyboardEvent) => {
     if (!visible || e.ctrlKey || e.metaKey || e.altKey) return;
-    const t = e.target as HTMLElement | null;
-    if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) return;
-    if (document.querySelector('.modal')) return;
-    const dir = ({ ArrowUp: 'N', ArrowDown: 'S', ArrowRight: 'E', ArrowLeft: 'W' } as Record<string, string>)[e.key];
-    if (!dir) return;
+    if (isTypingTarget(e.target) || modalOpen()) return;
+    const v = arrowDelta(e.key, step, e.shiftKey);
+    if (!v) return;
     e.preventDefault();
-    const [x, y] = dirDelta(dir, e.shiftKey ? 10 : 1);
-    nudge(x, y);
+    nudge(v[0], v[1]);
   };
 
   if (typeof ResizeObserver === 'function') {

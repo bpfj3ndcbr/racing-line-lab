@@ -1,9 +1,11 @@
 import {
-  type Circuit, type GeoLine, type LineCandidate, bearingDiff, detectLaps, findCrossings, formatJst, formatLapTime, lineBearing, lineMid,
-  lineMoveM, lineMovedTo, lineWithBearing, matchCircuit, metersPerDegree, orderSectors, rotateToward, roundLine, sectorPassTimes, shiftLine,
+  type Circuit, type FixLine, type GeoLine, type LineCandidate, bearingDiff, findCrossings, fixSummary, fmtAngleDiff, formatJst, formatLapTime, lapTrack,
+  lineBearing, lineChanged, lineMid, lineMoveM, lineMovedTo, lineWithBearing, matchCircuit, orderSectors, rotateToward, roundLine,
+  sectorChanges, sectorPassTimes, shiftLine, trackNear, escapeHtml as esc
 } from '../core';
 import type { LoadedLog, Session } from '../store/session';
 import { confirmDialog, customDialog } from './dialog';
+import { arrowDelta } from './nudge';
 import type { MapFactory, MapLine, MapTrack, TrackMap } from './mapTypes';
 
 /**
@@ -33,33 +35,11 @@ export const FIX_RANGE_DEG = 15;
 /** 修正の画面: 矢印キー 1 回の移動量(m。Shift で 10 倍) */
 export const FIX_STEP_M = 0.1;
 
-/** 修正の画面の線。before = 補正前(ファイルの線。この画面で足した線は、引いたときの線)、added = この画面で足した線 */
-export interface FixLine { before: GeoLine; line: GeoLine; added?: boolean }
 /** 候補ごとの、直した計測ラインとセクター。lines[0] が計測ライン、残りがセクター(通った順)。removed = 消したファイルのセクターの本数 */
 interface Fixed { lines: FixLine[]; removed: number }
-/** 線を補正前から動かしたか(この画面で足した線は、動かさなくても「変えた」) */
-export const lineChanged = (f: FixLine) =>
-  !!f.added || lineMoveM(f.before, f.line) >= 0.005 || Math.abs(bearingDiff(lineBearing(f.before), lineBearing(f.line))) >= 0.005;
-/** セクターの直し方の要約(「修正 1・追加 1・削除 1」。何もしていなければ空) */
-export function sectorChanges(lines: FixLine[], removed: number): string {
-  const secs = lines.slice(1);
-  const moved = secs.filter((f) => !f.added && lineChanged(f)).length, added = secs.filter((f) => f.added).length;
-  return [moved && `修正 ${moved}`, added && `追加 ${added}`, removed && `削除 ${removed}`].filter(Boolean).join('・');
-}
 
 /** 角度の表示(0.1° 単位) */
 const fmtDeg = (d: number) => `${(Math.round(d * 10) / 10).toFixed(1)}°`;
-/** 角度の差の表示(+1.2° / −0.3° / 0.0°) */
-function fmtDiff(d: number): string {
-  const r = Math.round(d * 10) / 10;
-  return r === 0 ? '0.0°' : `${r > 0 ? '+' : '−'}${Math.abs(r).toFixed(1)}°`;
-}
-/** 補正の内容(「角度 +1.2°・移動 0.6 m」) */
-export function fixSummary(before: GeoLine, after: GeoLine): string {
-  return `角度 ${fmtDiff(bearingDiff(lineBearing(before), lineBearing(after)))}・移動 ${lineMoveM(before, after).toFixed(1)} m`;
-}
-
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
 /** 選べるもの */
 export type LoadOption =
@@ -189,36 +169,6 @@ function listHtml(plan: LoadPlan, cur: LoadOption, line: GeoLine | null): string
     + extra('あとで', 'サーキットを決めずに閉じます。あとから、ログの枠や「はじめかた」のボタンで登録できます', radio(later, cur.key, 'あとで(未判定のまま)'));
 }
 
-/** 計測ラインの中心から radiusM 以内の走行ライン(とぎれごとに別の線。最大 maxRuns 本・1 本 maxPts 点まで間引く) */
-export function trackNear(l: LoadedLog, center: { lat: number; lon: number }, radiusM = 400, maxRuns = 6, maxPts = 400): [number, number][][] {
-  const m = metersPerDegree(center.lat);
-  const dLat = radiusM / m.lat, dLon = radiusM / m.lon;
-  const n = l.log.loop?.n ?? l.log.t.length;
-  const runs: [number, number][][] = [];
-  let cur: [number, number][] = [];
-  const { lat, lon } = l.log;
-  const off = { lat: l.offset.north / m.lat, lon: l.offset.east / m.lon };
-  for (let i = 0; i < n && runs.length < maxRuns; i++) {
-    const y = lat[i] + off.lat, x = lon[i] + off.lon;
-    if (Math.abs(y - center.lat) <= dLat && Math.abs(x - center.lon) <= dLon) cur.push([y, x]);
-    else if (cur.length) { runs.push(cur); cur = []; }
-  }
-  if (cur.length && runs.length < maxRuns) runs.push(cur);
-  return runs.map((r) => (r.length <= maxPts ? r : r.filter((_, k) => k % Math.ceil(r.length / maxPts) === 0)));
-}
-
-/** プレビューの「セクター」で描く走行ライン: 線 line で区切った最初の完了ラップ(無ければログ全体)を、maxPts 点まで間引く */
-export function lapTrack(l: LoadedLog, line: GeoLine, maxPts = 1500): [number, number][] {
-  const lap = detectLaps(l.log, line, [], { offset: l.offset, partial: 'never' }).find((x) => x.complete);
-  const from = lap?.startIndex ?? 0, to = lap?.endIndex ?? (l.log.loop?.n ?? l.log.t.length) - 1;
-  const m = metersPerDegree(l.log.lat[from]);
-  const off = { lat: l.offset.north / m.lat, lon: l.offset.east / m.lon };
-  const step = Math.max(1, Math.ceil((to - from + 1) / maxPts));
-  const pts: [number, number][] = [];
-  for (let i = from; i <= to; i += step) pts.push([l.log.lat[i] + off.lat, l.log.lon[i] + off.lon]);
-  return pts;
-}
-
 export interface LoadDialogDeps {
   /** プレビューの地図(無ければプレビューを出さない) */
   mapFactory?: MapFactory;
@@ -305,7 +255,7 @@ export function loadDialog(plan: LoadPlan, deps: LoadDialogDeps = {}, host: HTML
       map.setLines(lines);
       const c = lineMid(line);
       const src = cur.kind === 'cand' ? cur.log : plan.logs.find((l) => crosses(l, line));
-      const runs = !src ? [] : zoom === 'all' ? [lapTrack(src, line)] : trackNear(src, c);
+      const runs = !src ? [] : zoom === 'all' ? [lapTrack(src.log, src.offset, line)] : trackNear(src.log, src.offset, c);
       const tracks: MapTrack[] = runs.map((points) => ({ slot: 'A', points, color: accent() }));
       map.setTracks(tracks);
       map.invalidate();
@@ -390,7 +340,7 @@ export function loadDialog(plan: LoadPlan, deps: LoadDialogDeps = {}, host: HTML
       if (deps.mapFactory) {
         fixMap = deps.mapFactory($f('.ld-fix-map .map'));
         const control = fixing.lines[0].before;
-        fixMap.setTracks([lapTrack(cur.log, control), ...trackNear(cur.log, lineMid(control))].map((points) => ({ slot: 'A', points, color: accent() })));
+        fixMap.setTracks([lapTrack(cur.log.log, cur.log.offset, control), ...trackNear(cur.log.log, cur.log.offset, lineMid(control))].map((points) => ({ slot: 'A', points, color: accent() })));
         fixMap.invalidate();
         if (fromSectors) fixMap.fit();
         else { const c = lineMid(fixing.lines[0].line); fixMap.setView(c.lat, c.lon, 19); }
@@ -481,7 +431,7 @@ export function loadDialog(plan: LoadPlan, deps: LoadDialogDeps = {}, host: HTML
       const b0 = lineBearing(before), b1 = lineBearing(line), d = bearingDiff(b0, b1);
       $f('.ld-fix-b0').textContent = fmtDeg(b0);
       $f('.ld-fix-b1').textContent = fmtDeg(b1);
-      $f('.ld-fix-d').textContent = fmtDiff(d);
+      $f('.ld-fix-d').textContent = fmtAngleDiff(d);
       $f('.ld-fix-mv').textContent = `${lineMoveM(before, line).toFixed(1)} m`;
       const deg = $f<HTMLInputElement>('.ld-fix-deg');
       if (src !== deg) deg.value = (Math.round(b1 * 10) / 10 % 360).toFixed(1);
@@ -571,8 +521,7 @@ export function loadDialog(plan: LoadPlan, deps: LoadDialogDeps = {}, host: HTML
       else if (act === 'reset') setFixLine(selLine().before);
       else if (act === 'dec' || act === 'inc') setBearing(lineBearing(selLine().line) + (act === 'inc' ? 0.1 : -0.1));
       else if (act === 'nudge') {                // スマホの幅で地図の右下に出す矢印(案件 1)。矢印キーと同じく 0.1 m ずつ
-        const k = FIX_STEP_M;
-        const d = ({ N: [0, k], S: [0, -k], E: [k, 0], W: [-k, 0] } as Record<string, [number, number]>)[b.dataset.dir ?? ''];
+        const d = arrowDelta(b.dataset.dir ?? '', FIX_STEP_M);
         if (d) setFixLine(shiftLine(selLine().line, d[0], d[1]));
       }
     });
@@ -586,8 +535,7 @@ export function loadDialog(plan: LoadPlan, deps: LoadDialogDeps = {}, host: HTML
       }
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if ((e.target as HTMLElement).tagName === 'INPUT') return;               // スライダー・数値入力の矢印キーは、そちらで使う
-      const k = (e.shiftKey ? 10 : 1) * FIX_STEP_M;
-      const d = ({ ArrowUp: [0, k], ArrowDown: [0, -k], ArrowRight: [k, 0], ArrowLeft: [-k, 0] } as Record<string, [number, number]>)[e.key];
+      const d = arrowDelta(e.key, FIX_STEP_M, e.shiftKey);
       if (!d) return;
       e.preventDefault();
       setFixLine(shiftLine(selLine().line, d[0], d[1]));
