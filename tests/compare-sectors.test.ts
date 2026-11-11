@@ -152,7 +152,9 @@ describe('セクターボタンの動作の切り替え', () => {
 
   it('「先頭車両」「全車一致」と「解除」が 1 つの切り替えにまとまる。初期は全車一致', () => {
     setupOne();
-    expect(Array.from(root.querySelectorAll('[data-act="syncmode"]')).map((b) => b.textContent)).toEqual(['先頭車両', '全車一致']);
+    // 右の列と上部バー(スマホの横向き。案件 46)の 2 か所に同じものがある
+    expect(Array.from(root.querySelectorAll('#cmp-sync [data-act="syncmode"]')).map((b) => b.textContent)).toEqual(['先頭車両', '全車一致']);
+    expect(Array.from(root.querySelectorAll('#top-set [data-act="syncmode"]')).map((b) => b.textContent)).toEqual(['先頭車両', '全車一致']);
     expect(root.querySelector('#cmp-sec-note')).toBeNull();                      // 説明文は無い
     expect(mode('all').getAttribute('aria-pressed')).toBe('true');
     mode('leader').click();
@@ -585,5 +587,29 @@ describe('横軸「距離」のセクターボタン(案件 20)', () => {
       const line = session.resolveRef(session.assignment.A)!.log.circuit!.sectors[k];
       for (const slot of ['A', 'B']) expect(offLine(carPos(slot), line)).toBeLessThan(2);
     }
+  });
+});
+
+describe('上部バーのセクターボタンの動作(スマホの横向き。案件 46)', () => {
+  const top = (m: string) => $<HTMLButtonElement>(`#top-set [data-act="syncmode"][data-mode="${m}"]`);
+  const side = (m: string) => $<HTMLButtonElement>(`#cmp-sync [data-act="syncmode"][data-mode="${m}"]`);
+  const topRelease = () => $<HTMLButtonElement>('#top-set [data-act="sync-release"]');
+
+  it('右の列と同じ「先頭車両・全車一致・解除」を出し、押すと右の列のボタンを押したのと同じになる', () => {
+    setupOne();
+    expect($<HTMLElement>('#top-set .sync-grp').hidden).toBe(false);
+    expect(top('all').getAttribute('aria-pressed')).toBe('true');
+    top('leader').click();
+    expect(side('leader').getAttribute('aria-pressed')).toBe('true');
+    expect(top('leader').getAttribute('aria-pressed')).toBe('true');
+    expect(top('all').getAttribute('aria-pressed')).toBe('false');
+    top('all').click();
+    expect(topRelease().disabled).toBe(true);
+    sector(2).click();
+    expect(topRelease().disabled).toBe(false);                    // 「解除」の押せる・押せないも同じ
+    topRelease().click();
+    expect($<HTMLElement>('#cmp-sync-status').hidden).toBe(true);
+    expect(topRelease().disabled).toBe(true);
+    expect($('#top-set [id]')?.id).toBe('cmp-set-top');            // 右の列のボタンの id は写さない
   });
 });

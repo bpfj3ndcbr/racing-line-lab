@@ -248,7 +248,7 @@ select{min-height:44px;padding:0 10px;background:var(--surface);border:1px solid
   background:var(--sec-bg);border-left:1px solid var(--border-strong)}
 .side-upper{flex:1 1 0;min-height:0;overflow:hidden}
 .side-upper-in{padding:10px 12px 8px;display:flex;flex-direction:column;gap:8px}
-.cmp-cards{display:flex;flex-direction:column;gap:6px}
+.cmp-cards{display:flex;flex-direction:column;gap:6px;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}  /* 長押ししても、カードの文字を選択しない(案件 46) */
 .side-graph{flex:none;height:var(--graph-h);display:flex;flex-direction:column;padding:4px 6px 6px;min-height:0}
 .graph-bar{flex:none;display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;padding:0 2px 4px}
 .graph-host{flex:1;min-height:0;width:100%;position:relative;overflow:hidden;display:flex;flex-direction:column}
@@ -1001,4 +1001,91 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
   .map-legend .lg-unit{display:none}
   .map-legend{gap:3px;padding:0 3px}
   .legend-bar{width:14px}
+}
+
+/* ==========================================================================
+   スマホの横向き(高さが 500px まで。案件 46)。横向きで使うのは比較画面だけ。
+   幅が 768px 以上でも以下でも同じ並びにするため、上の幅の @media のあとに置いて上書きする
+   ========================================================================== */
+/* 比較以外の画面に重ねる案内。アプリの案内と分かるよう、ロゴとアプリ名の帯を付けた枠の中に出す */
+/* 上部バーの「表示中」と比較セットの選択(スマホの横向きだけで出す) */
+.top-set{display:none}
+.rotate-note{display:none;position:fixed;inset:0;z-index:3000;background:var(--bg);color:var(--text);
+  align-items:center;justify-content:center;padding:16px}
+.rn-box{width:min(420px,100%);border:1px solid var(--border-strong);border-radius:var(--r-l);background:var(--surface);overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.12)}
+.rn-head{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bar);border-bottom:1px solid var(--border-strong)}
+.rn-head svg{width:28px;height:28px;flex:none}
+.rn-name{font-weight:700;font-size:14.5px}
+.rn-body{display:flex;flex-direction:column;align-items:center;gap:10px;padding:18px 16px 20px;text-align:center}
+.rn-body svg{width:48px;height:48px;color:var(--muted)}
+.rn-body p{margin:0;font-size:14px;font-weight:700}
+.rn-body .sub{font-size:12px;color:var(--muted);font-weight:400}
+@media (orientation:landscape) and (max-height:500px){
+  :root{--top-h:41px}
+  /* 上部バー: ロゴ・タブ・「表示中」と比較セット・テーマ・About を 1 行に。サーキット名は出さない。
+     比較セットを上に出す分、右の列はカードから始まる */
+  .top{flex-wrap:nowrap;gap:8px;padding:0 10px;min-height:40px;height:40px;align-items:flex-end}
+  .top .brand{align-self:center}
+  .top .brand svg{width:28px;height:28px}
+  .brand-txt{display:none}
+  .navtabs{order:0;width:auto;flex:none;grid-auto-columns:minmax(56px,auto);gap:4px}
+  .navtab{min-height:32px;height:32px;padding:0 8px;font-size:12px}
+  .top-set{display:flex;align-items:center;gap:8px;align-self:center;flex:1 1 auto;min-width:0}
+  .top-set .cmp-set{flex:1;min-width:0;max-width:280px}
+  .top-set select{height:28px;min-height:28px}
+  .top-set .sync-grp{flex:none}
+  .top-set .seg.sm button{padding:0 7px;white-space:nowrap}
+  #cmp-set-wrap,#cmp-sync{display:none}            /* 右の列の比較セットとセクターボタンの動作は、上部バーに出す */
+  .top-right .seg button,.top-right .btn{font-size:10px;padding:0 7px}   /* テーマと About は小さく(比較セットの幅を空ける) */
+  .top>.grow{display:none}
+  .top-right{align-self:center;flex:none;gap:6px;margin-left:auto}
+  .top-right .cur{display:none}
+  .top-right .btn,.top-right .seg button{min-height:28px;height:28px}
+
+  /* 比較: 左に地図と再生の操作、右にカードと速度グラフ。画面の高さに収める(ページはスクロールしない) */
+  .cmp{height:calc(100vh - var(--top-h));height:calc(100dvh - var(--top-h));min-height:0}
+  .cmp-main{flex-direction:row}
+  .cmp-left{flex:1;height:auto;min-width:0}
+  .cmp-main>.splitter.v{display:block}
+  .cmp-side{width:var(--side-w);overflow:hidden;border-top:0;border-left:1px solid var(--border-strong)}
+  .cmp-side .side-upper{flex:1 1 0;height:auto;min-height:0;overflow-y:auto;overscroll-behavior:contain}   /* セクターの操作は、カードの下をスクロールして出す */
+  .cmp-side>.splitter{display:none}
+  .side-graph{order:0;flex:1.25 1 0;height:auto;border-bottom:0;border-top:1px solid var(--border-strong)}
+  .side-upper-in{padding:6px 8px;gap:6px}
+  .cmp-cards{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+  .cmp-cards .card{min-height:40px;padding:2px 6px;gap:6px}
+  .cmp-cards .card .chip{width:20px;height:20px;font-size:11px}
+  .cmp-cards .card-body>*{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}   /* 右の列を狭くしても、カードの文字は折り返さない */
+  .cmp-ctl{padding:4px 8px;gap:4px}
+  .cmp-time{min-width:0}
+  .cmp-seek{min-width:80px}
+  /* 速度グラフ: 拡大中の下のスクロールバーは出さない(グラフを横になぞれば動かせる)。「全体」が出ても 1 行に収める */
+  .g-ruler{display:none}
+  .graph-bar{flex-wrap:nowrap;padding-bottom:2px}
+  .graph-bar button{white-space:nowrap}                  /* 幅が足りなくても、ボタンの文字を縦に折り返さない */
+  .graph-bar .seg.sm button{padding:0 7px}
+  .graph-bar .btn.xs{padding:0 6px}
+  .graph-bar .zoom-grp{gap:2px}
+  /* 地図の上のメニューとセクターボタン(縦向きと同じ大きさ) */
+  .cmp-map .map-ov.tl{left:8px;top:8px}
+  .cmp-map .map-ov.tr{right:8px;top:8px}
+  .cmp-map .ov-menu-btn{min-height:30px;height:30px;padding:0 10px;font-size:11px}
+  .map-secs{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end;left:56px;right:8px;bottom:26px;pointer-events:none}
+  .map-secs .btn.sec{pointer-events:auto;min-height:32px;height:32px;min-width:38px;padding:0 6px;font-size:12px;justify-content:center}
+  .map-secs .btn.sec[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-on);font-weight:700}
+
+  /* 比較以外の画面: 縦向きにするよう案内を重ねる(上部バーも覆う) */
+  body:has(#view-compare[hidden]) .rotate-note{display:flex}
+  body:has(#view-compare[hidden]){overflow:hidden}
+}
+/* 横向きでも幅の狭い機種(667px など): タブ・セクターボタンの動作を詰め、About はアイコンだけにして、比較セットの幅を空ける */
+@media (orientation:landscape) and (max-height:500px) and (max-width:760px){
+  .navtabs{grid-auto-columns:minmax(46px,auto);gap:3px}
+  .navtab{padding:0 5px;font-size:11px}
+  .top-set{gap:6px}
+  .top-set .seg.sm button{padding:0 5px;font-size:10px}
+  .top-set .shown-mark{font-size:0;gap:0;padding:0 5px}           /* 「表示中」は目のアイコンだけ */
+  .top-right .seg button{padding:0 5px}
+  .top-right .seg button[data-act="about"]{font-size:0;padding:0 8px}
+  .top-right .seg button[data-act="about"] .ico{width:13px;height:13px;margin:0}
 }

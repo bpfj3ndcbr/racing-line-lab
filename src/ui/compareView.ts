@@ -26,6 +26,8 @@ export interface CompareDeps {
   onBack: () => void;
   /** 「サーキットを編集…」(セクターの追加など)。編集が終わると、比較に戻る */
   onEditCircuit?: (circuitId: string) => void;
+  /** スマホの横向きのときに、上部バーに出す「表示中」と比較セットの選択の置き場(案件 46。出すかどうかは CSS で決める) */
+  topSlot?: HTMLElement;
 }
 export interface CompareView {
   show(): void; hide(): void; readonly engine: PlaybackEngine;
@@ -121,7 +123,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
         <aside class="cmp-side" id="cmp-side" aria-label="走行データ">
           <div class="side-upper" id="cmp-upper">
             <div class="side-upper-in" id="cmp-upper-in">
-              <label class="sel cmp-set" id="cmp-set-wrap">${SHOWN_MARK}<select id="cmp-set" data-fk="cmp-set" aria-label="表示中の比較セット"></select></label>
+              <label class="sel cmp-set" id="cmp-set-wrap">${SHOWN_MARK}<select id="cmp-set" class="cmp-set-sel" data-fk="cmp-set" aria-label="表示中の比較セット"></select></label>
               <div id="cmp-cards" class="cmp-cards"></div>
               <div class="sec-block" id="cmp-sec-block">
                 <div class="h sec-h-row" id="cmp-sec-h"><span>セクター</span><button class="btn xs" id="cmp-edit-circuit" data-act="edit-circuit" hidden title="このサーキットのセクターを追加・編集します(終わったら比較に戻ります)">セクターを追加・編集…</button></div>
@@ -205,8 +207,15 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   const shown = () => cars.filter((c) => !hidden.has(c.slot));
   const cssColor = (slot: Slot) =>
     getComputedStyle(document.documentElement).getPropertyValue('--' + slot.toLowerCase()).trim() || '#888';
+  /** 比較画面と、上部バーの置き場(スマホの横向き。案件 46)の両方から探す */
+  const findAll = (sel: string): HTMLElement[] => [
+    ...root.querySelectorAll<HTMLElement>(sel),
+    ...(deps.topSlot ? deps.topSlot.querySelectorAll<HTMLElement>(sel) : []),
+  ];
+  /** セクターボタンの動作の切り替え(右の列と上部バー)を、セクターが無いときは隠す */
+  const setSyncHidden = (h: boolean) => findAll('.sync-grp').forEach((g) => { g.hidden = h; });
   const setPressed = (sel: string, match: (b: HTMLElement) => boolean) =>
-    root.querySelectorAll<HTMLElement>(sel).forEach((b) => {
+    findAll(sel).forEach((b) => {
       const on = match(b);
       b.classList.toggle('on', on);
       b.setAttribute('aria-pressed', String(on));
@@ -235,7 +244,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
     layout.sideW = clamp(layout.sideW, SIDE_MIN, sideMax());
     cmpEl.style.setProperty('--side-w', `${layout.sideW}px`);
     cmpEl.style.setProperty('--graph-h', `${graphNow()}px`);
-    $('cmp-sync').hidden = (ref()?.log.circuit?.sectors.length ?? 0) === 0;
+    setSyncHidden((ref()?.log.circuit?.sectors.length ?? 0) === 0);
     $('cmp-sync-status').hidden = !anchor && !syncMsg;
     $('cmp-sp-g').hidden = cars.length === 0;
   }
@@ -275,12 +284,28 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   applyLayout();
 
   // ---------- データ ----------
-  function renderSetSelect() {
-    const sel = root.querySelector<HTMLSelectElement>('#cmp-set')!;
-    sel.innerHTML = session.sets.map((w, i) =>
-      `<option value="${i}"${session.canShow(i) ? '' : ' disabled'}${i === session.activeIndex ? ' selected' : ''}>${esc(`${session.setName(i)}(${w.logs.length}本)`)}</option>`).join('');
+  // 比較セットの選択は、右の列と、上部バーの置き場(スマホの横向きで使う。案件 46)の 2 か所に同じものを出す
+  if (deps.topSlot) {
+    deps.topSlot.innerHTML = `<label class="sel cmp-set">${SHOWN_MARK}<select id="cmp-set-top" class="cmp-set-sel" aria-label="表示中の比較セット"></select></label>`
+      + `<div class="sync-grp" hidden><span class="seg sm" role="group" aria-label="セクターボタンの動作">${$('cmp-sync').querySelector('.seg')!.innerHTML.replace(/ id="[^"]*"/g, '')}</span></div>`;
+    // 上部バーのボタンは、右の列の同じボタンを押したことにする(動作は 1 か所で扱う)
+    deps.topSlot.addEventListener('click', (e) => {
+      const el = (e.target as HTMLElement).closest<HTMLElement>('[data-act]');
+      const d = el?.dataset;
+      if (d?.act === 'syncmode') root.querySelector<HTMLElement>(`#cmp-sync [data-act="syncmode"][data-mode="${d.mode}"]`)?.click();
+      else if (d?.act === 'sync-release') $('cmp-sync-release').click();
+    });
   }
-  root.querySelector('#cmp-set')!.addEventListener('change', (e) => session.setActive(Number((e.target as HTMLSelectElement).value)));
+  const setSelects = (): HTMLSelectElement[] => [
+    root.querySelector<HTMLSelectElement>('#cmp-set')!,
+    ...(deps.topSlot ? [deps.topSlot.querySelector<HTMLSelectElement>('#cmp-set-top')!] : []),
+  ];
+  function renderSetSelect() {
+    const html = session.sets.map((w, i) =>
+      `<option value="${i}"${session.canShow(i) ? '' : ' disabled'}${i === session.activeIndex ? ' selected' : ''}>${esc(`${session.setName(i)}(${w.logs.length}本)`)}</option>`).join('');
+    for (const sel of setSelects()) sel.innerHTML = html;
+  }
+  for (const sel of setSelects()) sel.addEventListener('change', (e) => session.setActive(Number((e.target as HTMLSelectElement).value)));
 
   function signature(): string {
     return session.activeIndex + '/' + SLOTS.map((s) => {
@@ -568,7 +593,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   function renderSectors() {
     const n = ref()?.log.circuit?.sectors.length ?? 0;
     $('cmp-edit-circuit').hidden = !(ref()?.log.circuit && deps.onEditCircuit);
-    $('cmp-sync').hidden = n === 0;
+    setSyncHidden(n === 0);
     if (n === 0) {
       $('cmp-sectors').innerHTML = '<div class="sub no-sector">セクター設定無し</div>';
       $('cmp-map-secs').innerHTML = '';
@@ -595,7 +620,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
     const box = $('cmp-sync-status');
     box.hidden = !anchor && !syncMsg;
     $('cmp-sync-text').textContent = anchor ? `S${anchor.k + 1} で全車一致中` : syncMsg;
-    $<HTMLButtonElement>('cmp-sync-release').disabled = activeSector === null;
+    findAll('[data-act="sync-release"]').forEach((b) => { (b as HTMLButtonElement).disabled = activeSector === null; });
     root.querySelectorAll<HTMLElement>('[data-act="sector"]').forEach((b) =>
       b.setAttribute('aria-pressed', String(activeSector === Number(b.dataset.k))));
   }

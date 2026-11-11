@@ -88,3 +88,53 @@ describe('見た目の指定', () => {
     expect(bar.querySelector('[data-act="xkind"]')).not.toBeNull();
   });
 });
+
+describe('スマホの横向き(案件 46)', () => {
+  const LAND = '@media (orientation:landscape) and (max-height:500px){';
+  const landBlock = () => css.slice(css.indexOf(LAND));
+
+  it('比較以外の画面に重ねる案内がある(文言)。表示は CSS で、ふだんは出さない', () => {
+    const note = $('#rotate-note');
+    expect(note.textContent).toContain('この画面は縦向きでお使いください');
+    expect(note.textContent).toContain('横向きで使えるのは「比較」の画面です');
+    expect(note.querySelector('button')).toBeNull();             // 比較画面へのボタンは置かない
+    expect(note.querySelector('.rn-head')!.textContent).toBe('Racing Line Lab');   // アプリの案内と分かるよう、ロゴとアプリ名の帯
+    expect(note.querySelector('.rn-head svg.logo')).not.toBeNull();
+    expect(css).toMatch(/\.rotate-note\{display:none;/);
+  });
+
+  it('横向きの指定は、幅の @media(767px まで)のあとに置き、比較が隠れているときだけ案内を出す', () => {
+    expect(css.indexOf(LAND)).toBeGreaterThan(css.indexOf('@media (max-width:767px){'));
+    expect(landBlock()).toContain('body:has(#view-compare[hidden]) .rotate-note{display:flex}');
+  });
+
+  it('比較画面は左右に並べ、画面の高さに収める(上部バーは 1 行)', () => {
+    const b = landBlock();
+    expect(b).toContain(':root{--top-h:41px}');
+    expect(b).toMatch(/\.top\{flex-wrap:nowrap;[^}]*height:40px/);
+    expect(b).toContain('.cmp-main{flex-direction:row}');
+    expect(b).toMatch(/\.cmp\{height:calc\(100dvh - var\(--top-h\)\)|\.cmp\{[^}]*height:calc\(100dvh - var\(--top-h\)\);min-height:0\}/);
+    expect(b).toMatch(/\.cmp-cards\{display:grid;grid-template-columns:1fr 1fr/);
+    expect(b).toContain('.graph-bar button{white-space:nowrap}');      // 幅が足りなくても、ボタンの文字を縦に折り返さない
+    expect(b).toContain('.g-ruler{display:none}');                   // 拡大中の下のスクロールバーは出さない(グラフをなぞって動かす)
+    expect(b).toMatch(/\.graph-bar\{flex-wrap:nowrap/);             // 「全体」が出ても 1 行
+  });
+});
+
+describe('上部バーの「表示中」と比較セット(スマホの横向き。案件 46)', () => {
+  it('カードは長押ししても文字を選択しない(どの幅でも)', () => {
+    expect(css).toMatch(/\.cmp-cards\{[^}]*-webkit-user-select:none;user-select:none;-webkit-touch-callout:none/);
+  });
+
+  it('上部バーの置き場に、右の列と同じ比較セットの選択を出す。ふだんは隠し、横向きでは右の列の方を隠す', () => {
+    const top = $<HTMLSelectElement>('#top-set #cmp-set-top');
+    const side = $<HTMLSelectElement>('#cmp-set');
+    expect($('#top-set .shown-mark').textContent).toBe('表示中');
+    expect(top.innerHTML).toBe(side.innerHTML);
+    expect(top.value).toBe(side.value);
+    expect(css).toMatch(/\.top-set\{display:none\}/);
+    const b = css.slice(css.indexOf('@media (orientation:landscape) and (max-height:500px){'));
+    expect(b).toMatch(/\.top-set\{display:flex;/);
+    expect(b).toContain('#cmp-set-wrap,#cmp-sync{display:none}');     // セクターボタンの動作も上部バーへ
+  });
+});

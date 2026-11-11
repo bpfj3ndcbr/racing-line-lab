@@ -21,6 +21,9 @@ export type ViewName = 'help' | 'import' | 'compare' | 'settings';
 /** About ボタンの ⓘ アイコン(線画。文字色に合わせる) */
 const INFO_ICON = '<svg class="ico" width="11" height="11" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 7.2v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="4.9" r=".95" fill="currentColor"/></svg>';
 
+/** スマホを横向きにしたとき、比較以外の画面に重ねる案内のアイコン(縦向きのスマホ。表示は CSS の @media で決める。案件 46) */
+const PHONE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/></svg>';
+
 /** 一時保存(案件 30)に失敗したときの案内 */
 export const RESUME_SAVE_FAILED = '走行ログが大きいため、一時保存できませんでした(読み込み直されると元に戻りません)。';
 
@@ -39,13 +42,15 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
         <button class="navtab" data-act="nav" data-view="compare">比較</button>
         <button class="navtab" data-act="nav" data-view="settings">設定</button>
       </nav>
+      <div class="top-set" id="top-set"></div>
       <div class="grow"></div>
       <div id="top-right" class="top-right"></div>
     </header>
     <div id="view-help" hidden></div>
     <div id="view-import"></div>
     <div id="view-compare" hidden></div>
-    <div id="view-settings" hidden></div>`;
+    <div id="view-settings" hidden></div>
+    <div class="rotate-note" id="rotate-note" role="status"><div class="rn-box"><div class="rn-head">${logoSvg(28)}<span class="rn-name">Racing Line Lab</span></div><div class="rn-body">${PHONE_ICON}<p>この画面は縦向きでお使いください</p><p class="sub">横向きで使えるのは「比較」の画面です</p></div></div></div>`;
 
   const helpEl = root.querySelector<HTMLElement>('#view-help')!;
   const importEl = root.querySelector<HTMLElement>('#view-import')!;
@@ -72,7 +77,7 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
     if (v !== 'import') importApi?.closeWork();      // 位置補正・サーキット登録の大きな画面は、データ管理を離れたら閉じる
     if (v === 'compare') {
       compare ??= mountCompareView(compareEl, session, {
-        mapFactory, theme, onBack: () => navigate('import'),
+        mapFactory, theme, onBack: () => navigate('import'), topSlot: root.querySelector<HTMLElement>('#top-set')!,
         onEditCircuit: (id) => { navigate('import'); importApi?.editCircuit(id); },     // 編集が終わったら比較に戻る
       });
       if (SLOTS.some((s) => session.assignment[s])) session.markGuideSeen();            // 一度比較まで進んだら、「はじめかた」は畳んで始める
