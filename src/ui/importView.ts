@@ -1,5 +1,5 @@
 import {
-  SLOTS, type Lap, type Slot, bestPerColumn, LINE_DIGITS, formatCln, formatJst, formatLapTime, formatSci, isBest, nameExists, sectorSplits,
+  SLOTS, type Lap, type Slot, bestPerColumn, LINE_DIGITS, formatCln, formatJst, formatLapTime, formatSci, isBest, nameExists, sectorSplits, escapeHtml as esc, fmtMinSec
 } from '../core';
 import { ALIAS_MAX, SET_COUNT, SLOT_ALIAS_MAX, type LoadedLog, type Session, type WorkSet, bestDuration } from '../store/session';
 import { mountCircuitEditor, type CircuitEditor } from './circuitEditor';
@@ -11,18 +11,15 @@ import type { MapFactory } from './mapTypes';
 import { SHOWN_MARK } from './marks';
 import type { ThemeController } from './theme';
 
-const esc = (s: string) =>
-  s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
-
 const NEW_CIRCUIT = '__new-circuit__';
 const fmtDelta = (d: number) => (d < 60 ? `+${d.toFixed(1)}` : `+${formatLapTime(d)}`);
 /** 1 周分だけのログ(輪)の始点と終点をつないで作ったラップか(closeLoop / detectLaps) */
 const joined = (l: LoadedLog, lap: Lap) => !!l.log.loop && lap.endIndex >= l.log.loop.n - 1;
 /** 「終端の調整」を出すラップ: ベストのこの倍率を超える長さ(調整前)のもの */
 const ADJUST_RATIO = 1.6;
-/** 秒 → "3:10" */
-const mmss = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, '0')}`;
-const endLabel = (lap: Lap) => `終端: ${mmss(lap.duration)}${lap.complete ? '' : '(参考値)'}`;
+/** ラップ一覧でグレーにするラップ: ベストのこの倍率を超えるもの(割り当ては可能) */
+const SLOW_RATIO = 1.2;
+const endLabel = (lap: Lap) => `終端: ${fmtMinSec(lap.duration)}${lap.complete ? '' : '(参考値)'}`;
 /**
  * 「終端の調整」のスライドバーの段階(1〜)と、終端(ラップ開始からの秒)の対応。
  * 上限が 10 分以下なら、端から端まで 10 秒刻み。10 分を超える長いラップでは、左半分(30 段階)を 0〜5 分の 10 秒刻み、
@@ -263,11 +260,11 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
     $('offsets-badge').textContent = n ? `補正済み ${n} ファイル` : '補正なし';
   }
 
-  /** 比較セット i+1 の、サーキット・操作ボタン・凡例 */
   /** ラップが出たのに割り当てが無い(自動割り当ての案内を出す) */
   function needsAssign(w: WorkSet): boolean {
     return w.logs.some((l) => l.circuit && l.laps.length) && !SLOTS.some((s) => w.assignment[s]);
   }
+  /** 比較セット i+1 の、サーキット・操作ボタン・凡例 */
   function renderSetBars(i: number, w: WorkSet) {
     const el = setEls[i];
     const freeSlot = SLOTS.find((s) => !w.assignment[s]);
@@ -287,7 +284,7 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
       ${w.showSectors ? `<span class="seg" role="group" aria-label="セクタータイムの種類">${segBtn('split', '区間タイム')}${segBtn('cumulative', '通過時刻')}</span>` : ''}
       ${needsAssign(w) ? `<button class="btn pri" data-act="auto-assign" data-set="${i}" data-fk="s${i}-auto">速いものから ${freeSlot} に自動で割り当て</button>` : ''}`;
 
-    el.querySelector('.foot')!.innerHTML = `<span>グレーの行はベストの120%超(割り当ては可能です)</span>
+    el.querySelector('.foot')!.innerHTML = `<span>グレーの行はベストの${Math.round(SLOW_RATIO * 100)}%超(割り当ては可能です)</span>
       ${w.showSectors ? '<span class="legend"><i class="bsec-dot"></i>紫の数字はそのデータ内での各セクター最速(グレーの行は除く)</span>' : ''}
       <span>ラップ番号は計測ラインの最初の通過から数えます(RaceChrono の番号と異なる場合があります)</span><span>割り当て済みのボタンを押し直すと解除します</span>`;
   }
@@ -351,7 +348,7 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
     const values = new Map(l.laps.map((lap) => [lap.number, w.sectorMode === 'split' ? sectorSplits(lap) : lap.sectorTimes]));
     const bestCols = bestPerColumn(
       l.laps.map((lap) => values.get(lap.number)!),
-      l.laps.map((lap) => lap.duration <= best * 1.2),
+      l.laps.map((lap) => lap.duration <= best * SLOW_RATIO),
     );
 
     const offTag = l.offset.east !== 0 || l.offset.north !== 0 ? `東 ${l.offset.east.toFixed(2)} m / 北 ${l.offset.north.toFixed(2)} m` : '';
@@ -383,7 +380,7 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
       rows = head + laps.map((lap) => {
         const d = lap.duration - best;
         const assigned = SLOTS.some((s) => w.assignment[s]?.logId === l.id && w.assignment[s]?.lap === lap.number);
-        const ex = lap.duration > best * 1.2;
+        const ex = lap.duration > best * SLOW_RATIO;
         const secCells = showSec
           ? values.get(lap.number)!.map((t, k) =>
               `<div class="num${!ex && isBest(t, bestCols[k]) ? ' bsec' : ''}">${t === null ? '-' : formatLapTime(t)}</div>`).join('')
@@ -581,7 +578,6 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
     }
   });
 
-  /** ドロップ枠の Enter / Space は、クリックと同じ */
   // 別名の入力: Enter で確定、Esc でやめる。見出し(summary)の開閉には伝えない
   root.addEventListener('keydown', (e) => {
     const inp = (e.target as HTMLElement).closest<HTMLInputElement>('.alias-input');
@@ -601,6 +597,7 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
     if ((e.target as HTMLElement).closest('.set-alias')) e.preventDefault();
     if (asTabs() && (e.target as HTMLElement).closest('.set-sec > summary') && !(e.target as HTMLElement).closest('input,button')) e.preventDefault();   // タブでは閉じない
   });
+  // ドロップ枠の Enter / Space は、クリックと同じ
   root.addEventListener('keydown', (e) => {
     const box = (e.target as HTMLElement).closest<HTMLElement>('.dropbox');
     if (box && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); box.click(); }
@@ -760,7 +757,7 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
     const t = e.target as HTMLInputElement;
     if (!t.classList.contains('lap-end-range')) return;
     const val = t.parentElement?.querySelector('.lap-end-val');
-    if (val) val.textContent = `終端: ${mmss(endFromStep(Number(t.value), Number(t.dataset.max)))}`;
+    if (val) val.textContent = `終端: ${fmtMinSec(endFromStep(Number(t.value), Number(t.dataset.max)))}`;
   });
 
   root.addEventListener('change', async (e) => {

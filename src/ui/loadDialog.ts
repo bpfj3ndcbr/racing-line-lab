@@ -1,6 +1,6 @@
 import {
   type Circuit, type GeoLine, type LineCandidate, bearingDiff, detectLaps, findCrossings, formatJst, formatLapTime, lineBearing, lineMid,
-  lineMoveM, lineMovedTo, lineWithBearing, matchCircuit, metersPerDegree, orderSectors, rotateToward, roundLine, sectorPassTimes, shiftLine,
+  lineMoveM, lineMovedTo, lineWithBearing, matchCircuit, metersPerDegree, orderSectors, rotateToward, roundLine, sectorPassTimes, shiftLine, escapeHtml as esc
 } from '../core';
 import type { LoadedLog, Session } from '../store/session';
 import { confirmDialog, customDialog } from './dialog';
@@ -58,8 +58,6 @@ function fmtDiff(d: number): string {
 export function fixSummary(before: GeoLine, after: GeoLine): string {
   return `角度 ${fmtDiff(bearingDiff(lineBearing(before), lineBearing(after)))}・移動 ${lineMoveM(before, after).toFixed(1)} m`;
 }
-
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
 /** 選べるもの */
 export type LoadOption =

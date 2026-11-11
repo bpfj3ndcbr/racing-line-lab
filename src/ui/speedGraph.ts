@@ -1,4 +1,4 @@
-import type { Slot } from '../core';
+import { type Slot, fmtMinSec } from '../core';
 
 const NS = 'http://www.w3.org/2000/svg';
 export const GRAPH_LEFT = 26, GRAPH_RIGHT = 8;
@@ -30,7 +30,6 @@ export function labelRows(items: { px: number; label: string }[], charW = 6): nu
 
 export const fmtDistTick = (m: number) =>
   m === 0 ? '0' : m >= 1000 ? `${+(m / 1000).toFixed(2)} km` : `${m} m`;
-export const fmtTimeTick = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
 
 const el = <K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, string | number> = {}) => {
   const e = document.createElementNS(NS, tag);
@@ -399,7 +398,7 @@ export class SpeedGraph {
     const first = Math.max(0, Math.ceil(this.viewStart / step - 1e-9) * step);
     for (let v = first; v <= end + 1e-9; v += step) {
       const t = el('text', { class: 'g-tick', x: this.sx(v), y: this.h - 6, 'text-anchor': v === 0 ? 'start' : 'middle' });
-      t.textContent = this.kind === 'dist' ? fmtDistTick(v) : fmtTimeTick(v);
+      t.textContent = this.kind === 'dist' ? fmtDistTick(v) : fmtMinSec(v);
       g.appendChild(t);
     }
     // セクターの線とラベル(重なるラベルは 2 段にずらす)
@@ -441,7 +440,7 @@ export class SpeedGraph {
     this.thumb.setAttribute('width', String(this.plotW / this.zoomK));
     const room = this.xMax - this.span;
     this.thumb.setAttribute('aria-valuenow', String(room > 0 ? Math.round((this.clampStart(this.viewStart) / room) * 100) : 0));
-    const f = (v: number) => (this.kind === 'dist' ? fmtDistTick(Math.round(v)) : fmtTimeTick(v));
+    const f = (v: number) => (this.kind === 'dist' ? fmtDistTick(Math.round(v)) : fmtMinSec(v));
     this.thumb.setAttribute('aria-valuetext', `表示範囲 ${f(this.viewStart)} から ${f(this.viewStart + this.span)}`);
     this.rtick.setAttribute('visibility', this.cursorX === null ? 'hidden' : 'visible');
     if (this.cursorX !== null) {

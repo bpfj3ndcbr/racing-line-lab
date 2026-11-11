@@ -1,6 +1,6 @@
 import { gsiGeocode, type GeoHit, type Geocoder } from '../io/geocode';
 import {
-  type GeoLine, LINE_DIGITS, distanceM, formatCln, formatSci, metersPerDegree, parseCln, parseSci, roundLine, sectorPassTimes, shiftLine,
+  type GeoLine, LINE_DIGITS, distanceM, formatCln, formatSci, metersPerDegree, parseCln, parseSci, roundLine, sectorPassTimes, shiftLine, escapeHtml as esc
 } from '../core';
 import type { LoadedLog, Session } from '../store/session';
 import { alertDialog, confirmDialog } from './dialog';
@@ -8,8 +8,6 @@ import { downloadText } from './download';
 import { hasExt, wrongExtMessage } from './fileKind';
 import type { MapFactory, TrackMap } from './mapTypes';
 import type { ThemeController } from './theme';
-
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
 export interface CircuitEditorDeps {
   mapFactory: MapFactory;

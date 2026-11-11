@@ -3,12 +3,12 @@
  * README で使っている書き方(見出し・段落・箇条書き・番号付きリスト・引用・表・画像・コード・太字・リンク・区切り線)だけに対応する。
  */
 
+import { escapeHtml as esc } from './format';
+
 export interface MarkdownOptions {
   /** 画像の src を、表示に使う URL に置き換える(見つからなければ、元の src のまま) */
   resolveImage?: (src: string) => string | undefined;
 }
-
-const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 /** 行の中の書式(コード・画像・リンク・太字)。行末の半角スペース 2 つは改行 */
 function inline(text: string, opts: MarkdownOptions): string {

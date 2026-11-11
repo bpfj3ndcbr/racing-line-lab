@@ -3,7 +3,7 @@ import { mountCompareView, type CompareView } from './compareView';
 import { type ImportApi, mountImportView } from './importView';
 import type { MapFactory } from './mapTypes';
 import type { Theme, ThemeController } from './theme';
-import { SLOTS } from '../core';
+import { SLOTS, escapeHtml as esc } from '../core';
 import { Prefs } from '../store/prefs';
 import { mountSettingsView } from './settingsView';
 import { logoSvg } from './logo';
@@ -16,19 +16,16 @@ import { applyAreas } from '../io/mapSave';
 import { MapAreas } from '../store/mapAreas';
 import { installAppleFilePicker } from './fileKind';
 
-const esc = (s: string) =>
-  s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
-
 export type ViewName = 'help' | 'import' | 'compare' | 'settings';
 
 /** About ボタンの ⓘ アイコン(線画。文字色に合わせる) */
 const INFO_ICON = '<svg class="ico" width="11" height="11" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 7.2v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="4.9" r=".95" fill="currentColor"/></svg>';
 
-/** アプリ全体の枠: 上部バー(画面の切り替え・サーキット名・テーマ)と、使い方 / データ管理 / 比較 / 設定の 4 画面。 */
 /** 一時保存(案件 30)に失敗したときの案内 */
 export const RESUME_SAVE_FAILED = '走行ログが大きいため、一時保存できませんでした(読み込み直されると元に戻りません)。';
 
 /**
+ * アプリ全体の枠: 上部バー(画面の切り替え・サーキット名・テーマ)と、使い方 / データ管理 / 比較 / 設定の 4 画面。
  * opts.resume: Web 版の一時保存の保存先(案件 30)。省略すると IndexedDB(使えなければ無し)。null で使わない。
  * デスクトップ版(window.rllNative がある)では使わない
  */
@@ -110,19 +107,12 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
     });
   }
 
-  function currentCircuitName(): string {
-    const sel = session.circuits.find((c) => c.id === session.selectedCircuitId);
-    if (sel) return sel.name;
-    const names = Array.from(new Set(session.logs.map((l) => l.circuit?.name).filter((n): n is string => !!n)));
-    return names.length ? names.join('、') : '未選択';
-  }
-
   function renderTop() {
     const t = theme.get();
     const seg = (v: Theme, label: string) =>
       `<button data-act="theme" data-theme="${v}" data-fk="theme-${v}" aria-pressed="${t === v}" class="${t === v ? 'on' : ''}">${label}</button>`;
     const key = (document.activeElement as HTMLElement | null)?.dataset?.fk;
-    topRight.innerHTML = `<span class="cur">サーキット: <b>${esc(currentCircuitName())}</b></span>` +
+    topRight.innerHTML = `<span class="cur">サーキット: <b>${esc(session.setCircuitOf()?.name ?? '未選択')}</b></span>` +
       `<span class="seg tiny" role="group" aria-label="テーマ">${seg('light', 'ライト')}${seg('dark', 'ダーク')}</span>` +
       `<span class="seg tiny" role="group" aria-label="このアプリについて"><button data-act="about" data-fk="about" aria-haspopup="dialog">${INFO_ICON}About</button></span>`;
     if (key) topRight.querySelector<HTMLElement>(`[data-fk="${key}"]`)?.focus({ preventScroll: true });

@@ -15,3 +15,4 @@ export * from './heat';
 export * from './correctPreview';
 export * from './align';
 export * from './tiles';
+export * from './format';

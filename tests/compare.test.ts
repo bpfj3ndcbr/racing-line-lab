@@ -5,7 +5,8 @@ import { parseVbo } from '../src/core';
 import { MemoryStore } from '../src/io/storage';
 import { Session } from '../src/store/session';
 import { mountApp } from '../src/ui/app';
-import { DIST_STEPS, TIME_STEPS, fmtDistTick, fmtTimeTick, pickStep } from '../src/ui/speedGraph';
+import { DIST_STEPS, TIME_STEPS, fmtDistTick, pickStep } from '../src/ui/speedGraph';
+import { fmtMinSec } from '../src/core';
 import { ThemeController } from '../src/ui/theme';
 import { FakeMap } from './helpers';
 import { GRAPH_LEFT, GRAPH_RIGHT } from '../src/ui/speedGraph';
@@ -244,7 +245,7 @@ describe('グラフの目盛り', () => {
     expect(fmtDistTick(500)).toBe('500 m');
     expect(fmtDistTick(1000)).toBe('1 km');
     expect(fmtDistTick(1500)).toBe('1.5 km');
-    expect(fmtTimeTick(90)).toBe('1:30');
+    expect(fmtMinSec(90)).toBe('1:30');
   });
 });
 

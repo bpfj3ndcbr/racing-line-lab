@@ -1,9 +1,9 @@
 import {
   type HeatRun as CoreRun, type Lap, type LapSeries, PlaybackEngine, SLOTS, type Slot,
-  accelSeries, alignedSeries, buildLapSeries, pickRuler, formatLapTime, heatColor, heatRuns, sampleSeries, speedColor, speedRange, speedRuns, timeAtDistance,
+  accelSeries, alignedSeries, buildLapSeries, pickRuler, formatLapTime, heatColor, heatRuns, sampleSeries, speedColor, speedRange, speedRuns, timeAtDistance, escapeHtml as esc
 } from '../core';
 import type { LoadedLog, Session } from '../store/session';
-import { Prefs, RATE_CHOICES, ZOOM_CHOICES, type LabelV, type PrefKey } from '../store/prefs';
+import { Prefs, RATE_CHOICES, ZOOM_CHOICES, type FollowV as Follow, type LabelV, type MapModeV as MapMode, type PrefKey, type SyncV as SyncMode } from '../store/prefs';
 import { SpeedGraph, ZOOM_MAX, type XKind } from './speedGraph';
 import { clamp, makeSplitter } from './splitter';
 import type { HeatRun, MapFactory, TrackMap } from './mapTypes';
@@ -15,10 +15,6 @@ import { SHOWN_MARK } from './marks';
  * track: 距離を、物差しの車の走行ラインに投影した距離に置き換えたもの。横軸「距離」で使う(コース上の同じ位置が同じ距離になる)
  */
 interface Car { slot: Slot; log: LoadedLog; lap: Lap; series: LapSeries; track: LapSeries; accel: HeatRun[]; speed: HeatRun[] }
-/** line = 車ごとの色の線 / speed = 速度のヒートマップ / accel = 加速・減速のマップ */
-type MapMode = 'line' | 'speed' | 'accel';
-type Follow = 'fixed' | 'leader' | Slot;
-type SyncMode = 'leader' | 'all';
 
 export interface CompareDeps {
   mapFactory: MapFactory;
@@ -51,7 +47,6 @@ const icon = (p: string) =>
   `<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">${p}</svg>`;
 
 // 画面の分割(サイズの上限・下限など)
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 const LAYOUT_VERSION = 1;
 interface Layout { v: number; sideW: number; graphH: number }
 const DEFAULT_LAYOUT: Layout = { v: LAYOUT_VERSION, sideW: 300, graphH: 300 };
@@ -61,7 +56,7 @@ const SIDE_MIN = 220, SIDE_MAX = 560, MAP_MIN_W = 240;
 const GRAPH_MIN_H = 170, SPLITTER_H = 6, UPPER_FALLBACK_H = 400;
 const EASE_MS = 400;
 
-/** 比較画面: 地図 + 速度グラフ + 再生。セクター同期は段階5。 */
+/** 比較画面: 地図 + 速度グラフ + 再生。 */
 export function mountCompareView(root: HTMLElement, session: Session, deps: CompareDeps): CompareView {
   root.innerHTML = `
     <div class="cmp">
@@ -182,9 +177,9 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
 
   const ref = () => cars[0];
   const offOf = (c: Car) => off.get(c.slot) ?? 0;
-  /** 再生時刻 tau のときの、その車のラップ内の時刻(範囲の外は端に張り付く) */
   /** 横軸に合わせた時系列: 距離のときは、物差しに投影した距離のもの */
   const sv = (c: Car) => (xKind === 'dist' ? c.track : c.series);
+  /** 再生時刻 tau のときの、その車のラップ内の時刻(範囲の外は端に張り付く) */
   const localOf = (c: Car, tau: number) => Math.min(Math.max(tau + offOf(c), 0), c.series.duration);
   /** 全体の長さ: 最後の車が走り終えるまで */
   const totalDuration = () => xKind === 'dist' && ref()

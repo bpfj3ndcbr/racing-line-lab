@@ -1,5 +1,5 @@
 import { Prefs, RATE_CHOICES, SPEED_RANGE, ZOOM_CHOICES, type PrefKey, type PrefValues } from '../store/prefs';
-import { type Circuit, type SaveArea, type TileId, tileInRect } from '../core';
+import { type Circuit, type SaveArea, type TileId, tileInRect, escapeHtml as esc } from '../core';
 import type { MapAreas } from '../store/mapAreas';
 import type { TileStore } from '../io/tileStore';
 import { applyAreas } from '../io/mapSave';
@@ -55,8 +55,6 @@ const GROUPS: { title: string; rows: (Row | Plain)[] }[] = [
     { name: '利用状況の送信', kind: 'analytics', hint: 'Web 版では、アプリの改善のため、Google アナリティクスで利用状況(ページの表示、使っている環境など)を送ります。走行ログの中身や位置、ファイル名は送りません。オフにすると送りません。デスクトップ版(Electron)では送りません。' },
   ] },
 ];
-
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
 /**
  * 設定タブ。各項目は「最初の状態」を選ぶ。「最後の状態を記憶する」にチェックすると、その項目は前回の状態で始まるので、
