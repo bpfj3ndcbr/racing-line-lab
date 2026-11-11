@@ -10,7 +10,7 @@ export interface LoadedLog {
   /** 「走行データN」の N。削除しても詰めない(割り当てが番号に依存するため) */
   no: number;
   log: TrackLog;
-  /** 位置補正量(ファイル単位)。段階6で編集 UI を付ける */
+  /** 位置補正量(ファイル単位) */
   offset: Offset;
   circuit: Circuit | null;
   /** true ならコントロールライン通過による自動判定 */
@@ -41,12 +41,14 @@ export interface CircuitResult {
 
 export interface SortState { key: 'lap' | 'time'; dir: 1 | -1 }
 
-/** ベスト基準: 完了ラップがあればその最速、無ければ全ラップの最速 */
-export function bestDuration(l: LoadedLog): number {
+/** そのログのベストラップ: 完了ラップがあればその最速、無ければ全ラップの最速。ラップが無ければ null */
+export function bestLap(l: LoadedLog): Lap | null {
   const done = l.laps.filter((x) => x.complete);
   const pool = done.length ? done : l.laps;
-  return pool.length ? Math.min(...pool.map((x) => x.duration)) : NaN;
+  return pool.length ? pool.reduce((a, b) => (b.duration < a.duration ? b : a)) : null;
 }
+/** ベスト基準のタイム(bestLap の長さ。ラップが無ければ NaN) */
+export function bestDuration(l: LoadedLog): number { return bestLap(l)?.duration ?? NaN; }
 
 function readJson<T>(store: KeyValueStore, key: string, fallback: T): T {
   try {
@@ -70,15 +72,21 @@ export class WorkSet {
   nextNo = 1;
 }
 
+/**
+ * 比較セットの設定(割り当て・サーキットの指定・並べ替え・セクターの表示・区間 / 通過)の保存の形。
+ * 前回の状態(lastSession)と一時保存(ResumeState)の両方で、この形をそのまま使う。
+ * 項目を足すときは、setPrefsOf・applySetPrefs(と、割り当てなら applyAssignment)を直せば、両方に効く
+ */
+export interface SetPrefs {
+  assignment?: Partial<Record<Slot, LapRef | null>>; circuitId?: string | null;
+  sort?: SortState; showSectors?: boolean; sectorMode?: 'split' | 'cumulative';
+}
+
 /** Web 版の一時保存(案件 30)の、小さな状態 */
 export interface ResumeState {
   v: 1;
   active: number;
-  sets: {
-    logs: { id: string; no: number }[]; nextNo?: number;
-    assignment?: Partial<Record<Slot, LapRef | null>>; circuitId?: string | null;
-    sort?: SortState; showSectors?: boolean; sectorMode?: 'split' | 'cumulative';
-  }[];
+  sets: ({ logs: { id: string; no: number }[]; nextNo?: number } & SetPrefs)[];
 }
 
 /** セットの別名の長さの上限(文字数) */
@@ -124,8 +132,6 @@ export class Session {
 
   /** アプリを初期状態に戻す: 保存したものをすべて消す(画面は呼び出し側で読み直す) */
   factoryReset(): void { this.store.clear(); }
-  /** セットの別名の長さの上限(文字数) */
-  static readonly ALIAS_MAX = ALIAS_MAX;
   /** 「比較セットN」(元の名前。別名があっても残る) */
   setLabel(i: number): string { return `比較セット${i + 1}`; }
   /** セット i の別名(無ければ空文字) */
@@ -134,7 +140,7 @@ export class Session {
   setAlias(i: number, text: string): void {
     if (i < 0 || i >= SET_COUNT) return;
     const all = Array.from({ length: SET_COUNT }, (_, k) => this.aliasOf(k));
-    all[i] = Array.from(text.trim()).slice(0, Session.ALIAS_MAX).join('');
+    all[i] = Array.from(text.trim()).slice(0, ALIAS_MAX).join('');
     this.setSetting('setAliases', all);
     this.emit();
   }
@@ -197,7 +203,7 @@ export class Session {
   private saveLastSession() {
     const sets = this.sets.map((w) => ({
       files: w.logs.filter((l) => this.paths.has(l.id)).map((l) => ({ id: l.id, path: this.paths.get(l.id)! })),
-      assignment: w.assignment, circuitId: w.selectedCircuitId, sort: w.sort, showSectors: w.showSectors, sectorMode: w.sectorMode,
+      ...this.setPrefsOf(w),
     }));
     this.store.set('lastSession', JSON.stringify({ v: 2, active: this.activeIndex, sets }));
   }
@@ -208,10 +214,7 @@ export class Session {
    * read は場所から中身を返す(読めなければ null)。
    */
   async restoreLast(read: (path: string) => Promise<string | null>): Promise<void> {
-    type SavedSet = {
-      files?: { id: string; path: string }[]; assignment?: Partial<Record<Slot, LapRef | null>>; circuitId?: string | null;
-      sort?: SortState; showSectors?: boolean; sectorMode?: 'split' | 'cumulative';
-    };
+    type SavedSet = { files?: { id: string; path: string }[] } & SetPrefs;
     type Saved = { v?: number; active?: number; sets?: SavedSet[] };
     const saved = readJson<Saved>(this.store, 'lastSession', {});
     const list: SavedSet[] = saved.sets ?? [];
@@ -224,10 +227,7 @@ export class Session {
     try {
       for (let si = 0; si < Math.min(list.length, SET_COUNT); si++) {
         const w = this.sets[si], sv = list[si];
-        if (sv.circuitId && this.circuits.some((c) => c.id === sv.circuitId)) w.selectedCircuitId = sv.circuitId;
-        if (sv.sort && (sv.sort.key === 'lap' || sv.sort.key === 'time') && (sv.sort.dir === 1 || sv.sort.dir === -1)) w.sort = sv.sort;
-        w.showSectors = sv.showSectors === true;
-        w.sectorMode = sv.sectorMode === 'cumulative' ? 'cumulative' : 'split';
+        this.applySetPrefs(w, sv);
         for (const f of sv.files ?? []) {
           const name = f.id.slice(0, f.id.lastIndexOf(':')) || f.id;
           this.loading = `前回のファイルを読み込み中… (${++done}/${total}) ${name}`;
@@ -243,16 +243,32 @@ export class Session {
             this.addEntry(w, log, f.id);
           } catch { cache.set(f.id, null); failed.push(name); }
         }
-        for (const s of SLOTS) {
-          const ref = sv.assignment?.[s] ?? null;
-          if (ref && this.resolveRef(ref, si)) w.assignment = { ...w.assignment, [s]: { logId: ref.logId, lap: ref.lap } };
-        }
+        this.applyAssignment(w, si, sv.assignment);
       }
       const a = saved.active;
       if (typeof a === 'number' && a >= 0 && a < SET_COUNT) this.activeIndex = a;
       this.message = failed.length ? `前回のファイルを読み込めませんでした: ${Array.from(new Set(failed)).join('、')}` : '';
     } finally { this.restoring = false; this.loading = ''; }
     this.emit();
+  }
+
+  /** 比較セットの設定の保存の形(SetPrefs)。前回の状態と一時保存で共通 */
+  private setPrefsOf(w: WorkSet): SetPrefs {
+    return { assignment: w.assignment, circuitId: w.selectedCircuitId, sort: w.sort, showSectors: w.showSectors, sectorMode: w.sectorMode };
+  }
+  /** 保存した比較セットの設定を戻す(割り当て以外)。登録に無いサーキット・形の合わない値は戻さない。走行ログを入れる前に呼ぶ */
+  private applySetPrefs(w: WorkSet, sv: SetPrefs) {
+    if (sv.circuitId && this.circuits.some((c) => c.id === sv.circuitId)) w.selectedCircuitId = sv.circuitId;
+    if (sv.sort && (sv.sort.key === 'lap' || sv.sort.key === 'time') && (sv.sort.dir === 1 || sv.sort.dir === -1)) w.sort = sv.sort;
+    w.showSectors = sv.showSectors === true;
+    w.sectorMode = sv.sectorMode === 'cumulative' ? 'cumulative' : 'split';
+  }
+  /** 保存した割り当てを戻す(そのラップが今もあるものだけ)。走行ログを入れたあとに呼ぶ */
+  private applyAssignment(w: WorkSet, si: number, saved: SetPrefs['assignment']) {
+    for (const s of SLOTS) {
+      const ref = saved?.[s] ?? null;
+      if (ref && this.resolveRef(ref, si)) w.assignment = { ...w.assignment, [s]: { logId: ref.logId, lap: ref.lap } };
+    }
   }
 
   /**
@@ -264,7 +280,7 @@ export class Session {
       v: 1, active: this.activeIndex,
       sets: this.sets.map((w) => ({
         logs: w.logs.map((l) => ({ id: l.id, no: l.no })), nextNo: w.nextNo,
-        assignment: w.assignment, circuitId: w.selectedCircuitId, sort: w.sort, showSectors: w.showSectors, sectorMode: w.sectorMode,
+        ...this.setPrefsOf(w),
       })),
     };
   }
@@ -281,10 +297,7 @@ export class Session {
     try {
       st.sets.slice(0, SET_COUNT).forEach((sv, si) => {
         const w = this.sets[si];
-        if (sv.circuitId && this.circuits.some((c) => c.id === sv.circuitId)) w.selectedCircuitId = sv.circuitId;
-        if (sv.sort && (sv.sort.key === 'lap' || sv.sort.key === 'time') && (sv.sort.dir === 1 || sv.sort.dir === -1)) w.sort = sv.sort;
-        w.showSectors = sv.showSectors === true;
-        w.sectorMode = sv.sectorMode === 'cumulative' ? 'cumulative' : 'split';
+        this.applySetPrefs(w, sv);
         for (const r of sv.logs ?? []) {
           const log = logs.get(r.id);
           if (!log) continue;
@@ -294,10 +307,7 @@ export class Session {
           n++;
         }
         if (Number.isInteger(sv.nextNo)) w.nextNo = Math.max(w.nextNo, sv.nextNo!);
-        for (const s of SLOTS) {
-          const ref = sv.assignment?.[s] ?? null;
-          if (ref && this.resolveRef(ref, si)) w.assignment = { ...w.assignment, [s]: { logId: ref.logId, lap: ref.lap } };
-        }
+        this.applyAssignment(w, si, sv.assignment);
       });
       if (typeof st.active === 'number' && st.active >= 0 && st.active < SET_COUNT) this.activeIndex = st.active;
       if (n) this.message = '前の画面の状態を元に戻しました。';
@@ -308,10 +318,7 @@ export class Session {
 
   // ---- 走行ログ ----
   /** どこかのセットに読み込み済みのファイルなら、その中身(同じファイルを別のセットに入れるとき、読み直さない) */
-  private knownLog(id: string): TrackLog | null {
-    for (const w of this.sets) { const l = w.logs.find((x) => x.id === id); if (l) return l.log; }
-    return null;
-  }
+  private knownLog(id: string): TrackLog | null { return this.knownEntry(id)?.log ?? null; }
 
   async addVboFile(file: File, path?: string, set?: number): Promise<void> {
     try {
@@ -330,13 +337,6 @@ export class Session {
     for (const f of files) await this.addVboFile(f.file, f.path, set);
   }
 
-  /** そのログのベストラップ(完了ラップがあればその最速) */
-  bestLap(l: LoadedLog): Lap | null {
-    const done = l.laps.filter((x) => x.complete);
-    const pool = done.length ? done : l.laps;
-    return pool.length ? pool.reduce((a, b) => (b.duration < a.duration ? b : a)) : null;
-  }
-
   /**
    * 各ログのベストラップを、速い順に、空いている枠の若い方から割り当てる(空きが無くなったら止める)。
    * 割り当てた数を返す。割り当てたセットが「表示セット」になる
@@ -345,7 +345,7 @@ export class Session {
     const i = set ?? this.activeIndex;
     const w = this.sets[i];
     if (!w) return 0;
-    const cands = w.logs.flatMap((l) => { const lap = this.bestLap(l); return lap ? [{ id: l.id, lap }] : []; })
+    const cands = w.logs.flatMap((l) => { const lap = bestLap(l); return lap ? [{ id: l.id, lap }] : []; })
       .sort((a, b) => a.lap.duration - b.lap.duration);
     let n = 0;
     for (const c of cands) {
@@ -430,9 +430,9 @@ export class Session {
     this.emit();
   }
 
-  /** 位置補正量を変更し、ラップを再計算する。(0, 0) に戻したときは保存からも消す。同じファイルが入っている全部のセットに効く */
   /**
-   * 位置補正量を変える。割り当ては、補正の前と同じラップ(matchLap)が見つかれば残し、
+   * 位置補正量を変え、ラップを計算し直す。(0, 0) に戻したときは保存からも消す。同じファイルが入っている全部のセットに効く。
+   * 割り当ては、補正の前と同じラップ(matchLap)が見つかれば残し、
    * 見つからなかったものだけ解除して、message で知らせる(案件 19)。解除したもの(セット・カード・ラップ番号)を返す
    */
   setOffset(id: string, offset: Offset): LostAssignment[] {
@@ -536,22 +536,46 @@ export class Session {
   setCircuit(id: string | null, set?: number): void {
     const w = this.ws(set);
     w.selectedCircuitId = id;
+    // 変えたセットだけでなく、全部のセットを計算し直す。終端の調整はファイル単位なので、このセットでサーキットが変わって
+    // 調整を解除したログが、ほかのセットにも入っていることがある(案件 38 で確かめた)
     this.resolveAll();
     this.emit();
   }
 
+  /** ファイル(.cln / .sci の中身)からサーキットを登録する。線はファイルの値のまま */
   registerCircuit(name: string, clnText: string, sciText: string, view?: MapView): CircuitResult {
+    const bad = this.circuitNameError(name);
+    if (bad) return bad;
+    const control = parseCln(clnText)[0];
+    if (!control) return { ok: false, reason: 'invalid', message: '.cln からコントロールラインを読み取れませんでした。' };
+    return this.addCircuit(name.trim(), control, parseSci(sciText).map((x) => x.line), view, false);
+  }
+
+  /**
+   * 画面で決めた線から、サーキットを登録する(サーキットの編集画面・読み込みの確認画面)。線は保存の桁(LINE_DIGITS)に丸める。
+   * announce なら、登録できたことを message で知らせる
+   */
+  registerCircuitLines(name: string, control: GeoLine, sectors: GeoLine[], opts: { view?: MapView; announce?: boolean } = {}): CircuitResult {
+    const bad = this.circuitNameError(name);
+    if (bad) return bad;
+    return this.addCircuit(name.trim(), roundLine(control), sectors.map(roundLine), opts.view, opts.announce === true);
+  }
+
+  private circuitNameError(name: string): CircuitResult | null {
     const trimmed = name.trim();
     if (!trimmed) return { ok: false, reason: 'invalid', message: 'サーキット名を入力してください。' };
     if (nameExists(this.circuits, trimmed)) return { ok: false, reason: 'duplicate', message: '既に名前が存在します' };
-    const control = parseCln(clnText)[0];
-    if (!control) return { ok: false, reason: 'invalid', message: '.cln からコントロールラインを読み取れませんでした。' };
-    const sectors = parseSci(sciText).map((x) => x.line);
-    this.circuits = [...this.circuits, { id: `c${Date.now().toString(36)}${this.circuits.length}`, name: trimmed, control, sectors, ...(view ? { view } : {}) }];
+    return null;
+  }
+
+  private addCircuit(name: string, control: GeoLine, sectors: GeoLine[], view: MapView | undefined, announce: boolean): CircuitResult {
+    this.circuits = [...this.circuits, { id: `c${Date.now().toString(36)}${this.circuits.length}`, name, control, sectors, ...(view ? { view } : {}) }];
     this.saveCircuits();
     this.resolveAll();
+    const message = `「${name}」を登録しました(セクター ${sectors.length} 本)。`;
+    if (announce) this.message = message;
     this.emit();
-    return { ok: true, message: `「${trimmed}」を登録しました(セクター ${sectors.length} 本)。` };
+    return { ok: true, message };
   }
 
   renameCircuit(id: string, name: string): CircuitResult {
