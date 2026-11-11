@@ -6,6 +6,7 @@ import { mountCircuitEditor, type CircuitEditor } from './circuitEditor';
 import { candidateLabel, loadDialog, planLoad } from './loadDialog';
 import { mountCorrectView, type CorrectView } from './correctView';
 import { alertDialog, promptDialog } from './dialog';
+import { downloadText } from './download';
 import { hasExt, wrongExtMessage } from './fileKind';
 import type { MapFactory } from './mapTypes';
 import { SHOWN_MARK } from './marks';
@@ -810,16 +811,9 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
     }
   });
 
-  /** 位置補正データを JSON ファイルとして保存する(ブラウザのダウンロード) */
+  /** 位置補正データを JSON ファイルとして保存する(.cln / .sci と同じく、デスクトップ版は保存ダイアログ) */
   function exportOffsets() {
-    const blob = new Blob([session.exportOffsets()], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'position-offsets.json';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    downloadText('position-offsets.json', session.exportOffsets(), 'application/json');
   }
 
   async function renameFlow(id: string) {

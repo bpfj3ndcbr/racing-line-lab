@@ -102,6 +102,41 @@ describe('セッション: 位置補正の保存と、書き出し・読み込�
   });
 });
 
+describe('補正データの書き出し(案件 37)', () => {
+  afterEach(() => { delete window.rllNative; });
+  const native = (r: { ok: boolean; canceled?: boolean; error?: string }) => {
+    const saveText = vi.fn(async () => r);
+    window.rllNative = {
+      storageGet: () => null, storageSet: () => {}, storageClear: () => {}, getPathForFile: () => '', readTextFile: async () => null, saveText,
+    };
+    return saveText;
+  };
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+
+  it('デスクトップ版では、.cln / .sci と同じ保存ダイアログ(saveText)で書き出す', async () => {
+    session.setOffset('u', { east: 1, north: 2 });
+    const saveText = native({ ok: true });
+    $<HTMLButtonElement>('[data-act="export-offsets"]').click();
+    await flush();
+    expect(saveText).toHaveBeenCalledTimes(1);
+    expect(saveText).toHaveBeenCalledWith('position-offsets.json', session.exportOffsets());
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it('保存に失敗したら、アプリのダイアログで知らせる(取り消しなら何も出さない)', async () => {
+    native({ ok: false, canceled: true });
+    $<HTMLButtonElement>('[data-act="export-offsets"]').click();
+    await flush();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    native({ ok: false, error: '書き込めません' });
+    $<HTMLButtonElement>('[data-act="export-offsets"]').click();
+    await flush();
+    const dlg = document.querySelector('[role="dialog"]')!;
+    expect(dlg.textContent).toContain('保存できませんでした');
+    expect(dlg.textContent).toContain('書き込めません');
+  });
+});
+
 describe('データ管理画面から位置補正の画面へ', () => {
   it('各 Run に「位置補正」ボタン(補正済みなら「(済)」と補正量のヒント)。書き出し・読み込みのボタンもある', () => {
     const b = $<HTMLButtonElement>('[data-act="correct"]');

@@ -56,7 +56,7 @@ app.whenReady().then(() => {
   ipcMain.handle('file:save-text', async (_e, fileName, text) => {
     if (typeof fileName !== 'string' || typeof text !== 'string') return { ok: false };
     const safe = path.basename(fileName);
-    const r = await dialog.showSaveDialog(win ?? undefined, { defaultPath: path.join(app.getPath('documents'), safe) });
+    const r = await dialog.showSaveDialog(win ?? undefined, { defaultPath: path.join(app.getPath('downloads'), safe) });
     if (r.canceled || !r.filePath) return { ok: false, canceled: true };
     try { fs.writeFileSync(r.filePath, text, 'utf8'); return { ok: true, path: r.filePath }; }
     catch (err) { return { ok: false, error: String(err && err.message || err) }; }

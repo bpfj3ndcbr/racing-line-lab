@@ -1,3 +1,5 @@
+import { alertDialog } from './dialog';
+
 /**
  * 文字列をファイルとして保存する。
  * Electron では保存ダイアログを出して書き込み、ブラウザではダウンロードにする。
@@ -6,7 +8,7 @@ export function downloadText(fileName: string, text: string, mime = 'text/plain'
   const native = typeof window !== 'undefined' ? window.rllNative : undefined;
   if (native) {
     void native.saveText(fileName, text).then((r) => {
-      if (!r.ok && !r.canceled) window.alert(`保存できませんでした${r.error ? `: ${r.error}` : ''}`);
+      if (!r.ok && !r.canceled) void alertDialog({ title: '保存できませんでした', detail: r.error });
     });
     return;
   }
