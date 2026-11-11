@@ -757,6 +757,14 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .ld-cur-l{padding-left:1em}
 .ld-cur-l span{color:var(--muted)}
 .ld-list{display:flex;flex-direction:column;gap:6px;overflow-y:auto;min-height:0}
+/* 幅の広い画面でも、ダイアログを画面の高さに収める(案件 47。狭い画面は @media (max-width:767px) の中)。
+   ふだんは走行ログの一覧だけがスクロールし、一覧が 140px より低くなるほど窓が低いときは、中身全体がスクロールする。
+   「計測ラインを修正」の画面も、入らなければスクロールする */
+@media (min-width:768px){
+  .modal.ld .ld-main{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;overflow-y:auto}
+  .modal.ld .ld-list{min-height:140px}
+  .modal.ld .ld-fix:not([hidden]){flex:1 1 auto;min-height:0;overflow-y:auto}
+}
 .ld-row{border:1px solid var(--border);border-radius:var(--r-l);background:var(--surface);padding:8px 12px;
   display:grid;grid-template-columns:minmax(0,1fr) 230px 320px;gap:4px 14px;align-items:start}
 .ld-row.ld-extra{background:var(--sec-bg)}
