@@ -49,16 +49,30 @@ export interface NativeBridge {
 }
 declare global { interface Window { rllNative?: NativeBridge } }
 
-/** Electron 版: メイン側のファイル(ユーザーデータ内の settings.json)に保存する */
+/**
+ * Electron 版: メイン側のファイル(ユーザーデータ内の settings.json)に保存する。
+ * 読み出しはメインとの同期の通信で、描画のたびに何度も呼ばれる(カード名など)ので、一度読んだ値は覚えておく(案件 36)。
+ * 書き換えはこの窓からしか来ない(窓は 1 つ)ので、覚えた値が古くなることはない。
+ */
 export class NativeStore implements KeyValueStore {
+  private memo = new Map<string, string | null>();
   constructor(private bridge: NativeBridge, private prefix = 'rll.') {}
   get(key: string): string | null {
-    try { return this.bridge.storageGet(this.prefix + key); } catch { return null; }
+    if (this.memo.has(key)) return this.memo.get(key)!;
+    try {
+      const v = this.bridge.storageGet(this.prefix + key);
+      this.memo.set(key, v);
+      return v;
+    } catch { return null; }
   }
   set(key: string, value: string): void {
+    this.memo.set(key, value);
     try { this.bridge.storageSet(this.prefix + key, value); } catch { /* 保存できなくても動作は続ける */ }
   }
-  clear(): void { try { this.bridge.storageClear(); } catch { /* 消せなくても動作は続ける */ } }
+  clear(): void {
+    this.memo.clear();
+    try { this.bridge.storageClear(); } catch { /* 消せなくても動作は続ける */ }
+  }
 }
 
 /** 実行環境に合った保存先を返す(Electron ならファイル、ブラウザなら localStorage) */
