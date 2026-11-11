@@ -237,7 +237,7 @@ select{min-height:44px;padding:0 10px;background:var(--surface);border:1px solid
 .cmp-main{flex:1;display:flex;min-height:0}
 .cmp-main[hidden],.cmp-empty[hidden]{display:none}
 .cmp-left{flex:1;min-width:0;display:flex;flex-direction:column}
-.cmp-map{flex:1;min-height:0;position:relative;background:var(--surface-2)}
+.cmp-map{flex:1;min-height:0;position:relative;background:var(--surface-2);-webkit-user-select:none;user-select:none}  /* マウスでなぞっても文字を選択しない(案件 43) */
 .map{position:absolute;inset:0}
 .cmp-ctl{flex:none;display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:6px 10px;background:var(--bar);border-top:1px solid var(--border-strong)}
 .cmp-time{min-width:130px;font-weight:700;font-size:12px}
@@ -968,7 +968,9 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
   .cmp-map .map-ov.tl{left:8px;top:8px}
   .cmp-map .map-ov.tr{right:8px;top:8px}
   .cmp-map .ov-menu-btn{min-height:30px;height:30px;padding:0 10px;font-size:11px}
-  .map-secs{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end;left:56px;right:8px;bottom:26px}
+  /* 枠はボタンの無い所も地図の上に広がるので、ボタン以外ではマウス・指を地図へ素通りさせる(地図を動かせるように。案件 43) */
+  .map-secs{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end;left:56px;right:8px;bottom:26px;pointer-events:none}
+  .map-secs .btn.sec{pointer-events:auto}
   .map-secs .btn.sec{min-height:32px;height:32px;min-width:38px;padding:0 6px;font-size:12px;justify-content:center}
   .map-secs .btn.sec[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-on);font-weight:700}
 
