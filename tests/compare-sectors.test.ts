@@ -126,6 +126,16 @@ describe('地図をタップして再生・一時停止(案件 1)', () => {
     ptr('pointerdown'); ptr('pointerup');                                        // 閉じたあとは、今までどおり
     expect(state()).toBe('playing');
   });
+
+  it('地図の上のボタンの付近(24px 以内)をたたいても切り替わらない(案件 43)', () => {
+    setupOne();
+    const rect = { left: 300, top: 10, right: 400, bottom: 40, x: 300, y: 10, width: 100, height: 30, toJSON: () => ({}) };
+    $('#cmp-view-btn').getBoundingClientRect = () => rect as DOMRect;           // jsdom は矩形が 0 なので、右上の「表示」の位置を決める
+    ptr('pointerdown', { x: 290, y: 60 }); ptr('pointerup', { x: 290, y: 60 }); // 左へ 10px・下へ 20px(約 22px)
+    expect(state()).toBe('paused');
+    ptr('pointerdown', { x: 350, y: 65 }); ptr('pointerup', { x: 350, y: 65 }); // 真下へ 25px
+    expect(state()).toBe('playing');
+  });
 });
 
 describe('セクターボタンの動作の切り替え', () => {

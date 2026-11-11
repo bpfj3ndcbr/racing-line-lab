@@ -10,6 +10,7 @@ import { isTypingTarget, modalOpen } from './nudge';
 import type { HeatRun, MapFactory, TrackMap } from './mapTypes';
 import type { ThemeController } from './theme';
 import { SHOWN_MARK } from './marks';
+import { nearAnyRect } from './mapPointer';
 
 /**
  * series: ラップの時系列(距離は速度の積み上げ)。
@@ -362,10 +363,18 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
 
   /**
    * 指で地図を軽くたたく(タップ)と、再生と一時停止を切り替える(案件 1)。マウスのクリックでは切り替えない。
-   * 動かした(ドラッグ)・2 本の指(ピンチで拡大・縮小)・長押し・地図の上のボタンや拡大縮小のボタンは、タップとみなさない
+   * 動かした(ドラッグ)・2 本の指(ピンチで拡大・縮小)・長押し・地図の上のボタンや拡大縮小のボタンは、タップとみなさない。
+   * ボタンからわずかに外れた所(BTN_MARGIN 以内)も、押し損ねとみなして切り替えない(案件 43)
    */
   function watchMapTap(el: HTMLElement) {
-    const TAP_MS = 350, TAP_PX = 10;
+    const TAP_MS = 350, TAP_PX = 10, BTN_MARGIN = 24;
+    /** 周りを「触っても切り替えない」範囲にする、地図の上のボタンなど(拡大・縮小と出典、表示位置・表示のメニュー、セクターボタン、凡例) */
+    const NEAR = '.leaflet-control, .map-ov button, .map-legend';
+    const nearButton = (x: number, y: number) => {
+      const box = el.closest('.cmp-map') ?? el;
+      const rects = Array.from(box.querySelectorAll(NEAR), (b) => b.getBoundingClientRect());
+      return nearAnyRect(x, y, rects, BTN_MARGIN);
+    };
     const down = new Map<number, { x: number; y: number; t: number }>();
     let multi = false;
     el.addEventListener('pointerdown', (e) => {
@@ -383,6 +392,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
       if (e.pointerId === menuClosingTap) { menuClosingTap = null; return; }      // 表示位置のメニューを閉じるためのタップ(案件 41)
       if (performance.now() - d.t > TAP_MS || Math.hypot(e.clientX - d.x, e.clientY - d.y) > TAP_PX) return;
       if ((e.target as HTMLElement | null)?.closest?.('.leaflet-control, .leaflet-marker-icon, button, a')) return;
+      if (nearButton(d.x, d.y)) return;                                         // ボタンの押し損ね(案件 43)
       engine.toggle();
     };
     el.addEventListener('pointerup', (e) => end(e, false));

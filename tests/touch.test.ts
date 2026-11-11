@@ -4,7 +4,7 @@ import { MemoryStore } from '../src/io/storage';
 import { Session } from '../src/store/session';
 import { mountApp } from '../src/ui/app';
 import { hasExt, installAppleFilePicker, isAppleTouch, wrongExtMessage } from '../src/ui/fileKind';
-import { attachSinglePointer } from '../src/ui/mapPointer';
+import { attachSinglePointer, nearAnyRect } from '../src/ui/mapPointer';
 import { ThemeController } from '../src/ui/theme';
 import { FakeMap } from './helpers';
 
@@ -78,6 +78,24 @@ describe('地図の上を 1 本の指でなぞる操作(案件 29)', () => {
     ptr(el.querySelector('.leaflet-control button')!, 'pointerdown', 2);
     ptr(el.querySelector('.leaflet-control button')!, 'pointerup', 2);
     expect(log).toEqual([]);
+  });
+});
+
+describe('ボタンの付近か(案件 43)', () => {
+  const btn = { left: 100, top: 100, right: 140, bottom: 130 };
+  it('矩形の中・辺から margin 以内は付近、それより外は付近でない', () => {
+    expect(nearAnyRect(120, 115, [btn], 24)).toBe(true);    // 中
+    expect(nearAnyRect(164, 115, [btn], 24)).toBe(true);    // 右へ 24px
+    expect(nearAnyRect(165, 115, [btn], 24)).toBe(false);   // 右へ 25px
+    expect(nearAnyRect(120, 76, [btn], 24)).toBe(true);     // 上へ 24px
+    expect(nearAnyRect(158, 148, [btn], 24)).toBe(false);   // 斜め(角から 18・18 → 約 25.5px)
+    expect(nearAnyRect(155, 145, [btn], 24)).toBe(true);    // 斜め(角から 15・15 → 約 21.2px)
+  });
+  it('大きさが 0 の矩形(隠れている要素)は数えない。どれか 1 つの付近なら付近', () => {
+    const hidden = { left: 0, top: 0, right: 0, bottom: 0 };
+    expect(nearAnyRect(0, 0, [hidden], 24)).toBe(false);
+    expect(nearAnyRect(120, 115, [hidden, btn], 24)).toBe(true);
+    expect(nearAnyRect(120, 115, [], 24)).toBe(false);
   });
 });
 

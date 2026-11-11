@@ -66,3 +66,19 @@ export function attachSinglePointer(el: HTMLElement, h: SinglePointerHandlers): 
     el.removeEventListener('pointercancel', cancel, true);
   };
 }
+
+/** 画面の上の矩形(getBoundingClientRect の値のうち、判定に使うものだけ) */
+export interface ScreenRect { left: number; top: number; right: number; bottom: number }
+
+/**
+ * 点 (x, y) が、どれかの矩形から margin px 以内にあるか(案件 43)。
+ * 大きさが 0 の矩形(隠れている要素)は数えない
+ */
+export function nearAnyRect(x: number, y: number, rects: readonly ScreenRect[], margin: number): boolean {
+  return rects.some((r) => {
+    if (r.right <= r.left || r.bottom <= r.top) return false;
+    const dx = Math.max(r.left - x, 0, x - r.right);
+    const dy = Math.max(r.top - y, 0, y - r.bottom);
+    return Math.hypot(dx, dy) <= margin;
+  });
+}
