@@ -87,7 +87,7 @@ describe('「記憶しない」: 設定した初期値で始まる', () => {
     });
     nav('compare');
     expect($('#view-compare [data-act="mapmode"].on').dataset.mode).toBe('speed');
-    expect($('#cmp-carlabel').getAttribute('aria-pressed')).toBe('true');
+    expect($('#view-compare [data-act="carlabel"].on').dataset.label).toBe('speed');
     expect($('#view-compare [data-act="xkind"].on').dataset.kind).toBe('time');
     expect($('#view-compare [data-act="rate"].on').dataset.rate).toBe('2');
     expect($('#view-compare [data-act="syncmode"].on').dataset.mode).toBe('leader');
@@ -157,7 +157,7 @@ describe('「記憶する」: 前回の状態で始まる', () => {
     boot((_p, s) => { s.setSetting('compare.mapMode', 'speed'); s.setSetting('compare.labels', 'speed'); s.setSetting('compare.sync', 'leader'); });
     nav('compare');
     expect($('#view-compare [data-act="mapmode"].on').dataset.mode).toBe('speed');
-    expect($('#cmp-carlabel').getAttribute('aria-pressed')).toBe('true');
+    expect($('#view-compare [data-act="carlabel"].on').dataset.label).toBe('speed');
     expect($('#view-compare [data-act="syncmode"].on').dataset.mode).toBe('leader');
   });
 });

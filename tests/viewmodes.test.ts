@@ -30,6 +30,13 @@ beforeEach(() => {
 const $ = <T extends HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
 const goCompare = () => $<HTMLButtonElement>('[data-act="nav"][data-view="compare"]').click();
 const seekTo = (sec: number) => { const e = $<HTMLInputElement>('#cmp-seek'); e.value = String(sec); e.dispatchEvent(new Event('input')); };
+/** 「表示」のメニューを開き、「ラベル」を開いて v を選ぶ(案件 41) */
+const label = (v: string) => {
+  $<HTMLButtonElement>('#cmp-view-btn').click();
+  $<HTMLButtonElement>('#cmp-label-btn').click();
+  $<HTMLButtonElement>(`[data-act="carlabel"][data-label="${v}"]`).click();
+};
+const labelOn = () => $<HTMLElement>('[data-act="carlabel"].on').dataset.label;
 const card = (slot: string) => $<HTMLButtonElement>(`[data-act="toggle-car"][data-slot="${slot}"]`);
 const key = (k: string) => document.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true }));
 function setupOne() {
@@ -71,35 +78,34 @@ describe('地図の線と車両アイコン', () => {
   it('「速度・差」のトグル: 入れると車に「速度kph」(基準車)が付き、切ると消える。選択は保存される', () => {
     setupOne();
     seekTo(40);
-    const btn = $<HTMLButtonElement>('#cmp-carlabel');
-    expect(btn.getAttribute('aria-pressed')).toBe('false');
-    btn.click();
-    expect(btn.getAttribute('aria-pressed')).toBe('true');
+    expect(labelOn()).toBe('off');
+    label('speed');
+    expect(labelOn()).toBe('speed');
     expect(fake.cars[0].label).toMatch(/^\d+kph$/);
     seekTo(45);
     expect(fake.cars[0].label).toMatch(/^\d+kph$/);
     expect(session.getSetting('compare.labels', 'off')).toBe('speed');
-    btn.click(); btn.click();                                  // 速度・差 → カード名 → 非表示
+    label('off');
     expect(fake.cars[0].label).toBeUndefined();
     expect(session.getSetting('compare.labels', 'speed')).toBe('off');
   });
 
-  it('引き出し線は 1 つのボタンで「非表示 → 速度・差 → カード名」と切り替わる。カード名は名前だけ(無ければ A〜D)', () => {
+  it('引き出し線は「表示」のメニューの「ラベル」で「非表示 / 速度・差 / カード名」から選ぶ(案件 41)。カード名は名前だけ(無ければ A〜D)', () => {
     setupTwo();
     seekTo(40);
-    const btn = $<HTMLButtonElement>('#cmp-carlabel');
-    expect(btn.textContent).toBe('ラベル: 非表示');
-    btn.click();
-    expect(btn.textContent).toBe('ラベル: 速度・差');
+    const btn = $<HTMLButtonElement>('#cmp-label-btn');
+    expect(btn.textContent).toBe('ラベル: 非表示 ▾');
+    label('speed');
+    expect(btn.textContent).toBe('ラベル: 速度・差 ▾');
     expect(fake.cars[0].label).toMatch(/^\d+kph$/);
-    btn.click();
-    expect(btn.textContent).toBe('ラベル: カード名');
+    label('name');
+    expect(btn.textContent).toBe('ラベル: カード名 ▾');
     expect(fake.cars.map((c) => c.label)).toEqual(['A', 'B']);
     session.setSlotAlias(session.activeIndex, 'A', '先週のベストラップ');
     expect(fake.cars[0].label).toBe('先週のベスト');               // 6 文字まで
     expect($('#cmp-cards').textContent).toContain('先週のベスト');
-    btn.click();
-    expect(btn.textContent).toBe('ラベル: 非表示');
+    label('off');
+    expect(btn.textContent).toBe('ラベル: 非表示 ▾');
     expect(fake.cars[0].label).toBeUndefined();
     expect(session.getSetting('compare.labels', 'x')).toBe('off');
   });
@@ -116,7 +122,7 @@ describe('地図の線と車両アイコン', () => {
     setupTwo();
     $<HTMLButtonElement>('[data-act="xkind"][data-kind="time"]').click();
     seekTo(40);
-    $<HTMLButtonElement>('#cmp-carlabel').click();
+    label('speed');
     const [a, b] = fake.cars;
     expect(a.label).toMatch(/^\d+kph$/);
     expect(b.label).toMatch(/^\d+kph\/[+-]\d+\.\d\ds$/);
@@ -291,7 +297,7 @@ describe('速度グラフが「距離」のときは、地図も距離ベース�
     seekTo(60);
     const gap = () => { const [a, b] = fake.cars; return Math.hypot((a.lat - b.lat) * 111000, (a.lon - b.lon) * 111000 * Math.cos((a.lat * Math.PI) / 180)); };
     $<HTMLButtonElement>('[data-act="xkind"][data-kind="time"]').click();
-    $<HTMLButtonElement>('#cmp-carlabel').click();                 // ラベル: 速度・差
+    label('speed');                 // ラベル: 速度・差
     const byTime = gap();
     expect(fake.cars[1].label).toMatch(/^\d+kph\/[+-]\d+\.\d\ds$/);
     $<HTMLButtonElement>('[data-act="xkind"][data-kind="dist"]').click();

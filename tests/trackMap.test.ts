@@ -81,6 +81,28 @@ describe('地図のキーボード', () => {
     m.destroy();
   });
 
+  it('少しずれただけ(縦と横の和が 15px 未満)では地図を動かさない(案件 43)', () => {
+    const el = document.createElement('div');
+    el.style.width = '400px'; el.style.height = '300px';
+    document.body.appendChild(el);
+    const m = createLeafletMap(el);
+    let dragged = 0;
+    m.onUserDrag(() => { dragged++; });
+    const mouse = (target: EventTarget, type: string, x: number, y: number) => {
+      const e = new MouseEvent(type, { bubbles: true, cancelable: true, button: 0, clientX: x, clientY: y });
+      Object.defineProperty(e, 'which', { value: 1 });         // jsdom は which を付けないので、Leaflet の左ボタンの判定のために足す
+      target.dispatchEvent(e);
+    };
+    const pane = el.querySelector('.leaflet-map-pane')!;
+    mouse(pane, 'mousedown', 100, 100);
+    mouse(pane, 'mousemove', 107, 107);                      // 和が 14px
+    expect(dragged).toBe(0);
+    mouse(pane, 'mousemove', 108, 108);                      // 和が 16px
+    expect(dragged).toBe(1);
+    mouse(pane, 'mouseup', 108, 108);
+    m.destroy();
+  });
+
   it('地図の画像の取得先: デスクトップ版で窓口に tileUrl があればメイン側(案件 2)、無ければ地理院', () => {
     const gsi = 'https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg';
     expect(tileUrlTemplate(undefined)).toBe(gsi);

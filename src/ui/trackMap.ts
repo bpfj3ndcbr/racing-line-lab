@@ -78,6 +78,10 @@ export function tileUrlTemplate(native: { tileUrl?: string } | undefined = windo
 export const createLeafletMap: MapFactory = (el): TrackMap => {
   // keyboard:false … 矢印キー・+/- で地図が動かないようにする(キーは再生の操作に使う)
   const map = L.map(el, { preferCanvas: true, minZoom: 10, maxZoom: 20, zoomControl: false, keyboard: false });
+  // 少しずれただけでは地図を動かさない(タップのつもりで指がずれたときに、追従が「固定」に戻らないように。案件 43)。
+  // Leaflet は縦と横の移動量の和で判定する。タップ(10px 以内)の範囲で動いても、ドラッグにならない値にする
+  const drag = (map.dragging as unknown as { _draggable?: { options: L.DraggableOptions } })._draggable;
+  if (drag) drag.options.clickTolerance = 15;
   L.control.zoom({ position: 'bottomleft', zoomInTitle: '拡大', zoomOutTitle: '縮小' }).addTo(map);
   map.setView([33.0385, 130.9735], 15);
   L.tileLayer(tileUrlTemplate(), { maxNativeZoom: 18, maxZoom: 20, attribution: GSI_ATTRIBUTION }).addTo(map);

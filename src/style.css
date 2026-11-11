@@ -7,6 +7,8 @@
   color-scheme: light;
   --bg: #e8ecf1;           /* ページ背景 */
   --bar: #dde2e9;          /* 上部バー・割り当て欄の背景 */
+  --map-strip-bg: rgba(255,255,255,.8);   /* 地図の下端の細い帯(凡例)。出典(Leaflet)の帯と同じ見た目で、テーマでは変えない */
+  --map-strip-fg: #333;
   --surface: #ffffff;      /* カード・表の背景 */
   --surface-2: #eef1f5;    /* 表の見出し・ファイル見出し */
   --sec-bg: #f4f6f9;       /* セクション枠の中 */
@@ -235,7 +237,9 @@ select{min-height:44px;padding:0 10px;background:var(--surface);border:1px solid
 .cmp-main{flex:1;display:flex;min-height:0}
 .cmp-main[hidden],.cmp-empty[hidden]{display:none}
 .cmp-left{flex:1;min-width:0;display:flex;flex-direction:column}
-.cmp-map{flex:1;min-height:0;position:relative;background:var(--surface-2)}
+.cmp-map{flex:1;min-height:0;position:relative;background:var(--surface-2);-webkit-user-select:none;user-select:none}  /* マウスでなぞっても文字を選択しない(案件 43) */
+/* 長押しで画面のスクロールを受け付けたときの合図: 画面の縁に色の線(案件 44) */
+.lp-ring{position:fixed;inset:0;z-index:3000;pointer-events:none;box-shadow:inset 0 0 0 3px var(--accent)}
 .map{position:absolute;inset:0}
 .cmp-ctl{flex:none;display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:6px 10px;background:var(--bar);border-top:1px solid var(--border-strong)}
 .cmp-time{min-width:130px;font-weight:700;font-size:12px}
@@ -328,13 +332,36 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .map-ov{position:absolute;z-index:1100}
 .map-ov.tl{left:10px;top:10px}
 .map-ov.tr{right:10px;top:10px}
+/* 地図の上のメニュー(案件 41。左上「表示位置」・右上「表示」。どの幅でも同じ)。下のセクターボタン(1100)より手前に出す */
+.map-ov.ov-menu{z-index:1150;display:flex;flex-direction:column;gap:4px}
+.map-ov.tl.ov-menu{align-items:flex-start}
+.map-ov.tr.ov-menu{align-items:flex-end}
+.ov-menu-btn{font-weight:700}
+.ov-list{display:flex;flex-direction:column;gap:2px;min-width:170px;padding:4px;background:var(--surface);
+  border:1px solid var(--border-strong);border-radius:var(--r-s);box-shadow:0 4px 14px rgba(0,0,0,.3)}
+.ov-list button{display:flex;align-items:center;gap:8px;width:100%;height:32px;padding:0 10px;border:0;border-radius:var(--r-s);
+  font:inherit;font-size:12px;text-align:left;color:var(--text);background:transparent;cursor:pointer}
+.ov-list button[role="menuitemradio"]::before{content:'✓';width:12px;flex:none;font-weight:700;visibility:hidden}
+.ov-list button.on::before{visibility:visible}
+.ov-list button:hover:not(:disabled){background:var(--surface-2)}
+.ov-list button.on,.ov-list button.on:hover{background:var(--accent);color:var(--accent-on)}
+.ov-list button:disabled{opacity:.45;cursor:default}
+.ov-list .chip,.ov-ico{width:18px;height:18px;font-size:10px}
+.ov-ico{display:inline-flex;align-items:center;justify-content:center;flex:none}
+.ov-sep{height:1px;margin:2px 4px;background:var(--border)}
+.ov-list .ov-sub{justify-content:space-between;padding-left:30px;font-weight:700}
+.ov-sublist{display:flex;flex-direction:column;gap:2px}
+.ov-sublist[hidden]{display:none}
+.ov-sublist button{padding-left:26px}
 .map-secs{display:none}
-.cmp-view-menu{display:none}
 .corr-pad-map{display:none}
-.map-legend{position:absolute;z-index:1100;right:10px;bottom:34px;display:flex;align-items:center;gap:8px;padding:4px 10px;
-  font-size:11px;font-weight:700;color:var(--text);background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r-s)}
+/* 速度・加減速の凡例(案件 42): 地図の左下の細い帯。右下の出典(地理院タイル)の帯と同じ高さ・同じ見た目にして、地図をできるだけ隠さない。
+   出典は消さない・隠さない(AGENTS.md)。狭い幅では文字を減らして、出典の左に収める。万一重なっても出典(Leaflet の部品は 1000)が手前 */
+.map-legend{position:absolute;z-index:900;left:0;bottom:0;display:flex;align-items:center;gap:5px;height:17px;padding:0 6px;
+  font-size:11px;font-weight:700;line-height:1;white-space:nowrap;color:var(--map-strip-fg);background:var(--map-strip-bg);border-radius:0 3px 0 0}
 .map-legend[hidden]{display:none}
-.legend-bar{display:block;width:140px;height:10px;border-radius:2px}
+.legend-bar{display:block;width:64px;height:6px;border-radius:2px}
+.cmp-map.has-legend .leaflet-bottom.leaflet-left .leaflet-control-zoom{margin-bottom:24px}
 .legend-bar.accel{background:linear-gradient(90deg,rgb(255,59,48),rgb(231,137,132) 25%,rgb(208,214,222) 50%,rgb(127,209,164) 75%,rgb(46,204,113))}
 .legend-bar.speed{background:linear-gradient(90deg,rgb(68,1,84),rgb(59,82,139) 25%,rgb(33,145,140) 50%,rgb(94,201,98) 75%,rgb(253,231,37))}
 
@@ -842,6 +869,9 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
    スマホ(縦向き)や、幅の狭いウィンドウ(767px まで。案件 1)。パソコンの幅の見た目は変えない
    ========================================================================== */
 @media (max-width:767px){
+  .map-legend .lg-word{display:none}           /* 凡例は「50 ▬ 180 km/h」だけにして、出典の左に収める(案件 42) */
+  .map-legend{gap:4px;padding:0 4px;font-size:10px}
+  .legend-bar{width:22px}
   /* 上部バー: 1 行目にロゴ・テーマ・About、2 行目にタブ(折り返さない)。サーキット名は出さない */
   .top{flex-wrap:wrap;gap:6px 8px;padding:6px 10px;min-height:0}
   .brand-txt{display:none}
@@ -936,15 +966,13 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
   .side-graph{height:230px;order:-1;border-bottom:1px solid var(--border-strong)}   /* 速度グラフを地図のすぐ下に(地図と一緒に見られるように) */
   .cmp-cards{display:grid;grid-template-columns:1fr 1fr}
   .cmp-cards .card{min-height:48px;padding:4px 8px;gap:8px}
-  /* 地図の上は 1 行: 左に「固定・先頭追従・A〜D」(小さく)、右に「表示 ▾」(押すと走行ラインの表示・ラベルが開く) */
+  /* 地図の上は 1 行: 左に「表示位置 ▾」、右に「表示 ▾」(案件 41。メニューの作りは広い幅と同じ。ここでは寸法だけ) */
   .cmp-map .map-ov.tl{left:8px;top:8px}
-  .cmp-map .map-ov.tl .seg.sm button{padding:0 7px;height:30px;min-height:30px}
-  .cmp-map .map-ov.tr{right:8px;top:8px;display:flex;flex-direction:column;align-items:flex-end;gap:4px}
-  .cmp-map .map-ov.tr>.seg{display:none}
-  .cmp-map .map-ov.tr.open>.seg{display:inline-flex}
-  .cmp-map .map-ov.tr .seg.sm button{height:30px;min-height:30px}
-  .cmp-view-menu{display:inline-flex;min-height:30px;height:30px;padding:0 10px;font-size:11px}
-  .map-secs{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end;left:56px;right:8px;bottom:26px}
+  .cmp-map .map-ov.tr{right:8px;top:8px}
+  .cmp-map .ov-menu-btn{min-height:30px;height:30px;padding:0 10px;font-size:11px}
+  /* 枠はボタンの無い所も地図の上に広がるので、ボタン以外ではマウス・指を地図へ素通りさせる(地図を動かせるように。案件 43) */
+  .map-secs{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end;left:56px;right:8px;bottom:26px;pointer-events:none}
+  .map-secs .btn.sec{pointer-events:auto}
   .map-secs .btn.sec{min-height:32px;height:32px;min-width:38px;padding:0 6px;font-size:12px;justify-content:center}
   .map-secs .btn.sec[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-on);font-weight:700}
 
@@ -966,4 +994,11 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
   .circ-form .frow input[type=text]{max-width:none}
   .circ-form .frow input[type=file]{max-width:100%}
   .circ-form .btn-row .btn{width:100%;justify-content:center}
+}
+
+/* さらに狭い幅(320px など): 凡例の km/h も隠す(出典の帯に重ならないように。案件 42) */
+@media (max-width:359px){
+  .map-legend .lg-unit{display:none}
+  .map-legend{gap:3px;padding:0 3px}
+  .legend-bar{width:14px}
 }
