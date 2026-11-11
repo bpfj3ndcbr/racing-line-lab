@@ -7,6 +7,8 @@ const HTML_ESC: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;
 /** HTML に埋め込む文字列のエスケープ(& < > ") */
 export const escapeHtml = (s: string): string => s.replace(/[&<>"]/g, (c) => HTML_ESC[c]!);
 
-/** 秒 → 「分:秒」(例: 83 → 「1:23」) */
-export const fmtMinSec = (sec: number): string =>
-  `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, '0')}`;
+/** 秒 → 「分:秒」(例: 83 → 「1:23」)。秒を先に丸めてから分と秒に分ける(59.6 秒は「1:00」で、「0:60」にしない) */
+export const fmtMinSec = (sec: number): string => {
+  const s = Math.round(sec);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+};

@@ -246,6 +246,11 @@ describe('グラフの目盛り', () => {
     expect(fmtDistTick(1000)).toBe('1 km');
     expect(fmtDistTick(1500)).toBe('1.5 km');
     expect(fmtMinSec(90)).toBe('1:30');
+    // 秒を先に丸める(案件 37): 「:60」にならない
+    expect(fmtMinSec(59.6)).toBe('1:00');
+    expect(fmtMinSec(179.7)).toBe('3:00');
+    expect(fmtMinSec(179.4)).toBe('2:59');
+    expect(fmtMinSec(0)).toBe('0:00');
   });
 });
 
