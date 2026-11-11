@@ -1,11 +1,11 @@
 import {
-  SLOTS, type Lap, type Slot, bestPerColumn, formatJst, formatLapTime, isBest, nameExists, sectorSplits, escapeHtml as esc, fmtMinSec
+  SLOTS, type Lap, type Slot, bestPerColumn, formatJst, formatLapTime, isBest, nameExists, sectorSplits, escapeHtml as esc, fmtMinSec, endFromStep, endSteps, stepFromEnd
 } from '../core';
 import { ALIAS_MAX, SET_COUNT, SLOT_ALIAS_MAX, type LoadedLog, type Session, type WorkSet, bestDuration } from '../store/session';
 import { mountCircuitEditor, type CircuitEditor } from './circuitEditor';
 import { candidateLabel, loadDialog, planLoad } from './loadDialog';
 import { mountCorrectView, type CorrectView } from './correctView';
-import { alertDialog, promptDialog } from './dialog';
+import { alertDialog, duplicateNameAlert, promptDialog } from './dialog';
 import { downloadText } from './download';
 import { hasExt, wrongExtMessage } from './fileKind';
 import type { MapFactory } from './mapTypes';
@@ -21,27 +21,6 @@ const ADJUST_RATIO = 1.6;
 /** ラップ一覧でグレーにするラップ: ベストのこの倍率を超えるもの(割り当ては可能) */
 const SLOW_RATIO = 1.2;
 const endLabel = (lap: Lap) => `終端: ${fmtMinSec(lap.duration)}${lap.complete ? '' : '(参考値)'}`;
-/**
- * 「終端の調整」のスライドバーの段階(1〜)と、終端(ラップ開始からの秒)の対応。
- * 上限が 10 分以下なら、端から端まで 10 秒刻み。10 分を超える長いラップでは、左半分(30 段階)を 0〜5 分の 10 秒刻み、
- * 右半分(30 段階)を 5 分〜上限に割り当てる(最初の数分を切り出しやすくするため)。右端は上限
- */
-const FINE_SEC = 300;
-const HALF_STEPS = 30;
-const isLong = (max: number) => max > 2 * FINE_SEC;
-export function endSteps(max: number): number { return isLong(max) ? 2 * HALF_STEPS : Math.max(1, Math.ceil(max / 10)); }
-export function endFromStep(k: number, max: number): number {
-  const n = endSteps(max);
-  if (k >= n) return max;
-  if (!isLong(max) || k <= HALF_STEPS) return 10 * Math.max(1, k);
-  return FINE_SEC + Math.round(((max - FINE_SEC) * (k - HALF_STEPS)) / HALF_STEPS / 10) * 10;
-}
-export function stepFromEnd(sec: number, max: number): number {
-  const n = endSteps(max);
-  if (sec >= max - 0.5) return n;
-  if (!isLong(max) || sec <= FINE_SEC) return Math.min(n - 1, Math.max(1, Math.round(sec / 10)));
-  return Math.min(n - 1, Math.max(HALF_STEPS + 1, HALF_STEPS + Math.round(((sec - FINE_SEC) / (max - FINE_SEC)) * HALF_STEPS)));
-}
 const JOINED_TITLE = 'ファイルの計測線とアプリの計測線が異なるため、計測線付近のデータを調整して、1 周分のラップにしています';
 /** 比較セットの並べ方(案件 27) */
 type SetsView = 'tabs' | 'list';
@@ -825,7 +804,7 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
       const r = session.renameCircuit(id, v);
       if (r.ok) { listMsg.textContent = r.message; return; }
       if (r.reason !== 'duplicate') { listMsg.textContent = r.message; return; }
-      await alertDialog({ title: '既に名前が存在します', detail: `「${v}」は登録済みです。別の名前にしてください。` });
+      await duplicateNameAlert(v);
       value = v;
     }
   }
@@ -857,7 +836,7 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
     const r = session.registerCircuit(name, await cln.text(), sci ? await sci.text() : '');
     if (!r.ok && r.reason === 'duplicate') {
       out.textContent = '';
-      await alertDialog({ title: '既に名前が存在します', detail: `「${name.trim()}」は登録済みです。別の名前にしてください。` });
+      await duplicateNameAlert(name.trim());
       nameInput.focus();
       return;
     }

@@ -68,3 +68,24 @@ export function lineMovedTo(l: GeoLine, c: LatLon): GeoLine {
 export function lineMoveM(before: GeoLine, after: GeoLine): number {
   return distanceM(lineMid(before), lineMid(after));
 }
+
+/** 修正の画面の線(案件 15・17)。before = 補正前(ファイルの線。足した線は、引いたときの線)、added = その画面で足した線 */
+export interface FixLine { before: GeoLine; line: GeoLine; added?: boolean }
+/** 線を補正前から動かしたか(足した線は、動かさなくても「変えた」) */
+export const lineChanged = (f: FixLine): boolean =>
+  !!f.added || lineMoveM(f.before, f.line) >= 0.005 || Math.abs(bearingDiff(lineBearing(f.before), lineBearing(f.line))) >= 0.005;
+/** セクターの直し方の要約(「修正 1・追加 1・削除 1」。何もしていなければ空)。lines[0] は計測ライン、removed = 消した本数 */
+export function sectorChanges(lines: FixLine[], removed: number): string {
+  const secs = lines.slice(1);
+  const moved = secs.filter((f) => !f.added && lineChanged(f)).length, added = secs.filter((f) => f.added).length;
+  return [moved && `修正 ${moved}`, added && `追加 ${added}`, removed && `削除 ${removed}`].filter(Boolean).join('・');
+}
+/** 角度の差の表示(+1.2° / −0.3° / 0.0°) */
+export function fmtAngleDiff(d: number): string {
+  const r = Math.round(d * 10) / 10;
+  return r === 0 ? '0.0°' : `${r > 0 ? '+' : '−'}${Math.abs(r).toFixed(1)}°`;
+}
+/** 補正の内容(「角度 +1.2°・移動 0.6 m」) */
+export function fixSummary(before: GeoLine, after: GeoLine): string {
+  return `角度 ${fmtAngleDiff(bearingDiff(lineBearing(before), lineBearing(after)))}・移動 ${lineMoveM(before, after).toFixed(1)} m`;
+}

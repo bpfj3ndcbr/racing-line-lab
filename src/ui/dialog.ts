@@ -69,6 +69,11 @@ function button(label: string, cls = ''): HTMLButtonElement {
   return b;
 }
 
+/** サーキット名が登録済みのときの案内(サーキットの登録・編集・名前の変更で共通) */
+export function duplicateNameAlert(name: string, host: HTMLElement = document.body): Promise<void> {
+  return alertDialog({ title: '既に名前が存在します', detail: `「${name}」は登録済みです。別の名前にしてください。` }, host);
+}
+
 /** メッセージと OK ボタンだけのダイアログ */
 export function alertDialog(o: Base & { ok?: string }, host: HTMLElement = document.body): Promise<void> {
   return open<void>((box, close) => {

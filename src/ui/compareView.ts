@@ -6,6 +6,7 @@ import type { LoadedLog, Session } from '../store/session';
 import { Prefs, RATE_CHOICES, ZOOM_CHOICES, type FollowV as Follow, type LabelV, type MapModeV as MapMode, type PrefKey, type SyncV as SyncMode } from '../store/prefs';
 import { SpeedGraph, ZOOM_MAX, type XKind } from './speedGraph';
 import { clamp, makeSplitter } from './splitter';
+import { isTypingTarget, modalOpen } from './nudge';
 import type { HeatRun, MapFactory, TrackMap } from './mapTypes';
 import type { ThemeController } from './theme';
 import { SHOWN_MARK } from './marks';
@@ -786,8 +787,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
    * どこにフォーカスがあっても同じ動きにする(直前に押したボタンが Space で再び押されないように、
    * Space は既定の動作を止める)。境界の線・ルーラーは、それ自身の矢印キー操作を優先する。
    */
-  const isTextField = (t: HTMLElement | null) =>
-    !!t && (t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && (t as HTMLInputElement).type !== 'range'));
+  const isTextField = (t: EventTarget | null) => isTypingTarget(t, true);      // スライダーの上でも、Space・矢印は再生の操作
   const ownsArrows = (t: HTMLElement | null) => {
     const role = t?.getAttribute?.('role');
     return role === 'separator' || role === 'scrollbar';
@@ -795,7 +795,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   const onKey = (e: KeyboardEvent) => {
     if (!visible || e.ctrlKey || e.metaKey || e.altKey) return;
     const t = e.target as HTMLElement | null;
-    if (isTextField(t) || document.querySelector('.modal')) return;
+    if (isTextField(t) || modalOpen()) return;
     if (e.key === ' ') {
       e.preventDefault();
       if (!e.repeat) engine.toggle();

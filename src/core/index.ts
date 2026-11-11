@@ -16,3 +16,5 @@ export * from './correctPreview';
 export * from './align';
 export * from './tiles';
 export * from './format';
+export * from './lapEnd';
+export * from './trackPreview';
