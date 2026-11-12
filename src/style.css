@@ -225,6 +225,8 @@ select{min-height:44px;padding:0 10px;background:var(--surface);border:1px solid
 .modal-field input{min-height:44px;padding:0 10px;color:var(--text);background:var(--surface-2);
   border:1px solid var(--btn-border);border-radius:var(--r-s)}
 .modal-actions{display:flex;justify-content:flex-end;gap:8px}
+.modal-actions .modal-check{margin-right:auto;display:inline-flex;align-items:center;gap:6px;color:var(--muted);cursor:pointer}
+.modal-actions .modal-check input{width:16px;height:16px;margin:0}
 /* 共有の画面から受け取ったときの、追加する比較セットの選択(案件 45) */
 .share-sets{display:flex;flex-direction:column;gap:6px;margin:4px 0 14px}
 .share-sets .btn{justify-content:space-between;gap:12px;min-height:44px;text-align:left}

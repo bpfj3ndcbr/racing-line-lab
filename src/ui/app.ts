@@ -33,7 +33,7 @@ export const RESUME_SAVE_FAILED = '走行ログが大きいため、一時保存
  * opts.resume: Web 版の一時保存の保存先(案件 30)。省略すると IndexedDB(使えなければ無し)。null で使わない。
  * デスクトップ版(window.rllNative がある)では使わない
  */
-export function mountApp(root: HTMLElement, session: Session, theme: ThemeController, mapFactory: MapFactory, opts: { reload?: () => void; resume?: ResumeStore | null; tiles?: TileStore | null; takeShared?: () => Promise<File[] | null>; sharedLaunch?: boolean } = {}): { dispose(): void } {
+export function mountApp(root: HTMLElement, session: Session, theme: ThemeController, mapFactory: MapFactory, opts: { reload?: () => void; resume?: ResumeStore | null; tiles?: TileStore | null; takeShared?: () => Promise<File[] | null>; sharedLaunch?: boolean; startupAbout?: boolean } = {}): { dispose(): void } {
   root.innerHTML = `
     <header class="top">
       <div class="brand">${logoSvg(36)}<div class="brand-txt"><div class="ttl">Racing Line Lab</div><div class="subttl">シンプル走行ライン比較ツール</div></div></div>
@@ -144,7 +144,7 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
   settingsApi = mountSettingsView(settingsEl, prefs, (key) => {
     if (key === 'theme') { if (!prefs.get('theme').remember) theme.set(prefs.get('theme').value); }
     else if (key === 'analytics') applyAnalytics(prefs.analytics);
-    else if (key !== 'autoLoad') compare?.applyPref(key);
+    else if (key !== 'autoLoad' && key !== 'startAbout') compare?.applyPref(key);
   }, () => {            // 「アプリを初期状態に戻す」: 保存したものをすべて消して、画面を読み直す(一時保存も消し、元に戻さない)
     session.factoryReset();
     const reload = opts.reload ?? (() => window.location.reload());
@@ -208,6 +208,10 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
   theme.subscribe(renderTop);
   renderTop();
   navigate('import');
+  // 起動時の About(案件 49。main.ts だけが有効にする)。同じタブの読み直し(Web 版の一時保存から戻すとき)と、共有の画面から開いたときは出さない
+  if (opts.startupAbout && prefs.startAbout && !resume?.resumed && !(opts.sharedLaunch ?? isSharedLaunch())) {
+    void showAbout(document.body, (hide) => { prefs.setStartAbout(!hide); settingsApi?.refresh(); });
+  }
   // Android の共有の画面から受け取ったファイル(案件 45。Web 版のみ)。元に戻し終わってから、データ管理で追加する
   const takeShared = opts.takeShared ?? (native ? null : takeSharedFiles);
   if (takeShared) {

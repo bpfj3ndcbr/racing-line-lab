@@ -8,5 +8,5 @@ import { registerServiceWorker } from './io/pwa';
 
 const store = createStore();
 const theme = new ThemeController(store); // 描画前に適用して、ちらつきを防ぐ
-mountApp(document.getElementById('app')!, new Session(store), theme, createLeafletMap);
+mountApp(document.getElementById('app')!, new Session(store), theme, createLeafletMap, { startupAbout: true });
 registerServiceWorker();          // Web 版の PWA(ネットが無くても起動できるように。案件 31)

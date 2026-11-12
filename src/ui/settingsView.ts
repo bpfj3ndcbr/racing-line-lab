@@ -16,7 +16,7 @@ const rangeText = (lo: number, hi: number) => (hi >= SPEED_RANGE.max ? `${lo} km
 const rangePos = (v: number) => (v - SPEED_RANGE.min) / (SPEED_RANGE.max - SPEED_RANGE.min);
 
 type Opt = { v: string; label: string };
-type Plain = { name: string; kind: 'yrange' | 'startpos' | 'autoload' | 'analytics' | 'mapAreas' | 'mapPrefetch' | 'mapPersist' | 'smooth'; hint?: string };
+type Plain = { name: string; kind: 'yrange' | 'startpos' | 'autoload' | 'analytics' | 'mapAreas' | 'mapPrefetch' | 'mapPersist' | 'smooth' | 'startabout'; hint?: string };
 type Row =
   | { key: PrefKey; name: string; kind: 'seg'; opts: Opt[]; hint?: string }
   | { key: PrefKey; name: string; kind: 'switch'; on: string; off: string; hint?: string }
@@ -50,6 +50,7 @@ const GROUPS: { title: string; rows: (Row | Plain)[] }[] = [
     { key: 'sync', name: 'セクターボタンの動作', kind: 'seg', opts: [{ v: 'leader', label: '先頭車両' }, { v: 'all', label: '全車一致' }] },
   ] },
   { title: '起動時', rows: [
+    { name: '起動時に About を表示する', kind: 'startabout', hint: 'アプリを起動したときに、アプリの紹介・バージョン・権利表記(About)を表示します。表示したときの「次回から表示しない」にチェックを入れると、ここがオフになります。' },
     { name: '最後の走行データを自動で読み込む', kind: 'autoload', hint: '前回読み込んだファイルと、A〜D の割り当てを元に戻します。ファイルの場所を覚えるので、Electron 版のみ使えます。移動・削除したファイルは読み込まれません。' },
   ] },
   { title: 'プライバシー', rows: [
@@ -66,7 +67,7 @@ export interface MapSaveDeps { store: TileStore | null; areas: MapAreas; mapFact
 
 const mb = (bytes: number) => (bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`);
 
-export function mountSettingsView(root: HTMLElement, prefs: Prefs, onChange: (key: PrefKey | 'yRange' | 'startPos' | 'autoLoad' | 'analytics' | 'smooth') => void, onFactoryReset: () => void = () => {}, mapSave?: MapSaveDeps): { refresh(): void } {
+export function mountSettingsView(root: HTMLElement, prefs: Prefs, onChange: (key: PrefKey | 'yRange' | 'startPos' | 'autoLoad' | 'analytics' | 'smooth' | 'startAbout') => void, onFactoryReset: () => void = () => {}, mapSave?: MapSaveDeps): { refresh(): void } {
   let resetArmed = false;
   let wipeArmed = false;
   const tiles = mapSave?.store ?? null;
@@ -157,6 +158,11 @@ export function mountSettingsView(root: HTMLElement, prefs: Prefs, onChange: (ke
           return `<div class="srow"><div class="sname">${r.name}</div><div class="sctl"><button type="button" role="switch" class="switch${on ? ' on' : ''}" data-autoload aria-checked="${on}" aria-label="${r.name}"${can ? '' : ' disabled'}><i></i></button>`
             + `<span class="swl">${on ? '有効' : '無効'}${can ? '' : '(Electron 版のみ)'}</span></div><div class="srem"></div>${r.hint ? `<div class="shint">${r.hint}</div>` : ''}</div>`;
         }
+        if (r.kind === 'startabout') {
+          const on = prefs.startAbout;
+          return `<div class="srow"><div class="sname">${r.name}</div><div class="sctl"><button type="button" role="switch" class="switch${on ? ' on' : ''}" data-startabout aria-checked="${on}" aria-label="${r.name}"><i></i></button>`
+            + `<span class="swl">${on ? 'オン' : 'オフ'}</span></div><div class="srem"></div>${r.hint ? `<div class="shint">${r.hint}</div>` : ''}</div>`;
+        }
         if (r.kind === 'smooth') {
           const on = prefs.smooth;
           return `<div class="srow"><div class="sname">${r.name}</div><div class="sctl"><button type="button" role="switch" class="switch${on ? ' on' : ''}" data-smooth aria-checked="${on}" aria-label="${r.name}"><i></i></button>`
@@ -217,6 +223,8 @@ export function mountSettingsView(root: HTMLElement, prefs: Prefs, onChange: (ke
     if (sp) { resetArmed = false; prefs.setStartPos(sp.dataset.startpos as 'center' | 'control'); onChange('startPos'); render(); return; }
     const al = t.closest<HTMLButtonElement>('[data-autoload]');
     if (al && !al.disabled) { resetArmed = false; prefs.setAutoLoad(!prefs.autoLoad); onChange('autoLoad'); render(); return; }
+    const sa = t.closest<HTMLButtonElement>('[data-startabout]');
+    if (sa) { resetArmed = false; prefs.setStartAbout(!prefs.startAbout); onChange('startAbout'); render(); return; }
     const sm = t.closest<HTMLButtonElement>('[data-smooth]');
     if (sm) { resetArmed = false; prefs.setSmooth(!prefs.smooth); onChange('smooth'); render(); return; }
     const an = t.closest<HTMLButtonElement>('[data-analytics]');
@@ -267,7 +275,7 @@ export function mountSettingsView(root: HTMLElement, prefs: Prefs, onChange: (ke
       resetArmed = false;
       prefs.reset();
       render();
-      (['theme', 'mapMode', 'labels', 'zoom', 'follow', 'xKind', 'sync', 'rate', 'yRange', 'startPos', 'autoLoad', 'analytics', 'smooth'] as const).forEach((k) => onChange(k));
+      (['theme', 'mapMode', 'labels', 'zoom', 'follow', 'xKind', 'sync', 'rate', 'yRange', 'startPos', 'autoLoad', 'analytics', 'smooth', 'startAbout'] as const).forEach((k) => onChange(k));
     }
   });
 
