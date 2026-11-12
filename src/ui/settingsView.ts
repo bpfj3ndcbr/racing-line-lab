@@ -6,6 +6,7 @@ import { applyAreas } from '../io/mapSave';
 import { openAreaEditor } from './areaEditor';
 import { confirmDialog } from './dialog';
 import type { MapFactory } from './mapTypes';
+import type { UpdateWatcher } from '../io/pwa';
 
 const ZOOM_STOPS = [0, ...ZOOM_CHOICES];   // スライダーの位置 → 倍率(0 = サーキット全体)
 const zoomText = (z: number) => (z === 0 ? 'サーキット全体' : `Z${z}`);
@@ -16,7 +17,7 @@ const rangeText = (lo: number, hi: number) => (hi >= SPEED_RANGE.max ? `${lo} km
 const rangePos = (v: number) => (v - SPEED_RANGE.min) / (SPEED_RANGE.max - SPEED_RANGE.min);
 
 type Opt = { v: string; label: string };
-type Plain = { name: string; kind: 'yrange' | 'startpos' | 'autoload' | 'analytics' | 'mapAreas' | 'mapPrefetch' | 'mapPersist' | 'smooth'; hint?: string };
+type Plain = { name: string; kind: 'yrange' | 'startpos' | 'autoload' | 'analytics' | 'mapAreas' | 'mapPrefetch' | 'mapPersist' | 'smooth' | 'startabout' | 'update'; hint?: string };
 type Row =
   | { key: PrefKey; name: string; kind: 'seg'; opts: Opt[]; hint?: string }
   | { key: PrefKey; name: string; kind: 'switch'; on: string; off: string; hint?: string }
@@ -50,7 +51,11 @@ const GROUPS: { title: string; rows: (Row | Plain)[] }[] = [
     { key: 'sync', name: 'セクターボタンの動作', kind: 'seg', opts: [{ v: 'leader', label: '先頭車両' }, { v: 'all', label: '全車一致' }] },
   ] },
   { title: '起動時', rows: [
+    { name: '起動時に About を表示する', kind: 'startabout', hint: 'アプリを起動したときに、アプリの紹介・バージョン・権利表記(About)を表示します。表示したときの「次回から表示しない」にチェックを入れると、ここがオフになります。' },
     { name: '最後の走行データを自動で読み込む', kind: 'autoload', hint: '前回読み込んだファイルと、A〜D の割り当てを元に戻します。ファイルの場所を覚えるので、Electron 版のみ使えます。移動・削除したファイルは読み込まれません。' },
+  ] },
+  { title: 'アプリの更新', rows: [
+    { name: '新しい版', kind: 'update', hint: 'インストールした Web 版では、新しい版は裏で取得され、アプリを完全に終了して開き直したときから使われます。「更新する」を押すと、すぐに切り替えて読み直します(読み込んだ走行ログと割り当ては残ります)。ネットが必要です。' },
   ] },
   { title: 'プライバシー', rows: [
     { name: '利用状況の送信', kind: 'analytics', hint: 'Web 版では、アプリの改善のため、Google アナリティクスで利用状況(ページの表示、使っている環境など)を送ります。走行ログの中身や位置、ファイル名は送りません。オフにすると送りません。デスクトップ版(Electron)では送りません。' },
@@ -66,8 +71,9 @@ export interface MapSaveDeps { store: TileStore | null; areas: MapAreas; mapFact
 
 const mb = (bytes: number) => (bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`);
 
-export function mountSettingsView(root: HTMLElement, prefs: Prefs, onChange: (key: PrefKey | 'yRange' | 'startPos' | 'autoLoad' | 'analytics' | 'smooth') => void, onFactoryReset: () => void = () => {}, mapSave?: MapSaveDeps): { refresh(): void } {
+export function mountSettingsView(root: HTMLElement, prefs: Prefs, onChange: (key: PrefKey | 'yRange' | 'startPos' | 'autoLoad' | 'analytics' | 'smooth' | 'startAbout') => void, onFactoryReset: () => void = () => {}, mapSave?: MapSaveDeps, updates: UpdateWatcher | null = null): { refresh(): void } {
   let resetArmed = false;
+  let updBusy = false, updMsg = '';
   let wipeArmed = false;
   const tiles = mapSave?.store ?? null;
   /** 保存範囲ごとの、保存したタイルの枚数と容量(集計中は null) */
@@ -157,6 +163,17 @@ export function mountSettingsView(root: HTMLElement, prefs: Prefs, onChange: (ke
           return `<div class="srow"><div class="sname">${r.name}</div><div class="sctl"><button type="button" role="switch" class="switch${on ? ' on' : ''}" data-autoload aria-checked="${on}" aria-label="${r.name}"${can ? '' : ' disabled'}><i></i></button>`
             + `<span class="swl">${on ? '有効' : '無効'}${can ? '' : '(Electron 版のみ)'}</span></div><div class="srem"></div>${r.hint ? `<div class="shint">${r.hint}</div>` : ''}</div>`;
         }
+        if (r.kind === 'update') {
+          const label = updates?.waiting ? '更新する' : updBusy ? '確認中…' : '更新を確認する';
+          const text = !updates ? '(インストールした Web 版のみ)' : updates.waiting ? '新しい版があります' : updMsg;
+          return `<div class="srow"><div class="sname">${r.name}</div><div class="sctl"><button type="button" class="btn${updates?.waiting ? ' pri' : ''}" data-update${updates && !updBusy ? '' : ' disabled'}>${label}</button>`
+            + `<span class="swl" role="status">${text}</span></div><div class="srem"></div>${r.hint ? `<div class="shint">${r.hint}</div>` : ''}</div>`;
+        }
+        if (r.kind === 'startabout') {
+          const on = prefs.startAbout;
+          return `<div class="srow"><div class="sname">${r.name}</div><div class="sctl"><button type="button" role="switch" class="switch${on ? ' on' : ''}" data-startabout aria-checked="${on}" aria-label="${r.name}"><i></i></button>`
+            + `<span class="swl">${on ? 'オン' : 'オフ'}</span></div><div class="srem"></div>${r.hint ? `<div class="shint">${r.hint}</div>` : ''}</div>`;
+        }
         if (r.kind === 'smooth') {
           const on = prefs.smooth;
           return `<div class="srow"><div class="sname">${r.name}</div><div class="sctl"><button type="button" role="switch" class="switch${on ? ' on' : ''}" data-smooth aria-checked="${on}" aria-label="${r.name}"><i></i></button>`
@@ -217,6 +234,20 @@ export function mountSettingsView(root: HTMLElement, prefs: Prefs, onChange: (ke
     if (sp) { resetArmed = false; prefs.setStartPos(sp.dataset.startpos as 'center' | 'control'); onChange('startPos'); render(); return; }
     const al = t.closest<HTMLButtonElement>('[data-autoload]');
     if (al && !al.disabled) { resetArmed = false; prefs.setAutoLoad(!prefs.autoLoad); onChange('autoLoad'); render(); return; }
+    const up = t.closest<HTMLButtonElement>('[data-update]');
+    if (up && !up.disabled && updates) {
+      resetArmed = false;
+      if (updates.waiting) { updates.apply(); return; }
+      updBusy = true; updMsg = ''; render();
+      void updates.check().then((r) => {
+        updBusy = false;
+        updMsg = r === 'latest' ? `最新です(バージョン ${__APP_VERSION__})` : r === 'failed' ? '確認できませんでした(ネットにつながっているか確かめてください)' : '';
+        render();
+      });
+      return;
+    }
+    const sa = t.closest<HTMLButtonElement>('[data-startabout]');
+    if (sa) { resetArmed = false; prefs.setStartAbout(!prefs.startAbout); onChange('startAbout'); render(); return; }
     const sm = t.closest<HTMLButtonElement>('[data-smooth]');
     if (sm) { resetArmed = false; prefs.setSmooth(!prefs.smooth); onChange('smooth'); render(); return; }
     const an = t.closest<HTMLButtonElement>('[data-analytics]');
@@ -267,7 +298,7 @@ export function mountSettingsView(root: HTMLElement, prefs: Prefs, onChange: (ke
       resetArmed = false;
       prefs.reset();
       render();
-      (['theme', 'mapMode', 'labels', 'zoom', 'follow', 'xKind', 'sync', 'rate', 'yRange', 'startPos', 'autoLoad', 'analytics', 'smooth'] as const).forEach((k) => onChange(k));
+      (['theme', 'mapMode', 'labels', 'zoom', 'follow', 'xKind', 'sync', 'rate', 'yRange', 'startPos', 'autoLoad', 'analytics', 'smooth', 'startAbout'] as const).forEach((k) => onChange(k));
     }
   });
 

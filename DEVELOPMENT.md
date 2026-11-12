@@ -104,6 +104,7 @@ npm run build        # 型チェック + ビルド(dist/)
 | `ui.compare.layout` | 比較画面の右パネルの幅・グラフの高さ(`v` が保存形式の版。形式を変えるときは版を上げる) |
 | `ui.setAliases` / `ui.slotAliases` | 比較セットの別名 / カード(セットごとの A〜D)の別名 |
 | `ui.guideClosed` / `ui.guideSeen` | はじめかたの表示状態 |
+| `ui.seenVersion` | 前回開いたアプリの版(更新された直後の知らせに使う) |
 | `ui.setsView` | 「データ管理」の比較セットの並べ方(`tabs` / `list`) |
 | `ui.mapAreas` | 地図の保存範囲(Z18 のタイルの区切りにそろえた四角 `x0`〜`x1`・`y0`〜`y1` と名前) |
 
@@ -129,6 +130,7 @@ npm run build        # 型チェック + ビルド(dist/)
 Web 版は PWA です(`public/manifest.webmanifest`、`src/sw/sw.ts`、`src/io/pwa.ts`)。デスクトップ版・開発中(`npm run dev`)・テストでは service worker を登録しません。
 
 - **アプリのファイル**: `npm run build` のあと、`vite.config.ts` の `swPlugin` が `dist` のファイルの一覧を `__PRECACHE__` として埋め込み、`src/sw/sw.ts` を 1 つの `dist/sw.js` にまとめます(アプリ本体とは部品を共有しない。依存パッケージは使わない)。service worker は、入れたときに一覧のファイルを Cache Storage `rll-app-<印>` に保存し、保存したものを返します。新しい版は、ネットがあるときに取得され、アプリを閉じて次に起動したときから使われます。
+- **更新の知らせ(案件 50)**: 新しい版は待機中になり(`skipWaiting` しない)、`UpdateWatcher`(`src/io/pwa.ts`)が `updatefound` → `installed` で見つけて画面に知らせます。「更新する」は、待機中の worker に `rll-skip-waiting` を送って切り替え、`controllerchange` で読み直します(自分で頼んだときだけ)。「更新しました」は `ui.seenVersion` と今の版を比べて出します。
 - **型チェック**: service worker は画面側と型の種類(WebWorker)が違うので、`tsconfig.sw.json` で別に確かめます(`npm run typecheck` と `npm run build` は両方を行う)。
 - **地図の保存**: service worker は、保存範囲(`ui.mapAreas`。画面が Cache Storage `rll-tiles-meta` の `rll-areas.json` に写して渡す)の中の地理院タイル(Z15〜Z18)を、表示したときに Cache Storage `rll-tiles` に保存し、次からは保存したものを返します。範囲の外は今までどおりネットから取ります。タイルの計算は `src/core/tiles.ts`、画面からの操作(一覧・削除・概略の地図の先読み・消されにくくする依頼)は `src/io/tileStore.ts` と `src/io/mapSave.ts` です。
 - 同じ画面の中では、一度表示した地図をブラウザが使い回し、service worker を通らないことがあります。そのため、範囲を決める画面(`src/ui/areaEditor.ts`)で見えていた地図は、範囲を追加したときに画面から保存します。

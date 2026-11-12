@@ -35,6 +35,7 @@ const ABOUT_HTML = `
 <li>各ライブラリの詳細は <a href="${GH}/blob/main/THIRD-PARTY-NOTICES.txt" target="_blank" rel="noopener noreferrer">THIRD-PARTY-NOTICES.txt</a> をご参照ください。</li>
 </ul>`;
 
-export function showAbout(host: HTMLElement = document.body): Promise<void> {
-  return contentDialog({ title: 'About', html: ABOUT_HTML, wide: true }, host);
+/** hideNext を渡すと(起動時の表示)、「次回から表示しない」のチェックが付く。チェックの状態が変わるたびに呼ぶ */
+export function showAbout(host: HTMLElement = document.body, hideNext?: (hide: boolean) => void): Promise<void> {
+  return contentDialog({ title: 'About', html: ABOUT_HTML, wide: true, check: hideNext && { label: '次回から表示しない', onChange: hideNext } }, host);
 }

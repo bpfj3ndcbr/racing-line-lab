@@ -11,5 +11,5 @@
     "noEmit": true,
     "types": []
   },
-  "include": ["src/sw", "src/core/tiles.ts"]
+  "include": ["src/sw", "src/core/tiles.ts", "src/core/share.ts"]
 }

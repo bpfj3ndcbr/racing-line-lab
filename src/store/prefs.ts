@@ -64,7 +64,7 @@ const clean: { [K in PrefKey]: (v: unknown) => PrefValues[K] | null } = {
 };
 
 export type StartPos = 'center' | 'control';
-interface Saved { items?: Partial<Record<PrefKey, { remember?: unknown; value?: unknown }>>; yMin?: unknown; yMax?: unknown; startPos?: unknown; autoLoad?: unknown; analytics?: unknown; mapPrefetch?: unknown; mapPersist?: unknown; smooth?: unknown }
+interface Saved { items?: Partial<Record<PrefKey, { remember?: unknown; value?: unknown }>>; yMin?: unknown; yMax?: unknown; startPos?: unknown; autoLoad?: unknown; analytics?: unknown; mapPrefetch?: unknown; mapPersist?: unknown; smooth?: unknown; startAbout?: unknown }
 
 export class Prefs {
   constructor(private s: PrefStore) {}
@@ -120,6 +120,10 @@ export class Prefs {
   /** 利用状況の送信(Google アナリティクス。Web 版のみ)。初期値はオン */
   get analytics(): boolean { return this.saved().analytics !== false; }
   setAnalytics(v: boolean) { this.write({ ...this.saved(), analytics: v }); }
+
+  /** 起動時に About を表示する(案件 49)。初期値はオン。「次回から表示しない」で、または設定タブでオフにする */
+  get startAbout(): boolean { return this.saved().startAbout !== false; }
+  setStartAbout(v: boolean) { this.write({ ...this.saved(), startAbout: v }); }
 
   /** 地図の保存(案件 31。Web 版のみ): 概略の地図(Z15・Z16)は、表示する前に、保存範囲の分をまとめて保存する。初期値は無効 */
   get mapPrefetch(): boolean { return this.saved().mapPrefetch === true; }

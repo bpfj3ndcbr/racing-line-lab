@@ -3,7 +3,7 @@ import type { Session } from '../store/session';
 import { mountCircuitEditor, type CircuitEditor } from './circuitEditor';
 import { loadDialog, planLoad } from './loadDialog';
 import { mountCorrectView, type CorrectView } from './correctView';
-import { alertDialog } from './dialog';
+import { alertDialog, customDialog } from './dialog';
 import { hasExt } from './fileKind';
 import { CIRCUITS_HTML, createCircuits } from './importCircuits';
 import { createGuide } from './importGuide';
@@ -43,6 +43,8 @@ export interface ImportApi {
   needsLeaveConfirm(): boolean;
   /** 位置補正の画面の保存していない補正量を、破棄して移ってよいか確かめる */
   confirmLeave(): Promise<boolean>;
+  /** Android の共有の画面から受け取ったファイル(案件 45): 追加する比較セットを選んでから、いつもの追加と同じ流れで読み込む */
+  addShared(files: File[]): Promise<void>;
 }
 
 export function mountImportView(root: HTMLElement, session: Session, opts: ImportViewOpts = {}): ImportApi {
@@ -177,6 +179,64 @@ ${OFFSETS_HTML}
     if (added.length) await checkLoaded(set, added, before.size === 0, undefined, true);
   }
 
+  // ---------- 共有の画面から受け取る(案件 45) ----------
+  async function addShared(files: File[]) {
+    // .vbo が 1 つも無ければ、セットは聞かずに、いつもの「読み込めるのは .vbo ファイルだけです」を出す
+    if (!files.some((f) => hasExt(f.name, '.vbo'))) { await addFiles(files, session.activeIndex); return; }
+    const set = await chooseShareSet(files.filter((f) => hasExt(f.name, '.vbo')).length);
+    if (set === null) { session.say('共有された走行ログは追加しませんでした。'); return; }
+    sets.scrollToSet(set);
+    await addFiles(files, set);
+  }
+
+  /** 追加する比較セットを選ぶ。初めは表示中(無ければ表示予定)の比較セットを選んでいる。キャンセル・Esc は null */
+  function chooseShareSet(n: number): Promise<number | null> {
+    return customDialog<number | null>((box, close) => {
+      const h = document.createElement('h3');
+      h.id = 'share-set-t';
+      h.textContent = '追加する比較セットを選んでください';
+      const p = document.createElement('p');
+      p.textContent = `共有された走行ログ(${n} 件)を追加します。`;
+      box.setAttribute('aria-labelledby', h.id);
+      const list = document.createElement('div');
+      list.className = 'share-sets';
+      let first: HTMLButtonElement | null = null;
+      session.sets.forEach((w, i) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'btn' + (i === session.activeIndex ? ' pri' : '');
+        b.dataset.shareSet = String(i);
+        const name = document.createElement('span');
+        name.textContent = session.setName(i);
+        // 別名があるときは、元の名前(比較セット1 など)も添える
+        if (session.aliasOf(i)) {
+          const label = document.createElement('span');
+          label.className = 'sub';
+          label.textContent = ` (${session.setLabel(i)})`;
+          name.appendChild(label);
+        }
+        const cnt = document.createElement('span');
+        cnt.className = 'share-count';
+        cnt.textContent = w.logs.length ? `走行ログ ${w.logs.length} 件` : '空き';
+        b.append(name, cnt);
+        b.addEventListener('click', () => close(i));
+        list.appendChild(b);
+        if (i === session.activeIndex) first = b;
+      });
+      const cancel = document.createElement('button');
+      cancel.type = 'button';
+      cancel.className = 'btn';
+      cancel.textContent = 'キャンセル';
+      cancel.dataset.dialog = 'cancel';
+      cancel.addEventListener('click', () => close(null));
+      const row = document.createElement('div');
+      row.className = 'modal-actions';
+      row.appendChild(cancel);
+      box.append(h, p, list, row);
+      return first ?? cancel;
+    }, null);
+  }
+
   // ---------- 読み込みの確認(案件 3) ----------
   /** 確認ダイアログから開いた登録画面: 登録したら、そのサーキットを比較セットのサーキットにする */
   let pending: { set: number; circuits: number } | null = null;
@@ -274,6 +334,7 @@ ${OFFSETS_HTML}
     needsLeaveConfirm: () => work === 'correct' && !!correct?.isDirty(),
     confirmLeave: () => (work === 'correct' && correct ? correct.confirmLeave() : Promise.resolve(true)),
     closeSets: () => sets.closeSets(),
+    addShared,
     /** 比較画面から: サーキットを編集する(終わったら比較に戻る) */
     editCircuit(id: string) { openWork('circuit', id, undefined, undefined, true); backToCompare = work === 'circuit'; },
   };

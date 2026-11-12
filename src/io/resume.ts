@@ -17,6 +17,11 @@ export interface ResumeStore {
   load(): Promise<{ state: unknown; logs: Map<string, TrackLog> } | null>;
   /** このタブの保存を消し、次の読み直しで元に戻さないようにする(「アプリを初期状態に戻す」など) */
   forget(): Promise<void>;
+  /**
+   * ほかのタブ(窓)のうち、いちばん新しく保存した状態を、このタブのものとして引き継ぐ(元の分は移すので残らない)。無ければ null。
+   * Android の共有の画面から開くと、アプリが新しい窓で開き直されるので、直前の状態を続けて使うため(案件 45)
+   */
+  adoptLatest(): Promise<{ state: unknown; logs: Map<string, TrackLog> } | null>;
 }
 
 const TAB_KEY = 'rll.resumeTab';
@@ -96,6 +101,20 @@ export function openResumeStore(now = () => Date.now()): ResumeStore | null {
       try { sessionStorage.removeItem(TAB_KEY); sessionStorage.removeItem(STATE_KEY); } catch { /* 無視 */ }
       await tx(['state', 'logs'], 'readwrite', (t) => removeTab(t, me));
     },
+    async adoptLatest() {
+      const d = await db();
+      const all = await req(d.transaction('state').objectStore('state').getAll()) as { tab: string; at: number; state: unknown }[];
+      const prev = all.filter((s) => s.tab !== me && now() - s.at <= MAX_AGE_MS).sort((a, b) => b.at - a.at)[0];
+      if (!prev) return null;
+      const rows = await req(d.transaction('logs').objectStore('logs').index('tab').getAll(IDBKeyRange.only(prev.tab))) as { id: string; log: TrackLog }[];
+      await tx(['state', 'logs'], 'readwrite', (t) => {
+        removeTab(t, prev.tab);
+        t.objectStore('state').put({ tab: me, at: now(), state: prev.state });
+        for (const r of rows) t.objectStore('logs').put({ key: `${me}\u0000${r.id}`, tab: me, id: r.id, at: now(), log: r.log });
+      });
+      try { sessionStorage.setItem(STATE_KEY, JSON.stringify(prev.state)); } catch { /* IndexedDB のほうだけ */ }
+      return { state: prev.state, logs: new Map(rows.map((r) => [r.id, r.log])) };
+    },
   };
 }
 
@@ -109,4 +128,14 @@ export class MemoryResumeStore implements ResumeStore {
   async putState(state: unknown) { this.state = state; }
   async load() { return this.state === null ? null : { state: this.state, logs: new Map(this.logs) }; }
   async forget() { this.logs.clear(); this.state = null; this.resumed = false; }
+  /** ほかのタブの保存(adoptLatest で引き継ぐもの) */
+  previous: { state: unknown; logs: Map<string, TrackLog> } | null = null;
+  async adoptLatest() {
+    const p = this.previous;
+    if (!p) return null;
+    this.previous = null;
+    this.state = p.state;
+    this.logs = new Map(p.logs);
+    return { state: p.state, logs: new Map(p.logs) };
+  }
 }

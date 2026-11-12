@@ -158,7 +158,7 @@ export function customDialog<T>(
 }
 
 /** 中身を HTML で渡す、読むだけのダイアログ(About など)。HTML は呼び出し側が用意した固定の文字列だけを渡すこと。 */
-export function contentDialog(o: { title: string; html: string; ok?: string; wide?: boolean }, host: HTMLElement = document.body): Promise<void> {
+export function contentDialog(o: { title: string; html: string; ok?: string; wide?: boolean; check?: { label: string; onChange: (checked: boolean) => void } }, host: HTMLElement = document.body): Promise<void> {
   return open<void>((box, close) => {
     if (o.wide) box.classList.add('wide');
     head(box, { title: o.title });
@@ -171,6 +171,17 @@ export function contentDialog(o: { title: string; html: string; ok?: string; wid
     ok.addEventListener('click', () => close());
     const row = document.createElement('div');
     row.className = 'modal-actions';
+    if (o.check) {
+      // 「次回から表示しない」など。チェックを変えたらすぐ知らせる(Esc で閉じても、選んだ状態は残る)
+      const label = document.createElement('label');
+      label.className = 'modal-check';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.dataset.dialog = 'check';
+      cb.addEventListener('change', () => o.check!.onChange(cb.checked));
+      label.append(cb, ' ' + o.check.label);
+      row.appendChild(label);
+    }
     row.appendChild(ok);
     box.appendChild(row);
     return { focus: ok };
