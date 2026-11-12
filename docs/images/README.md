@@ -20,3 +20,6 @@
 | usage-11-circuit-tabs.png | サーキットの 3 つのタブ |
 | usage-12-correction.png | 位置補正の画面 |
 | usage-13-settings.png | 設定タブ |
+| mobile-01-assigned.png | スマホ(縦向き)で手動で割り当てたところ(ラップの一覧。A・B・C に割り当て済み) |
+| mobile-02-compare.png | スマホ(縦向き)の比較画面 |
+| mobile-03-compare-land.png | スマホ(横向き)の比較画面 |
