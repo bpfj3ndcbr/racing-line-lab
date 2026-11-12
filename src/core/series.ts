@@ -88,6 +88,35 @@ export function sampleSeries(s: LapSeries, tau: number): SeriesSample {
   return { lat, lon: lerp(s.lon), speed: lerp(s.speed), dist: lerp(s.dist), heading };
 }
 
+/** アニメーションをなめらかにする窓の片側(秒)。固定(案件 48) */
+export const SMOOTH_HALF_SEC = 0.4;
+const SMOOTH_TAPS = 4;   // 片側のサンプル数。重みは中心が最大の三角形(加重移動平均)
+
+/**
+ * 時刻 tau での状態のうち、見た目(位置と向き)だけを、前後 halfSec 秒の加重移動平均でなめらかにしたもの。
+ * 速度と距離は sampleSeries の値のまま(ログの値と食い違わせない)。計算や描画のラインには使わない。
+ */
+export function sampleSeriesSmooth(s: LapSeries, tau: number, halfSec = SMOOTH_HALF_SEC): SeriesSample {
+  const base = sampleSeries(s, tau);
+  if (!(halfSec > 0) || s.duration <= 0) return base;
+  const avg = (x: number) => {
+    let la = 0, lo = 0, w = 0;
+    for (let k = -SMOOTH_TAPS; k <= SMOOTH_TAPS; k++) {
+      const p = sampleSeries(s, x + (k * halfSec) / SMOOTH_TAPS);   // 範囲外は端に張り付く
+      const wk = SMOOTH_TAPS + 1 - Math.abs(k);
+      la += p.lat * wk; lo += p.lon * wk; w += wk;
+    }
+    return { lat: la / w, lon: lo / w };
+  };
+  const c = avg(tau);
+  // 向きは、なめらかにした位置の前後の差から求める(ほとんど動かないときは、元の向きのまま)
+  const a = avg(tau - halfSec / 2), b = avg(tau + halfSec / 2);
+  const dy = b.lat - a.lat;
+  const dx = (b.lon - a.lon) * Math.cos((c.lat * Math.PI) / 180);
+  const heading = Math.hypot(dx, dy) < 1e-9 ? base.heading : ((Math.atan2(dx, dy) * 180) / Math.PI + 360) % 360;
+  return { ...base, lat: c.lat, lon: c.lon, heading };
+}
+
 /** 走行距離 d(m)に達する時刻(秒)。範囲外は端。距離は単調増加なので二分探索できる。 */
 export function timeAtDistance(s: LapSeries, d: number): number {
   if (d <= 0) return 0;

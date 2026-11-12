@@ -64,7 +64,7 @@ const clean: { [K in PrefKey]: (v: unknown) => PrefValues[K] | null } = {
 };
 
 export type StartPos = 'center' | 'control';
-interface Saved { items?: Partial<Record<PrefKey, { remember?: unknown; value?: unknown }>>; yMin?: unknown; yMax?: unknown; startPos?: unknown; autoLoad?: unknown; analytics?: unknown; mapPrefetch?: unknown; mapPersist?: unknown }
+interface Saved { items?: Partial<Record<PrefKey, { remember?: unknown; value?: unknown }>>; yMin?: unknown; yMax?: unknown; startPos?: unknown; autoLoad?: unknown; analytics?: unknown; mapPrefetch?: unknown; mapPersist?: unknown; smooth?: unknown }
 
 export class Prefs {
   constructor(private s: PrefStore) {}
@@ -128,6 +128,10 @@ export class Prefs {
   /** 保存したデータ(アプリと地図)を、ブラウザに消されにくくするよう頼む(案件 31。Web 版のみ)。初期値は有効 */
   get mapPersist(): boolean { return this.saved().mapPersist !== false; }
   setMapPersist(v: boolean) { this.write({ ...this.saved(), mapPersist: v }); }
+
+  /** 走行アニメ(地図の車)の位置と向きをなめらかにする(案件 48)。初期値はオフ */
+  get smooth(): boolean { return this.saved().smooth === true; }
+  setSmooth(v: boolean) { this.write({ ...this.saved(), smooth: v }); }
 
   /** 前回の状態(保存が無い・読めないときは null) */
   last<K extends PrefKey>(k: K): PrefValues[K] | null {
