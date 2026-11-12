@@ -5,11 +5,13 @@
  * - 新しい版は、ネットがあるときに裏で取得し、アプリを閉じて次に起動したときから使われる(PWA の通常の動き)
  * - 地図(地理院タイル)は、「設定」の保存範囲の中で表示したもの(Z15〜Z18)を保存し、次からは保存したものを返す
  *   (ネットが無くても表示できる)。範囲の外は、今までどおりネットから取る
+ * - Android の共有の画面から送られたファイル(案件 45)を受け取って保存し、アプリの画面に移す
  * ビルドは vite.config.ts の swPlugin が、このファイルだけを 1 つの sw.js にまとめて行う(アプリ本体とは別)。
  */
 import {
   type SaveArea, TILE_AREAS_FILE, TILE_BYTES_HEADER, TILE_CACHE, TILE_META_CACHE, cleanAreas, parseTileUrl, tileInAreas,
 } from '../core/tiles';
+import { SHARE_ACTION, SHARE_CACHE, SHARE_FIELD, SHARE_NAME_HEADER, SHARE_PARAM, shareKey } from '../core/share';
 const sw = self as unknown as ServiceWorkerGlobalScope;
 /** ビルドしたときのアプリのファイルの一覧(sw.js からの相対パス。'./' は index.html) */
 declare const __PRECACHE__: string[];
@@ -50,8 +52,28 @@ async function tile(req: Request, t: { z: number; x: number; y: number }): Promi
   return stored;
 }
 
+// ---- 共有の画面から受け取る(案件 45) ----
+/** 送られたファイルを保存して(前に受け取った分は消す)、アプリの画面(?share=1)に移す。画面がそこから取り出して読み込む */
+async function receiveShare(req: Request): Promise<Response> {
+  const scope = sw.registration.scope;
+  try {
+    const form = await req.formData();
+    const files = form.getAll(SHARE_FIELD).filter((f): f is File => typeof f !== 'string');
+    await caches.delete(SHARE_CACHE);
+    const cache = await caches.open(SHARE_CACHE);
+    await Promise.all(files.map((f, i) => cache.put(shareKey(scope, i), new Response(f, {
+      headers: { 'content-type': f.type || 'application/octet-stream', [SHARE_NAME_HEADER]: encodeURIComponent(f.name) },
+    }))));
+  } catch { /* 受け取れなくても、アプリは開く(画面が「受け取れませんでした」と知らせる) */ }
+  return Response.redirect(new URL(`./?${SHARE_PARAM}=1`, scope).href, 303);
+}
+
 sw.addEventListener('fetch', (e) => {
   const req = e.request;
+  if (req.method === 'POST' && new URL(req.url).href === new URL(SHARE_ACTION, sw.registration.scope).href) {
+    e.respondWith(receiveShare(req));
+    return;
+  }
   if (req.method !== 'GET') return;
   const t = parseTileUrl(req.url);
   if (t) { if (t.z >= 15 && t.z <= 18) e.respondWith(tile(req, t).catch(() => Response.error())); return; }

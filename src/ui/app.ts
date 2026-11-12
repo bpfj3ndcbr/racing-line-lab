@@ -13,6 +13,7 @@ import { applyAnalytics } from '../io/analytics';
 import { openResumeStore, type ResumeStore } from '../io/resume';
 import { openNativeTileStore, openTileStore, type TileStore } from '../io/tileStore';
 import { applyAreas } from '../io/mapSave';
+import { isSharedLaunch, takeSharedFiles } from '../io/share';
 import { MapAreas } from '../store/mapAreas';
 import { installAppleFilePicker } from './fileKind';
 
@@ -32,7 +33,7 @@ export const RESUME_SAVE_FAILED = '走行ログが大きいため、一時保存
  * opts.resume: Web 版の一時保存の保存先(案件 30)。省略すると IndexedDB(使えなければ無し)。null で使わない。
  * デスクトップ版(window.rllNative がある)では使わない
  */
-export function mountApp(root: HTMLElement, session: Session, theme: ThemeController, mapFactory: MapFactory, opts: { reload?: () => void; resume?: ResumeStore | null; tiles?: TileStore | null } = {}): { dispose(): void } {
+export function mountApp(root: HTMLElement, session: Session, theme: ThemeController, mapFactory: MapFactory, opts: { reload?: () => void; resume?: ResumeStore | null; tiles?: TileStore | null; takeShared?: () => Promise<File[] | null>; sharedLaunch?: boolean } = {}): { dispose(): void } {
   root.innerHTML = `
     <header class="top">
       <div class="brand">${logoSvg(36)}<div class="brand-txt"><div class="ttl">Racing Line Lab</div><div class="subttl">シンプル走行ライン比較ツール</div></div></div>
@@ -164,6 +165,8 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
   // Web 版の一時保存(案件 30)。同じタブの中の読み直し(スリープ・アプリの切り替え・手での再読み込み)で元に戻す
   const resume: ResumeStore | null = native ? null : opts.resume !== undefined ? opts.resume : openResumeStore();
   let forgotten = false;
+  /** 一時保存から元に戻し終わるまで(共有の画面から受け取ったファイルは、そのあとで追加する) */
+  let restored: Promise<void> = Promise.resolve();
   let unhook = () => {};
   if (native && prefs.autoLoad) {
     // 読み込めたら、表示セットに割り当てがあるとき、そのまま「比較」を開く
@@ -186,9 +189,12 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
     document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('pagehide', saveState);
     unhook = () => { document.removeEventListener('visibilitychange', onVisibility); window.removeEventListener('pagehide', saveState); session.logHooks = null; };
-    if (resume.resumed) {
+    // 共有の画面から開いた新しい窓(案件 45): Android は窓を開き直すので、直前に使っていた窓の状態を引き継ぐ
+    const sharedLaunch = opts.sharedLaunch ?? isSharedLaunch();
+    const loadSaved = resume.resumed ? () => resume.load() : sharedLaunch ? () => resume.adoptLatest() : null;
+    if (loadSaved) {
       session.setLoading('前の画面の状態を元に戻しています…');
-      void resume.load().then((saved) => {
+      restored = loadSaved().then((saved) => {
         if (!saved) return;
         session.restoreResume(saved.state, saved.logs);
         const v = (saved.state as { view?: unknown } | null)?.view;
@@ -202,6 +208,16 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
   theme.subscribe(renderTop);
   renderTop();
   navigate('import');
+  // Android の共有の画面から受け取ったファイル(案件 45。Web 版のみ)。元に戻し終わってから、データ管理で追加する
+  const takeShared = opts.takeShared ?? (native ? null : takeSharedFiles);
+  if (takeShared) {
+    void restored.then(() => takeShared()).then(async (files) => {
+      if (!files) return;
+      if (!files.length) { session.say('共有されたファイルを受け取れませんでした。'); return; }
+      navigate('import');
+      await importApi?.addShared(files);
+    }).catch(() => session.say('共有されたファイルを受け取れませんでした。'));
+  }
   // ファイルを枠の外に落としても、ブラウザがそのファイルを開いてしまわないようにする(追加は、ドロップ枠に落としたときだけ)
   const stopDrop = (e: DragEvent) => { if (Array.from(e.dataTransfer?.types ?? []).includes('Files')) e.preventDefault(); };
   window.addEventListener('dragover', stopDrop);
