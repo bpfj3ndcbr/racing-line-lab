@@ -14,6 +14,7 @@ import { openResumeStore, type ResumeStore } from '../io/resume';
 import { openNativeTileStore, openTileStore, type TileStore } from '../io/tileStore';
 import { applyAreas } from '../io/mapSave';
 import { isSharedLaunch, takeSharedFiles } from '../io/share';
+import type { UpdateWatcher } from '../io/pwa';
 import { MapAreas } from '../store/mapAreas';
 import { installAppleFilePicker } from './fileKind';
 
@@ -33,7 +34,7 @@ export const RESUME_SAVE_FAILED = '走行ログが大きいため、一時保存
  * opts.resume: Web 版の一時保存の保存先(案件 30)。省略すると IndexedDB(使えなければ無し)。null で使わない。
  * デスクトップ版(window.rllNative がある)では使わない
  */
-export function mountApp(root: HTMLElement, session: Session, theme: ThemeController, mapFactory: MapFactory, opts: { reload?: () => void; resume?: ResumeStore | null; tiles?: TileStore | null; takeShared?: () => Promise<File[] | null>; sharedLaunch?: boolean; startupAbout?: boolean } = {}): { dispose(): void } {
+export function mountApp(root: HTMLElement, session: Session, theme: ThemeController, mapFactory: MapFactory, opts: { reload?: () => void; resume?: ResumeStore | null; tiles?: TileStore | null; takeShared?: () => Promise<File[] | null>; sharedLaunch?: boolean; startupAbout?: boolean; updates?: UpdateWatcher | null } = {}): { dispose(): void } {
   root.innerHTML = `
     <header class="top">
       <div class="brand">${logoSvg(36)}<div class="brand-txt"><div class="ttl">Racing Line Lab</div><div class="subttl">シンプル走行ライン比較ツール</div></div></div>
@@ -63,6 +64,10 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
   let compare: CompareView | null = null;
   let importApi: ImportApi | null = null;
   let settingsApi: { refresh(): void } | null = null;
+  /** About ボタンの下の小さな表示(案件 50)。次に画面を切り替えたら消す */
+  let notice = '';
+  /** 起動時の自動の画面の切り替え(前の画面に戻す・自動読み込み・共有の受け取り)では、知らせを消さない */
+  const autoNavigate = (v: ViewName) => { const n = notice; navigate(v); notice = n; if (n) renderTop(); };
 
   function navigate(v: ViewName) {
     if (v !== current && importApi?.isEditing()) return;     // サーキットの登録・編集中は、保存かキャンセルするまで移れない
@@ -87,6 +92,7 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
       compare?.hide();
     }
     renderNav();
+    if (notice && v !== from) { notice = ''; renderTop(); }
   }
 
   /** 利用者の操作でほかの画面へ移る。位置補正で補正量を動かしたままなら、確かめてから移る */
@@ -120,7 +126,8 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
     const key = (document.activeElement as HTMLElement | null)?.dataset?.fk;
     topRight.innerHTML = `<span class="cur">サーキット: <b>${esc(session.setCircuitOf()?.name ?? '未選択')}</b></span>` +
       `<span class="seg tiny" role="group" aria-label="テーマ">${seg('light', 'ライト')}${seg('dark', 'ダーク')}</span>` +
-      `<span class="seg tiny" role="group" aria-label="このアプリについて"><button data-act="about" data-fk="about" aria-haspopup="dialog">${INFO_ICON}About</button></span>`;
+      `<span class="about-wrap"><span class="seg tiny" role="group" aria-label="このアプリについて"><button data-act="about" data-fk="about" aria-haspopup="dialog">${INFO_ICON}About</button></span>`
+      + `${notice ? `<span class="upd-note" role="status">${esc(notice)}</span>` : ''}</span>`;
     if (key) topRight.querySelector<HTMLElement>(`[data-fk="${key}"]`)?.focus({ preventScroll: true });
   }
 
@@ -155,7 +162,7 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
       resume?.forget(),
       tiles ? tiles.clear().then(() => tiles.setAreas([])) : undefined,
     ].map((p) => Promise.resolve(p).catch(() => { /* 消せなくても読み直す */ }))).finally(reload);
-  }, { store: tiles, areas: mapAreas, mapFactory, circuits: () => session.circuits });
+  }, { store: tiles, areas: mapAreas, mapFactory, circuits: () => session.circuits }, opts.updates ?? null);
   // 起動時: 保存範囲を service worker に渡し直し、概略の地図のうち足りない分を保存する(ネットがあるとき)
   if (tiles) {
     void applyAreas(tiles, mapAreas.list(), { prefetch: prefs.mapPrefetch && navigator.onLine !== false, persist: prefs.mapPersist }).catch(() => { /* 次の機会に */ });
@@ -173,7 +180,7 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
     // 割り当てが無ければ「データ管理」のまま、比較セットは閉じた状態で始める(一覧ではすべて閉じ、タブは表示中の比較セット。案件 26)
     void session.restoreLast((p) => native.readTextFile(p)).then(() => {
       if (current !== 'import') return;
-      if (SLOTS.some((s) => session.assignment[s])) navigate('compare'); else importApi?.closeSets();
+      if (SLOTS.some((s) => session.assignment[s])) autoNavigate('compare'); else importApi?.closeSets();
     });
   }
 
@@ -198,7 +205,7 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
         if (!saved) return;
         session.restoreResume(saved.state, saved.logs);
         const v = (saved.state as { view?: unknown } | null)?.view;
-        if (current === 'import' && (v === 'compare' || v === 'help' || v === 'settings')) navigate(v);
+        if (current === 'import' && (v === 'compare' || v === 'help' || v === 'settings')) autoNavigate(v);
       }).catch(() => { /* 戻せなければ初期状態のまま */ }).finally(() => { if (session.loading) session.setLoading(''); });
     }
   }
@@ -208,6 +215,17 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
   theme.subscribe(renderTop);
   renderTop();
   navigate('import');
+  // 更新の知らせ(案件 50): 更新された直後(前回開いた版と違う)と、新しい版が待機中になったとき。初めて使うときは出さない
+  const seen = session.getSetting<string>('seenVersion', '');
+  if (seen !== __APP_VERSION__) {
+    session.setSetting('seenVersion', __APP_VERSION__);
+    if (seen) { notice = `${__APP_VERSION__} に更新しました`; renderTop(); }
+  }
+  if (opts.updates) {
+    const showWaiting = () => { if (opts.updates!.waiting) { notice = '新しい版があります'; renderTop(); } settingsApi?.refresh(); };
+    opts.updates.subscribe(showWaiting);
+    if (opts.updates.waiting) showWaiting();
+  }
   // 起動時の About(案件 49。main.ts だけが有効にする)。同じタブの読み直し(Web 版の一時保存から戻すとき)と、共有の画面から開いたときは出さない
   if (opts.startupAbout && prefs.startAbout && !resume?.resumed && !(opts.sharedLaunch ?? isSharedLaunch())) {
     void showAbout(document.body, (hide) => { prefs.setStartAbout(!hide); settingsApi?.refresh(); });
@@ -218,7 +236,7 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
     void restored.then(() => takeShared()).then(async (files) => {
       if (!files) return;
       if (!files.length) { session.say('共有されたファイルを受け取れませんでした。'); return; }
-      navigate('import');
+      autoNavigate('import');
       await importApi?.addShared(files);
     }).catch(() => session.say('共有されたファイルを受け取れませんでした。'));
   }

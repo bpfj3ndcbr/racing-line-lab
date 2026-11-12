@@ -110,6 +110,9 @@ h2{margin:0}
 .navtab.on{box-shadow:var(--btn-pressed);font-weight:700}
 .navtab.dim,.navtab:disabled{opacity:.6;cursor:not-allowed}
 .top-right{display:flex;align-items:center;gap:16px}
+/* About ボタンの下の、ごく小さな更新の知らせ(案件 50)。ほかの部品の大きさ・並びは変えない */
+.about-wrap{position:relative;display:inline-flex}
+.upd-note{position:absolute;top:100%;right:0;margin-top:1px;font-size:9px;line-height:1;white-space:nowrap;color:var(--accent);pointer-events:none}
 .cur b{font-weight:700}
 
 /* A〜D の割り当て欄 */
@@ -1048,6 +1051,7 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
   .top-right{align-self:center;flex:none;gap:6px;margin-left:auto}
   .top-right .cur{display:none}
   .top-right .btn,.top-right .seg button{min-height:28px;height:28px}
+  .upd-note{font-size:8px;line-height:8px;margin-top:0}            /* 上部バーが低いので、更新の知らせをさらに小さく */
 
   /* 比較: 左に地図と再生の操作、右にカードと速度グラフ。画面の高さに収める(ページはスクロールしない) */
   .cmp{height:calc(100vh - var(--top-h));height:calc(100dvh - var(--top-h));min-height:0}
