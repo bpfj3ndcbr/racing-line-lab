@@ -47,10 +47,21 @@ describe('設定タブ', () => {
     expect(Array.from(root.querySelectorAll('#view-settings h3')).map((h) => h.textContent)).toEqual(['外観', 'マップ', '地図の保存', '速度グラフ', '再生・セクター', '起動時', 'プライバシー']);
   });
 
-  it('項目: テーマ / 描画 / 引き出し線の表示 / 倍率 / 初期位置 / 追従 / 地図の保存(3 項目) / 速度レンジ / 横軸 / 再生速度 / セクターボタンの動作 / 自動読み込み / 利用状況の送信 と、初期化ボタン', () => {
+  it('項目: テーマ / 描画 / 引き出し線の表示 / 倍率 / 初期位置 / 走行アニメをなめらかにする / 追従 / 地図の保存(3 項目) / 速度レンジ / 横軸 / 再生速度 / セクターボタンの動作 / 自動読み込み / 利用状況の送信 と、初期化ボタン', () => {
     const names = Array.from(root.querySelectorAll('#view-settings .sname')).map((e) => e.textContent);
-    expect(names).toEqual(['テーマ', '描画', '引き出し線の表示', '倍率', '初期位置', '追従', '保存範囲', '概略の地図は表示前に保存する', '保存したデータを消されにくくする', '速度レンジ', '横軸', '再生速度', 'セクターボタンの動作', '最後の走行データを自動で読み込む', '利用状況の送信']);
+    expect(names).toEqual(['テーマ', '描画', '引き出し線の表示', '倍率', '初期位置', '走行アニメをなめらかにする', '追従', '保存範囲', '概略の地図は表示前に保存する', '保存したデータを消されにくくする', '速度レンジ', '横軸', '再生速度', 'セクターボタンの動作', '最後の走行データを自動で読み込む', '利用状況の送信']);
     expect($('[data-reset]')).toBeTruthy();
+  });
+
+  it('「走行アニメをなめらかにする」: 初期値はオフで、押すとオン・オフが切り替わり、保存される', () => {
+    const sw = () => $<HTMLButtonElement>('[data-smooth]');
+    expect(sw().getAttribute('aria-checked')).toBe('false');
+    expect(new Prefs(session).smooth).toBe(false);
+    sw().click();
+    expect(sw().getAttribute('aria-checked')).toBe('true');
+    expect(new Prefs(session).smooth).toBe(true);
+    sw().click();
+    expect(new Prefs(session).smooth).toBe(false);
   });
 
   it('初めから「記憶する」なのは、操作の結果を自動で保存する項目(テーマ・描画・ラベル・セクターの動作)', () => {

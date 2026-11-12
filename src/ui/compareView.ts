@@ -1,6 +1,6 @@
 import {
   type HeatRun as CoreRun, type Lap, type LapSeries, PlaybackEngine, SLOTS, type Slot,
-  accelSeries, alignedSeries, buildLapSeries, pickRuler, formatLapTime, heatColor, heatRuns, sampleSeries, speedColor, speedRange, speedRuns, timeAtDistance, escapeHtml as esc
+  accelSeries, alignedSeries, buildLapSeries, pickRuler, formatLapTime, heatColor, heatRuns, sampleSeries, sampleSeriesSmooth, speedColor, speedRange, speedRuns, timeAtDistance, escapeHtml as esc
 } from '../core';
 import type { LoadedLog, Session } from '../store/session';
 import { Prefs, RATE_CHOICES, ZOOM_CHOICES, type FollowV as Follow, type LabelV, type MapModeV as MapMode, type PrefKey, type SyncV as SyncMode } from '../store/prefs';
@@ -32,7 +32,7 @@ export interface CompareDeps {
 export interface CompareView {
   show(): void; hide(): void; readonly engine: PlaybackEngine;
   /** 設定タブで初期値が変わったとき、その項目を比較画面にも反映する(「記憶する」項目は何もしない) */
-  applyPref(key: PrefKey | 'yRange' | 'startPos' | 'autoLoad'): void;
+  applyPref(key: PrefKey | 'yRange' | 'startPos' | 'autoLoad' | 'smooth'): void;
 }
 
 const RATES = RATE_CHOICES;
@@ -747,11 +747,17 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
     // 時間ベース: 全車が同じ経過時間の位置。距離ベース(速度グラフが「距離」): 基準の車と同じ距離の位置(その場所での走行ラインと速度を比べる)。
     // 距離ベースの距離は、物差しの走行ラインに投影したもの(コース上の同じ断面にいれば同じ距離)
     const refSample = sampleSeries(sv(r), localOf(r, tau));
-    const samples = cars.map((c) => ({
-      c, s: xKind === 'dist' && c !== r ? sampleSeries(c.track, timeAtDistance(c.track, refSample.dist)) : c === r ? refSample : sampleSeries(c.series, localOf(c, tau)),
-    }));
+    const at = (c: Car) => xKind === 'dist' && c !== r ? { ser: c.track, t: timeAtDistance(c.track, refSample.dist) }
+      : c === r ? { ser: sv(r), t: localOf(r, tau) } : { ser: c.series, t: localOf(c, tau) };
+    const samples = cars.map((c) => {
+      const a = at(c);
+      return { c, s: c === r ? refSample : sampleSeries(a.ser, a.t), a };
+    });
+    // 「走行アニメをなめらかにする」: 地図の車の位置・向き(と追従)だけ。速度・距離・タイム差は元の値のまま
+    const smooth = prefs.smooth;
+    const shown = smooth ? samples.map((x) => ({ ...x, s: { ...x.s, ...sampleSeriesSmooth(x.a.ser, x.a.t, undefined), speed: x.s.speed, dist: x.s.dist } })) : samples;
     const refDist = samples[0].s.dist;
-    const onMap = samples.filter(({ c }) => !hidden.has(c.slot));
+    const onMap = shown.filter(({ c }) => !hidden.has(c.slot));
     followCamera(onMap);
     graph.setCursor(
       xKind === 'time' ? tau : refDist,
@@ -945,10 +951,11 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   renderLegend();
   syncModeUi();
 
-  function applyPref(key: PrefKey | 'yRange' | 'startPos' | 'autoLoad') {
+  function applyPref(key: PrefKey | 'yRange' | 'startPos' | 'autoLoad' | 'smooth') {
     if (key === 'yRange') { graph.setYRange(prefs.yMin, prefs.yMax); return; }
     if (key === 'startPos') { if (visible && cars.length) applyInitialView(); return; }
     if (key === 'autoLoad') return;
+    if (key === 'smooth') { if (visible) updateFrame(); return; }
     if (prefs.get(key).remember) return;                       // 「記憶する」の項目は、前回の状態のまま
     const v = prefs.initial(key);
     switch (key) {
