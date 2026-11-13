@@ -115,6 +115,21 @@ describe('画面の一時保存(Web 版)', () => {
     expect(view('compare').hidden).toBe(false);
   });
 
+  it('走行ログは、向き・高度・加速度を省いて保存し(案件 59)、それでも元に戻して比較できる', async () => {
+    const s1 = await firstRun();
+    const id = s1.logs[0].id;
+    expect(s1.logs[0].log.heading).toBeDefined();      // 画面で使っているログはそのまま
+    const saved = resume.logs.get(id)!;
+    expect([saved.heading, saved.height, saved.longAcc, saved.latAcc]).toEqual([undefined, undefined, undefined, undefined]);
+    expect(saved.t).toEqual(parseVbo(vbo, 'a.vbo').t);    // 間引かない(1 周分のログは、輪につなぐ前のまま)
+    nav('compare');
+    const s2 = reloadSameTab();
+    await flush();
+    expect(s2.logs[0].laps.map((l) => l.duration)).toEqual(s1.logs[0].laps.map((l) => l.duration));
+    expect(s2.assignment.B).toEqual({ logId: id, lap: 1 });
+    expect(view('compare').hidden).toBe(false);
+  });
+
   it('画面が隠れたとき(visibilitychange)にも小さな状態を保存する。「データ管理」のままならデータ管理に戻る', async () => {
     await firstRun();
     Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });

@@ -129,6 +129,16 @@ export function parseVbo(text: string, fileName = ''): TrackLog {
   return log;
 }
 
+/**
+ * 保存用の走行ログ(案件 59)。画面と計算で使わない配列(向き・高度・前後 / 横の加速度)を省いた写しを返す。
+ * 車の向きは位置から計算し直している(series.ts)ので、ログの heading は使わない。
+ * 値の丸めや、サンプルの間引きはしない(生のデータのまま)。元のログは変えない
+ */
+export function storableLog(log: TrackLog): TrackLog {
+  const { heading: _h, height: _z, longAcc: _a, latAcc: _b, ...rest } = log;
+  return rest;
+}
+
 /** 表示用: UNIX ms → "2026/05/06 09:45" (JST) */
 export function formatJst(epochMs: number): string {
   const d = new Date(epochMs + 9 * 3600 * 1000);
