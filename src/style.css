@@ -410,8 +410,14 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .secs .btn.sec{min-height:24px;height:24px;min-width:30px;padding:0 6px;font-size:10px;justify-content:center}
 .secs .btn.sec[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-on);font-weight:700}
 .no-sector{color:var(--muted)}
-.sync-grp{display:flex;flex-direction:column;gap:6px}
+.sync-grp{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
 .sync-grp[hidden]{display:none}
+/* セクターの操作のまとまり(「先頭車両・全車一致・解除」「自動」「S1〜」)ごとに、左に細い縦線(案件 58) */
+.sync-part{display:inline-flex}
+#cmp-sync .sync-part,.secs:has(.sec){border-left:2px solid var(--border-strong);padding-left:6px}
+/* 上部バーの「セクター動作」の見出し(スマホの横向きだけ。下の @media で出す) */
+.sync-cap{display:none}
+.sync-row{display:contents}
 .sync-status{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .sync-status[hidden]{display:none}
 
@@ -518,7 +524,7 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .car-lbl-c .lbl-line line{stroke:var(--c)}.car-lbl-c .lbl-txt{color:var(--c-lbl,#6fe08a)}
 .car-lbl-d .lbl-line line{stroke:var(--d)}.car-lbl-d .lbl-txt{color:var(--d-lbl,#ffc94d)}
 
-/* テーマの切り替えボタン(小さめ) */
+/* ヘッダーの小さなボタン(About) */
 .seg.tiny button{min-height:22px;height:22px;padding:0 7px;font-size:10px}
 .seg.tiny button .ico{vertical-align:-2px;margin-right:4px}
 
@@ -892,7 +898,7 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
   .map-legend .lg-word{display:none}           /* 凡例は「50 ▬ 180 km/h」だけにして、出典の左に収める(案件 42) */
   .map-legend{gap:4px;padding:0 4px;font-size:10px}
   .legend-bar{width:22px}
-  /* 上部バー: 1 行目にロゴ・テーマ・About、2 行目にタブ(折り返さない)。サーキット名は出さない */
+  /* 上部バー: 1 行目にロゴ・About、2 行目にタブ(折り返さない)。サーキット名は出さない */
   .top{flex-wrap:wrap;gap:6px 8px;padding:6px 10px;min-height:0}
   .brand-txt{display:none}
   .navtabs{order:3;width:100%;gap:4px}
@@ -1042,7 +1048,7 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .rn-body .sub{font-size:12px;color:var(--muted);font-weight:400}
 @media (orientation:landscape) and (max-height:500px){
   :root{--top-h:41px}
-  /* 上部バー: ロゴ・タブ・「表示中」と比較セット・テーマ・About を 1 行に。サーキット名は出さない。
+  /* 上部バー: ロゴ・タブ・「表示中」と比較セット・セクターの動作・About を 1 行に。サーキット名は出さない。
      比較セットを上に出す分、右の列はカードから始まる */
   .top{flex-wrap:nowrap;gap:8px;padding:0 10px;min-height:40px;height:40px;align-items:flex-end}
   .top .brand{align-self:center}
@@ -1053,10 +1059,14 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
   .top-set{display:flex;align-items:center;gap:8px;align-self:center;flex:1 1 auto;min-width:0}
   .top-set .cmp-set{flex:1;min-width:0;max-width:280px}
   .top-set select{height:28px;min-height:28px}
-  .top-set .sync-grp{flex:none}
+  .top-set .sync-grp{flex:none;flex-direction:column;flex-wrap:nowrap;align-items:stretch;gap:1px}
+  /* 「セクター動作」の小さな見出しと下線で、セクターの操作のまとまりと分かるようにする(案件 58) */
+  .top-set .sync-cap{display:block;font-size:8px;line-height:8px;color:var(--muted);padding:3px 2px 0;border-bottom:1px solid var(--border-strong);white-space:nowrap}
+  .top-set .sync-grp .seg.sm button{height:24px;min-height:24px}          /* 見出しの上に余白を取るため、上部バーの高さに収まるよう少し低く */
+  .top-set .sync-row{display:flex;align-items:center;gap:4px}
   .top-set .seg.sm button{padding:0 7px;white-space:nowrap}
   #cmp-set-wrap,#cmp-sync{display:none}            /* 右の列の比較セットとセクターボタンの動作は、上部バーに出す */
-  .top-right .seg button,.top-right .btn{font-size:10px;padding:0 7px}   /* テーマと About は小さく(比較セットの幅を空ける) */
+  .top-right .seg button,.top-right .btn{font-size:10px;padding:0 7px}   /* About は小さく(比較セットの幅を空ける) */
   .top>.grow{display:none}
   .top-right{align-self:center;flex:none;gap:6px;margin-left:auto}
   .top-right .cur{display:none}

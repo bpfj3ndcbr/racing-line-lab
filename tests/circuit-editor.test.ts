@@ -596,10 +596,10 @@ describe('読み込み・書き出し', () => {
   });
 });
 
-describe('テーマの切り替えボタン', () => {
-  it('小さいボタン(高さ 22px)', () => {
+describe('ヘッダーの小さなボタン', () => {
+  it('About は小さいボタン(高さ 22px)', () => {
     expect(readFileSync('src/style.css', 'utf8')).toMatch(/\.seg\.tiny button\{min-height:22px;height:22px;/);
-    expect(readFileSync('src/ui/app.ts', 'utf8')).toContain('class="seg tiny" role="group" aria-label="テーマ"');
+    expect(readFileSync('src/ui/app.ts', 'utf8')).toContain('class="seg tiny" role="group" aria-label="このアプリについて"');
   });
 
   it('セクターを追加・削除しただけなら、割り当てを解除しない(ラップは同じ)', async () => {

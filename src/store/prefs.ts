@@ -42,9 +42,12 @@ export interface PrefItem<V> { remember: boolean; value: V }
 export const DEFAULT_VALUES: PrefValues = {
   theme: 'light', mapMode: 'line', labels: 'off', zoom: 0, follow: 'leader', xKind: 'dist', sync: 'all', rate: 1,
 };
-/** 最初から「記憶する」になっている項目(操作の結果を自動で保存する項目) */
+/**
+ * 最初から「記憶する」になっている項目(操作の結果を自動で保存する項目)。
+ * テーマは設定タブでだけ選ぶ(案件 58 でヘッダーの切り替えをやめた)ので「記憶する」は無く、いつも設定の値で始まる
+ */
 export const DEFAULT_REMEMBER: Record<PrefKey, boolean> = {
-  theme: true, mapMode: true, labels: true, zoom: false, follow: false, xKind: false, sync: true, rate: false,
+  theme: false, mapMode: true, labels: true, zoom: false, follow: false, xKind: false, sync: true, rate: false,
 };
 /** 「前回の状態」の保存先(theme は ThemeController が管理) */
 export const LAST_KEY: Record<PrefKey, string | null> = {
@@ -172,4 +175,14 @@ export class Prefs {
   }
 
   reset() { this.write({}); }
+
+  /**
+   * テーマの設定を「設定タブで選んだ値」の形にそろえる(案件 58)。1.6.3 までは、ヘッダーで切り替えたテーマを記憶する設定が
+   * 初期値だったので、テーマの値をまだ選んでいない(または記憶していた)ときは、今のテーマを設定の値として引き継ぐ
+   */
+  adoptTheme(current: ThemeV) {
+    const it = this.saved().items?.theme;
+    if (it && it.remember === false && clean.theme(it.value)) return;
+    this.patch('theme', { remember: false, value: current });
+  }
 }
