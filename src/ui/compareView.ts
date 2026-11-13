@@ -64,6 +64,8 @@ interface Layout { v: number; sideW: number; graphH: number }
 const DEFAULT_LAYOUT: Layout = { v: LAYOUT_VERSION, sideW: 300, graphH: 300 };
 /** 右パネルの幅の範囲(最小 220px はこれ以上狭められない) */
 const SIDE_MIN = 220, SIDE_MAX = 560, MAP_MIN_W = 240;
+/** 地図を動かしたあと、前回の表示位置として覚えるまでの待ち(動き続けている間は覚えない) */
+const VIEW_SAVE_MS = 400;
 /** 速度グラフの高さの下限(これより低いと文字が読めない)、境界線の太さ、上の部分の高さが測れないときの値 */
 const GRAPH_MIN_H = 170, SPLITTER_H = 6, UPPER_FALLBACK_H = 400;
 const EASE_MS = 400;
@@ -359,14 +361,24 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   // 地図の初期の倍率: 0 = 走行ライン全体が入る倍率。数値のときは、同じ中心のまま、その倍率にする。
   // サーキット登録画面の地図の倍率(登録した表示位置)は使わない(別々に管理する)
   let applyingView = false;
+  let viewTimer: ReturnType<typeof setTimeout> | null = null;
+  /** 利用者が地図を動かした・拡大縮小したか(プログラムが合わせた位置は、前回の表示位置として覚えない) */
+  let viewTouched = false;
+  /** 前回の表示位置を覚えるときの、サーキットの印(サーキットが無いログは空) */
+  const circuitKey = () => ref()?.log.circuit?.id ?? '';
   function applyInitialView() {
     if (!map) return;
     const z = prefs.initial('zoom');
+    viewTouched = false;
     const ctl = ref()?.log.circuit?.control;
     const atControl = prefs.startPos === 'control' && !!ctl;     // 初期位置: コントロールラインの中心
+    // 初期位置が「現在の表示位置」: 前回見ていた位置と倍率(同じサーキットのときだけ。無ければ、地図の中心と同じ)
+    const last = prefs.startPos === 'view' ? prefs.lastView() : null;
+    const lastHere = last && last.circuit === circuitKey() ? last : null;
     applyingView = true;
     try {
       map.fit();
+      if (lastHere) { map.setView(lastHere.lat, lastHere.lon, lastHere.zoom); return; }
       if (z !== 0 || atControl) {
         const base = map.getView();
         const zoom = z === 0 ? base.zoom : z;
@@ -381,10 +393,21 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
     map = deps.mapFactory($('cmp-map'));
     map.onZoomChange((z) => {                                  // 利用者が変えた倍率を、前回の状態として覚える
       if (applyingView) return;
+      viewTouched = true;
       const lo = ZOOM_CHOICES[0], hi = ZOOM_CHOICES[ZOOM_CHOICES.length - 1];
       prefs.saveLast('zoom', Math.min(hi, Math.max(lo, Math.round(z))));
     });
-    map.onUserDrag(() => setFollow('fixed'));   // 地図を手で動かしたら追従をやめる
+    map.onUserDrag(() => { viewTouched = true; setFollow('fixed'); });   // 地図を手で動かしたら追従をやめる
+    map.onViewChange(() => {                                   // 見ている位置と倍率を、前回の位置として覚える(動きが止まってから 1 回)
+      if (applyingView) return;
+      if (viewTimer) clearTimeout(viewTimer);
+      viewTimer = setTimeout(() => {
+        viewTimer = null;
+        if (!map || !visible || !viewTouched) return;
+        const v = map.getView();
+        prefs.saveLastView({ circuit: circuitKey(), lat: v.lat, lon: v.lon, zoom: v.zoom });
+      }, VIEW_SAVE_MS);
+    });
     watchMapTap($('cmp-map'));
   }
 

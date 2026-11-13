@@ -40,7 +40,7 @@ export type PrefKey = keyof PrefValues;
 export interface PrefItem<V> { remember: boolean; value: V }
 
 export const DEFAULT_VALUES: PrefValues = {
-  theme: 'light', mapMode: 'line', labels: 'off', zoom: 0, follow: 'fixed', xKind: 'dist', sync: 'all', rate: 1,
+  theme: 'light', mapMode: 'line', labels: 'off', zoom: 0, follow: 'leader', xKind: 'dist', sync: 'all', rate: 1,
 };
 /** 最初から「記憶する」になっている項目(操作の結果を自動で保存する項目) */
 export const DEFAULT_REMEMBER: Record<PrefKey, boolean> = {
@@ -63,7 +63,11 @@ const clean: { [K in PrefKey]: (v: unknown) => PrefValues[K] | null } = {
   rate: (v) => (typeof v === 'number' && RATE_CHOICES.includes(v) ? v : null),
 };
 
-export type StartPos = 'center' | 'control';
+export type StartPos = 'center' | 'control' | 'view';
+
+/** 前回見ていた地図の位置(案件 54)。サーキットごとの位置なので、サーキットの id と一緒に覚える */
+export interface LastView { circuit: string; lat: number; lon: number; zoom: number }
+export const LAST_VIEW_KEY = 'compare.view';
 interface Saved { items?: Partial<Record<PrefKey, { remember?: unknown; value?: unknown }>>; yMin?: unknown; yMax?: unknown; startPos?: unknown; autoLoad?: unknown; analytics?: unknown; mapPrefetch?: unknown; mapPersist?: unknown; smooth?: unknown; startAbout?: unknown }
 
 export class Prefs {
@@ -109,8 +113,11 @@ export class Prefs {
     this.write({ ...rest, yMin: min, ...(max === null ? {} : { yMax: max }) });
   }
 
-  /** 地図の初期位置: 'center' = 地図の中心(登録した表示位置・走行ライン全体の中心)、'control' = コントロールラインの中心。操作で変わらないので「記憶する」は無い */
-  get startPos(): StartPos { return this.saved().startPos === 'control' ? 'control' : 'center'; }
+  /**
+   * 地図の初期位置: 'center' = 地図の中心(登録した表示位置・走行ライン全体の中心)、'control' = コントロールラインの中心、
+   * 'view' = 前回見ていた位置と倍率(案件 54。サーキットが違う・覚えていないときは 'center' と同じ)。操作で変わらないので「記憶する」は無い
+   */
+  get startPos(): StartPos { const v = this.saved().startPos; return v === 'control' || v === 'view' ? v : 'center'; }
   setStartPos(v: StartPos) { this.write({ ...this.saved(), startPos: v }); }
 
   /** 起動時に、前回の走行データ(ファイルと A〜D の割り当て)を自動で読み込む */
@@ -136,6 +143,16 @@ export class Prefs {
   /** 走行アニメ(地図の車)の位置と向きをなめらかにする(案件 48)。初期値はオフ */
   get smooth(): boolean { return this.saved().smooth === true; }
   setSmooth(v: boolean) { this.write({ ...this.saved(), smooth: v }); }
+
+  /** 前回見ていた地図の位置(案件 54)。保存が無い・読めないときは null */
+  lastView(): LastView | null {
+    const v = this.s.getSetting<unknown>(LAST_VIEW_KEY, null) as Partial<LastView> | null;
+    if (!v || typeof v.circuit !== 'string') return null;
+    const ok = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n);
+    if (!ok(v.lat) || !ok(v.lon) || !ok(v.zoom) || Math.abs(v.lat) > 90 || Math.abs(v.lon) > 180 || v.zoom < 1 || v.zoom > 24) return null;
+    return { circuit: v.circuit, lat: v.lat, lon: v.lon, zoom: v.zoom };
+  }
+  saveLastView(v: LastView): void { this.s.setSetting(LAST_VIEW_KEY, v); }
 
   /** 前回の状態(保存が無い・読めないときは null) */
   last<K extends PrefKey>(k: K): PrefValues[K] | null {
