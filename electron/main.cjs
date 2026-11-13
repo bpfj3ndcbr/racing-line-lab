@@ -19,6 +19,8 @@ let tiles;
 protocol.registerSchemesAsPrivileged([{ scheme: 'rll-tile', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 /** 地理院から取る(15 秒で諦める) */
 const fetchUpstream = (url) => net.fetch(url, { signal: AbortSignal.timeout(15000) });
+/** 新しい版の確認(案件 52)で見る、GitHub のタグの一覧 */
+const UPDATE_TAGS_URL = 'https://api.github.com/repos/bpfj3ndcbr/racing-line-lab/tags?per_page=100';
 let win = null;
 
 function createWindow() {
@@ -83,6 +85,18 @@ app.whenReady().then(() => {
   ipcMain.handle('tiles:remove', (_e, list) => tiles.remove(list));
   ipcMain.handle('tiles:clear', () => { tiles.clear(); return true; });
   ipcMain.handle('tiles:prefetch', (_e, list) => prefetchTiles(tiles, fetchUpstream, list));
+
+  // 新しい版の確認(案件 52): 設定の「更新を確認する」を押したときだけ、GitHub のタグの名前の一覧を取る(10 秒で諦める)。
+  // 比べるのは画面側。送るのは通信に必要な情報だけで、走行ログや設定は送らない
+  ipcMain.handle('update:check', async () => {
+    try {
+      const r = await net.fetch(UPDATE_TAGS_URL, { signal: AbortSignal.timeout(10000), headers: { Accept: 'application/vnd.github+json' } });
+      if (!r.ok) return { ok: false };
+      const list = await r.json();
+      if (!Array.isArray(list)) return { ok: false };
+      return { ok: true, tags: list.map((x) => x && x.name).filter((n) => typeof n === 'string').slice(0, 100) };
+    } catch { return { ok: false }; }
+  });
 
   createWindow();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
