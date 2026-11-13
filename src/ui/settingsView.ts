@@ -1,4 +1,4 @@
-import { Prefs, RATE_CHOICES, SPEED_RANGE, ZOOM_CHOICES, type PrefKey, type PrefValues } from '../store/prefs';
+import { Prefs, RATE_CHOICES, SPEED_RANGE, ZOOM_CHOICES, type PrefKey, type PrefValues, type StartPos } from '../store/prefs';
 import { type Circuit, type SaveArea, type TileId, tileInRect, escapeHtml as esc } from '../core';
 import type { MapAreas } from '../store/mapAreas';
 import type { TileStore } from '../io/tileStore';
@@ -32,7 +32,7 @@ const GROUPS: { title: string; rows: (Row | Plain)[] }[] = [
     { key: 'mapMode', name: '描画', kind: 'seg', opts: [{ v: 'line', label: '走行ライン' }, { v: 'speed', label: '速度' }, { v: 'accel', label: '加減速' }] },
     { key: 'labels', name: '引き出し線の表示', kind: 'seg', opts: [{ v: 'off', label: '非表示' }, { v: 'speed', label: '速度・差' }, { v: 'name', label: 'カード名' }] },
     { key: 'zoom', name: '倍率', kind: 'zoom', hint: '「サーキット全体」は、比較画面では走行ライン全体が入る倍率、サーキット登録の地図では登録した表示位置です。数値は地図のズームで、比較画面とサーキット登録の地図の両方に使います(それぞれ別に管理します)。' },
-    { name: '初期位置', kind: 'startpos', hint: '地図を開いたときの中心です。「地図の中心」は、登録した表示位置(無ければ走行ライン全体)の中心、「コントロールライン」はその線の中心です。' },
+    { name: '初期位置', kind: 'startpos', hint: '地図を開いたときの中心です。「地図の中心」は、登録した表示位置(無ければ走行ライン全体)の中心、「コントロールライン」はその線の中心です。「現在の表示位置」は、前回見ていた位置と倍率で始まります(倍率の初期値は使いません。サーキットが違うときや、まだ覚えていないときは「地図の中心」と同じです)。' },
     { name: '走行アニメをなめらかにする', kind: 'smooth', hint: '地図の車の位置と向きを、前後の位置からの加重移動平均でなめらかにします。見た目だけで、走行ライン・速度・タイム差は変わりません。' },
     { key: 'follow', name: '追従', kind: 'seg', opts: [{ v: 'fixed', label: '固定' }, { v: 'leader', label: '先頭追従' }, { v: 'A', label: 'A' }, { v: 'B', label: 'B' }, { v: 'C', label: 'C' }, { v: 'D', label: 'D' }],
       hint: '割り当ての無い枠を選んだときは「固定」になります。' },
@@ -156,7 +156,7 @@ export function mountSettingsView(root: HTMLElement, prefs: Prefs, onChange: (ke
         if (r.kind === 'startpos') {
           const cur = prefs.startPos;
           return `<div class="srow"><div class="sname">${r.name}</div><div class="sctl"><span class="seg slide" role="radiogroup" aria-label="初期位置">${
-            ([['center', '地図の中心'], ['control', 'コントロールライン']] as const).map(([v, l]) =>
+            ([['center', '地図の中心'], ['control', 'コントロールライン'], ['view', '現在の表示位置']] as const).map(([v, l]) =>
               `<button type="button" role="radio" data-startpos="${v}" aria-checked="${cur === v}" class="${cur === v ? 'on' : ''}">${l}</button>`).join('')}</span></div><div class="srem"></div>${r.hint ? `<div class="shint">${r.hint}</div>` : ''}</div>`;
         }
         if (r.kind === 'autoload') {
@@ -238,7 +238,7 @@ export function mountSettingsView(root: HTMLElement, prefs: Prefs, onChange: (ke
     const seg = t.closest<HTMLButtonElement>('[data-set]');
     if (seg && !seg.disabled) { resetArmed = false; setVal(seg.dataset.set as PrefKey, seg.dataset.v!); render(); return; }
     const sp = t.closest<HTMLButtonElement>('[data-startpos]');
-    if (sp) { resetArmed = false; prefs.setStartPos(sp.dataset.startpos as 'center' | 'control'); onChange('startPos'); render(); return; }
+    if (sp) { resetArmed = false; prefs.setStartPos(sp.dataset.startpos as StartPos); onChange('startPos'); render(); return; }
     const al = t.closest<HTMLButtonElement>('[data-autoload]');
     if (al && !al.disabled) { resetArmed = false; prefs.setAutoLoad(!prefs.autoLoad); onChange('autoLoad'); render(); return; }
     const un = t.closest<HTMLButtonElement>('[data-update-native]');

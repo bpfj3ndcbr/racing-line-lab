@@ -224,11 +224,22 @@ describe('走行ライン / ヒートマップ(速度) / 加減速 の切り替�
 });
 
 describe('地図の追従', () => {
-  it('初期は固定: 地図の中心は動かさない', () => {
+  it('初期は先頭追従(案件 54): 再生位置を動かすと、地図の中心が車に付いてくる', () => {
     setupOne();
+    expect(followBtn('leader').getAttribute('aria-checked')).toBe('true');
+    expect(fake.centers.length).toBeGreaterThan(0);
+    const n = fake.centers.length;
     seekTo(30);
-    expect(fake.centers).toHaveLength(0);
+    expect(fake.centers.length).toBeGreaterThan(n);
+  });
+
+  it('「固定」を選ぶと、地図の中心は動かさない', () => {
+    setupOne();
+    followBtn('fixed').click();
     expect(followBtn('fixed').getAttribute('aria-checked')).toBe('true');
+    const n = fake.centers.length;
+    seekTo(30);
+    expect(fake.centers).toHaveLength(n);
   });
 
   it('割り当てが無い枠(B〜D)への追従は選べない', () => {
@@ -239,8 +250,10 @@ describe('地図の追従', () => {
 
   it('A に追従: 再生位置を動かすたびに A の位置へ中心が移る', () => {
     setupOne();
+    followBtn('fixed').click();
+    const n0 = fake.centers.length;
     followBtn('A').click();
-    expect(fake.centers).toHaveLength(1);
+    expect(fake.centers).toHaveLength(n0 + 1);
     seekTo(50);
     const last = fake.centers[fake.centers.length - 1];
     expect(last).toEqual([fake.cars[0].lat, fake.cars[0].lon]);
@@ -287,14 +300,14 @@ describe('地図の追従', () => {
   it('表示位置はメニュー(案件 41): ボタンには今の表示位置。押すと開き、選ぶと閉じてボタンの文字が変わる', () => {
     setupOne();
     const btn = $<HTMLButtonElement>('#cmp-follow-btn'), list = $('#cmp-follow-list');
-    expect(btn.textContent).toBe('表示位置: 固定 ▾');
+    expect(btn.textContent).toBe('表示位置: 先頭追従 ▾');
     expect(list.hidden).toBe(true);
     expect(Array.from(list.querySelectorAll('[data-act="follow"]')).map((b) => b.textContent)).toEqual(['固定', '先頭追従', 'AA を追従', 'BB を追従', 'CC を追従', 'DD を追従']);
     expect(list.querySelectorAll('.ov-ico, .chip')).toHaveLength(6);                // どの行にも同じ幅の印(アイコン / A〜D の丸)があり、文字の頭がそろう
     btn.click();
     expect(list.hidden).toBe(false);
     expect(btn.getAttribute('aria-expanded')).toBe('true');
-    expect(btn.textContent).toBe('表示位置: 固定 ▴');
+    expect(btn.textContent).toBe('表示位置: 先頭追従 ▴');
     followBtn('A').click();
     expect(list.hidden).toBe(true);
     expect(btn.getAttribute('aria-expanded')).toBe('false');
@@ -317,7 +330,7 @@ describe('地図の追従', () => {
     expect(list.hidden).toBe(false);
     press(document.body, 'Escape');
     expect(list.hidden).toBe(true);
-    expect(followBtn('fixed').getAttribute('aria-checked')).toBe('true');
+    expect(followBtn('leader').getAttribute('aria-checked')).toBe('true');
   });
 
   it('割り当てを外すと、その枠への追従は固定に戻る', () => {
