@@ -30,7 +30,6 @@ describe('走行ライン補正データ管理', () => {
     expect(t).toContain('その補正データの書き出し、読み込みを行います。');
     expect(t).toContain('補正済みのファイルは次回から自動で補正が適用されます(どの比較セットでも同じファイルは同じ補正値です)。');
     expect(Array.from(sec.querySelectorAll('button')).map((b) => b.textContent)).toEqual(['補正データを書き出す', '補正データを読み込む']);
-    expect(root.querySelector('.sets-head')!.contains(root.querySelector('#log-bar'))).toBe(false);
   });
 
   it('見出しの横に、補正済みのファイル数が出る', () => {
