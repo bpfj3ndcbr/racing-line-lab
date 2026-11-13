@@ -64,9 +64,11 @@ describe('設定タブ', () => {
     expect(new Prefs(session).smooth).toBe(false);
   });
 
-  it('初めから「記憶する」なのは、操作の結果を自動で保存する項目(テーマ・描画・ラベル・セクターの動作)', () => {
-    for (const k of Object.keys(DEFAULT_REMEMBER) as (keyof typeof DEFAULT_REMEMBER)[]) expect(rem(k).checked).toBe(DEFAULT_REMEMBER[k]);
-    expect(['theme', 'mapMode', 'labels', 'sync'].every((k) => rem(k).checked)).toBe(true);
+  it('初めから「記憶する」なのは、操作の結果を自動で保存する項目(描画・ラベル・セクターの動作)。テーマには「記憶する」が無い(案件 58)', () => {
+    for (const k of Object.keys(DEFAULT_REMEMBER) as (keyof typeof DEFAULT_REMEMBER)[]) if (k !== 'theme') expect(rem(k).checked).toBe(DEFAULT_REMEMBER[k]);
+    expect(root.querySelector('[data-rem="theme"]')).toBeNull();
+    expect(row('theme').querySelectorAll('button:disabled')).toHaveLength(0);
+    expect(['mapMode', 'labels', 'sync'].every((k) => rem(k).checked)).toBe(true);
     expect(['zoom', 'follow', 'xKind', 'rate'].every((k) => !rem(k).checked)).toBe(true);
   });
 
@@ -126,15 +128,31 @@ describe('「記憶しない」: 設定した初期値で始まる', () => {
     expect($('#view-compare [data-act="rate"].on').dataset.rate).toBe('0.25');
   });
 
-  it('テーマ: 記憶しないなら、起動時に設定の値になり、設定を変えるとすぐ切り替わる', () => {
+  it('テーマ: 起動時は設定の値になり、設定を変えるとすぐ切り替わる(テーマは設定タブでだけ選ぶ。案件 58)', () => {
     expect(document.documentElement.dataset.theme).toBe('light');
-    setRem('theme', false);
     pick('theme', 'dark');
     expect(document.documentElement.dataset.theme).toBe('dark');
     pick('theme', 'light');
     expect(document.documentElement.dataset.theme).toBe('light');
     pick('theme', 'dark');
     boot();
+    expect(document.documentElement.dataset.theme).toBe('dark');
+  });
+
+  it('テーマ: 1.6.3 までにヘッダーで選んで記憶していたテーマを、設定の値として引き継ぐ(案件 58)', () => {
+    store = new MemoryStore();
+    store.set('theme', 'dark');                        // ヘッダーで切り替えたテーマ(記憶する = 初期値)
+    boot();
+    expect(document.documentElement.dataset.theme).toBe('dark');
+    nav('settings');
+    expect(row('theme').querySelector('[data-v="dark"]')!.getAttribute('aria-checked')).toBe('true');
+    expect(new Prefs(session).get('theme')).toEqual({ remember: false, value: 'dark' });
+  });
+
+  it('テーマ: 1.6.3 までに「記憶しない」で選んでいた値は、そのまま使う(案件 58)', () => {
+    store = new MemoryStore();
+    store.set('theme', 'light');
+    boot((p) => { p.setRemember('theme', false); p.setValue('theme', 'dark'); });
     expect(document.documentElement.dataset.theme).toBe('dark');
   });
 });

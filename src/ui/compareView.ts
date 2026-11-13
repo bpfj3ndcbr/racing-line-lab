@@ -130,11 +130,14 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
               <div class="sec-block" id="cmp-sec-block">
                 <div class="h sec-h-row" id="cmp-sec-h"><span>セクター</span><button class="btn xs" id="cmp-edit-circuit" data-act="edit-circuit" hidden title="このサーキットのセクターを追加・編集します(終わったら比較に戻ります)">セクターを追加・編集…</button></div>
                 <div id="cmp-sync" class="sync-grp">
-                  <span class="seg sm" role="group" aria-label="セクターボタンの動作">
+                  <span class="sync-part"><span class="seg sm" role="group" aria-label="セクターボタンの動作">
                     <button data-act="syncmode" data-mode="leader" aria-pressed="false">先頭車両</button>
                     <button data-act="syncmode" data-mode="all" aria-pressed="true" class="on">全車一致</button>
-                    <button id="cmp-sync-release" data-act="sync-release" disabled title="選んでいるセクターを解除して、通常の表示に戻します">解除</button>
-                  </span>
+                    <button id="cmp-sync-release" data-act="sync-release" disabled title="選んでいるセクターを解除して、通常の表示に戻します(自動もオフにします)">解除</button>
+                  </span></span>
+                  <span class="sync-part"><span class="seg sm" role="group" aria-label="セクター通過時の自動合わせ">
+                    <button data-act="autosync" aria-pressed="false">自動</button>
+                  </span></span>
                 </div>
                 <div id="cmp-sectors" class="secs"></div>
                 <div id="cmp-sync-status" class="sub sync-status" role="status" hidden>
@@ -186,6 +189,10 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   let anchor: { k: number; t: Map<Slot, number>; d: Map<Slot, number> } | null = null;   // 全車一致の基準(セクター k)
   let syncMsg = '';
   let activeSector: number | null = null;      // 選んでいるセクター(どちらの動作でも)
+  // セクター通過時の自動合わせ(案件 58): オンのとき、再生で基準の車がセクターを通ると、そのセクターのボタンを押したのと同じにする
+  let autoSync = false;
+  /** 先頭車両の動作で手前に戻った基準の車が、同じセクターをもう一度通るときは合わせない(戻り続けないように) */
+  let autoSkip: number | null = null;
   let map: TrackMap | null = null;
   let visible = false;
   let raf = 0;
@@ -289,13 +296,15 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   // 比較セットの選択は、右の列と、上部バーの置き場(スマホの横向きで使う。案件 46)の 2 か所に同じものを出す
   if (deps.topSlot) {
     deps.topSlot.innerHTML = `<label class="sel cmp-set">${SHOWN_MARK}<select id="cmp-set-top" class="cmp-set-sel" aria-label="表示中の比較セット"></select></label>`
-      + `<div class="sync-grp" hidden><span class="seg sm" role="group" aria-label="セクターボタンの動作">${$('cmp-sync').querySelector('.seg')!.innerHTML.replace(/ id="[^"]*"/g, '')}</span></div>`;
+      // 上部バーでは、セクターの操作と分かるよう、上に小さく「セクター動作」と書いて線でまとめる(案件 58)
+      + `<div class="sync-grp" hidden><span class="sync-cap" aria-hidden="true">セクター動作</span><span class="sync-row">${$('cmp-sync').innerHTML.replace(/ id="[^"]*"/g, '')}</span></div>`;
     // 上部バーのボタンは、右の列の同じボタンを押したことにする(動作は 1 か所で扱う)
     deps.topSlot.addEventListener('click', (e) => {
       const el = (e.target as HTMLElement).closest<HTMLElement>('[data-act]');
       const d = el?.dataset;
       if (d?.act === 'syncmode') root.querySelector<HTMLElement>(`#cmp-sync [data-act="syncmode"][data-mode="${d.mode}"]`)?.click();
       else if (d?.act === 'sync-release') $('cmp-sync-release').click();
+      else if (d?.act === 'autosync') root.querySelector<HTMLElement>('#cmp-sync [data-act="autosync"]')?.click();
     });
   }
   const setSelects = (): HTMLSelectElement[] => [
@@ -336,7 +345,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
       speed: toRuns(speedRuns(b.series, range.lo, range.hi), speedColor),
     }));
     hidden.clear();
-    off = new Map(); anchor = null; syncMsg = ''; activeSector = null;
+    off = new Map(); anchor = null; syncMsg = ''; activeSector = null; autoSkip = null;
     const has = cars.length > 0;
     $('cmp-main').hidden = !has;
     $('cmp-empty').hidden = has;
@@ -533,6 +542,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
       b.setAttribute('aria-checked', String(on));
     });
     syncMenuButtons();
+    syncAutoUi();                                    // 「自動」の基準の車は、表示位置の選択で決まる
   }
 
   // ---------- 地図の上のメニュー(案件 41): 左上「表示位置」、右上「表示」(走行ラインの表示と、ラベル)。どの幅でも同じ ----------
@@ -637,12 +647,71 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   /** ボタンの動作の切り替え表示と、その説明 */
   function syncModeUi() {
     setPressed('[data-act="syncmode"]', (b) => b.dataset.mode === syncMode);
+    syncAutoUi();
+  }
+
+  // ---------- セクター通過時の自動合わせ(案件 58) ----------
+  /** 自動で合わせる基準の車: 「表示位置」で選んでいる車。固定・先頭追従のときは null(先頭の車) */
+  const autoSlot = (): Slot | null =>
+    follow !== 'fixed' && follow !== 'leader' && cars.some((c) => c.slot === follow) ? follow : null;
+  const autoWho = () => autoSlot() ?? '先頭の車';
+  const autoHow = () => (syncMode === 'all' ? '全車一致' : '先頭車両');
+  /** 「自動」ボタン: オンのときは基準の車を添える(「自動 A」「自動 先頭」) */
+  function syncAutoUi() {
+    const text = autoSync ? `自動 ${autoSlot() ?? '先頭'}` : '自動';
+    const tip = `${autoWho()} がセクターを通過したとき、自動で${autoHow()}に合わせます`;
+    findAll('[data-act="autosync"]').forEach((b) => {
+      if (b.textContent !== text) b.textContent = text;
+      b.title = tip;
+      b.classList.toggle('on', autoSync);
+      b.setAttribute('aria-pressed', String(autoSync));
+    });
+  }
+  function setAutoSync(on: boolean) {
+    autoSync = on; autoSkip = null;
+    syncAutoUi();
+    if (!anchor && (on || activeSector === null)) syncMsg = on ? `自動: ${autoWho()} がセクターを通過したとき、${autoHow()}で合わせます` : '';
+    renderSyncStatus();
+  }
+  /**
+   * 再生で進んだ間(tau0 → tau1)に、基準の車が通ったセクター(いくつもあれば最初のもの)。無ければ null。
+   * 基準の車が先頭(固定・先頭追従)のときは、そのセクターを最初に通った車。距離ベースでは基準車(全車が同じ距離にいる)
+   */
+  function crossedSector(tau0: number, tau1: number): number | null {
+    const n = ref()?.log.circuit?.sectors.length ?? 0;
+    if (!n || tau1 <= tau0) return null;
+    const slot = autoSlot();
+    const lead = xKind !== 'dist' && !slot;
+    const who = xKind === 'dist' ? [ref()] : slot ? cars.filter((c) => c.slot === slot) : (shown().length ? shown() : cars);
+    const passed = (c: Car, k: number, tau: number) => {
+      const s = c.lap.sectorTimes[k];
+      return s != null && localOf(c, tau) >= s;
+    };
+    let best: { k: number; at: number } | null = null;
+    for (let k = 0; k < n; k++) {
+      if (lead && who.some((c) => passed(c, k, tau0))) continue;     // ほかの車が先に通っている(先頭の通過ではない)
+      for (const c of who) {
+        if (passed(c, k, tau0) || !passed(c, k, tau1)) continue;
+        const at = (c.lap.sectorTimes[k] as number) - offOf(c);
+        if (!best || at < best.at) best = { k, at };
+      }
+    }
+    return best?.k ?? null;
+  }
+  function autoCheck(tau0: number, tau1: number) {
+    const k = crossedSector(tau0, tau1);
+    if (k === null) return;
+    if (autoSkip === k) { autoSkip = null; return; }
+    pressSector(k, true);
+    const c = xKind === 'dist' ? null : cars.find((x) => x.slot === autoSlot());
+    const s = c?.lap.sectorTimes[k];
+    if (c && s != null && localOf(c, engine.t) < s) autoSkip = k;
   }
 
   function renderSyncStatus() {
     const box = $('cmp-sync-status');
     box.hidden = !anchor && !syncMsg;
-    $('cmp-sync-text').textContent = anchor ? `S${anchor.k + 1} で全車一致中` : syncMsg;
+    $('cmp-sync-text').textContent = anchor ? `S${anchor.k + 1} で全車一致中${autoSync ? '(自動)' : ''}` : syncMsg;
     findAll('[data-act="sync-release"]').forEach((b) => { (b as HTMLButtonElement).disabled = activeSector === null; });
     root.querySelectorAll<HTMLElement>('[data-act="sector"]').forEach((b) =>
       b.setAttribute('aria-pressed', String(activeSector === Number(b.dataset.k))));
@@ -654,17 +723,20 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
    *   いちばん遅く通る車(時刻 T)に合わせ、他の車は「その分あとからスタートした」ものとして扱う(ずれ ≤ 0)。
    * 先頭車両: ずれは作らず、先頭の車がセクターを通った時刻へ移動する。
    * どちらも、再生中なら再生のまま、一時停止中なら一時停止のまま。
+   * auto: セクター通過時の自動合わせで呼んだとき(知らせる文に「(自動)」を添える)
    */
-  function pressSector(k: number) {
+  function pressSector(k: number, auto = false) {
     const has = cars.filter((c) => c.lap.sectorTimes[k] != null);
     if (!has.length) return;
     const tOf = (c: Car) => c.lap.sectorTimes[k] as number;
+    const by = auto ? '(自動)' : '';
+    if (!auto) autoSkip = null;
     activeSector = k;
     if (xKind === 'dist') {                 // 距離ベース: 基準の車がセクターを通る位置へ移る(全車がその場所に並ぶ)
       const rr = ref();
       if (!rr || rr.lap.sectorTimes[k] == null) return;
       off = new Map(); anchor = null;
-      syncMsg = `S${k + 1}: 基準の車が通過する位置へ移動しました`;
+      syncMsg = `S${k + 1}: 基準の車が通過する位置へ移動しました${by}`;
       engine.setDuration(totalDuration());
       pushGraph(true);
       engine.seek(rr.lap.sectorTimes[k] as number);
@@ -677,7 +749,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
       const pool = has.filter((c) => !hidden.has(c.slot));
       const lead = (pool.length ? pool : has).reduce((a, b) => (tOf(b) < tOf(a) ? b : a));
       off = new Map(); anchor = null;
-      syncMsg = `S${k + 1}: ${lead.slot} が先頭で通過した時点へ移動しました`;
+      syncMsg = `S${k + 1}: ${lead.slot} が先頭で通過した時点へ移動しました${by}`;
       engine.setDuration(totalDuration());
       pushGraph(true);
       engine.seek(tOf(lead));
@@ -856,7 +928,9 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
     // 次のコマを、tick の前に予約する。tick の通知(下の subscribe)で再生の開始と見なされて
     // last が今の時刻に書き換わると、描画にかかった時間の分だけ再生の時計が遅れるため。
     raf = requestAnimationFrame(loop);
+    const tau0 = engine.t;
     engine.tick(dt);
+    if (autoSync) autoCheck(tau0, engine.t);          // 自動合わせは再生で進んだときだけ(シークやセクターボタンでは動かない)
   }
   engine.subscribe(() => {
     updateFrame();
@@ -893,7 +967,8 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
         syncModeUi();
         if (activeSector !== null) pressSector(activeSector);      // 選んでいるセクターを、新しい動作で開始したものとして表示を計算し直す
         break;
-      case 'sync-release': releaseSync(); break;
+      case 'sync-release': releaseSync(); setAutoSync(false); break;     // 解除すると、自動もオフ
+      case 'autosync': setAutoSync(!autoSync); break;
       case 'menu': setMenu(openMenu === d.menu ? null : d.menu as MenuKey); break;
       case 'label-menu': setLabelList(labelList.hidden); break;
       case 'mapmode': setMapMode(d.mode as MapMode); setMenu(null); break;

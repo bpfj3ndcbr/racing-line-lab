@@ -8,14 +8,14 @@ import { ThemeController } from '../src/ui/theme';
 import { FakeMap } from './helpers';
 
 describe('About', () => {
-  it('テーマの右に「About」ボタンがあり、押すとダイアログが開く。Esc で閉じる', () => {
+  it('ヘッダーの右に「About」ボタンがあり、押すとダイアログが開く。Esc で閉じる', () => {
     document.body.innerHTML = '<div id="app"></div>';
     const root = document.getElementById('app')!;
     const store = new MemoryStore();
     mountApp(root, new Session(store), new ThemeController(store), () => new FakeMap());
     const segs = root.querySelectorAll('.top-right .seg');
     expect(segs[segs.length - 1].textContent!.trim()).toBe('About');
-    expect(segs[segs.length - 2].getAttribute('aria-label')).toBe('テーマ');
+    expect(root.querySelector('.top [data-act="theme"]')).toBeNull();      // テーマの切り替えは設定タブだけ(案件 58)
 
     root.querySelector<HTMLElement>('[data-act="about"]')!.click();
     const dlg = document.querySelector('.modal')!;

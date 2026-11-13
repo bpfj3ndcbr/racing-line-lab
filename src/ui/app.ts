@@ -2,7 +2,7 @@ import type { Session } from '../store/session';
 import { mountCompareView, type CompareView } from './compareView';
 import { type ImportApi, mountImportView } from './importView';
 import type { MapFactory } from './mapTypes';
-import type { Theme, ThemeController } from './theme';
+import type { ThemeController } from './theme';
 import { SLOTS, escapeHtml as esc } from '../core';
 import { Prefs } from '../store/prefs';
 import { mountSettingsView } from './settingsView';
@@ -121,12 +121,8 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
   }
 
   function renderTop() {
-    const t = theme.get();
-    const seg = (v: Theme, label: string) =>
-      `<button data-act="theme" data-theme="${v}" data-fk="theme-${v}" aria-pressed="${t === v}" class="${t === v ? 'on' : ''}">${label}</button>`;
     const key = (document.activeElement as HTMLElement | null)?.dataset?.fk;
     topRight.innerHTML = `<span class="cur">サーキット: <b>${esc(session.setCircuitOf()?.name ?? '未選択')}</b></span>` +
-      `<span class="seg tiny" role="group" aria-label="テーマ">${seg('light', 'ライト')}${seg('dark', 'ダーク')}</span>` +
       `<span class="about-wrap"><span class="seg tiny" role="group" aria-label="このアプリについて"><button data-act="about" data-fk="about" aria-haspopup="dialog">${INFO_ICON}About</button></span>`
       + `${notice ? `<span class="upd-note" role="status">${esc(notice)}</span>` : ''}</span>`;
     if (key) topRight.querySelector<HTMLElement>(`[data-fk="${key}"]`)?.focus({ preventScroll: true });
@@ -137,7 +133,6 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
     if (!el) return;
     if (el.dataset.act === 'nav') void leaveTo(el.dataset.view as ViewName);
     if (el.dataset.act === 'about') { void showAbout(); return; }
-    if (el.dataset.act === 'theme') theme.set(el.dataset.theme as Theme);
   });
 
   // 地図の保存。保存範囲の中で表示した地図を、Web 版は service worker が(案件 31)、デスクトップ版はメイン側が(案件 2)保存する
@@ -147,10 +142,11 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
 
   // 設定タブ: 「記憶しない」項目は、起動時と変更時に初期値を反映する
   const prefs = new Prefs(session);
-  if (!prefs.get('theme').remember) theme.set(prefs.get('theme').value);
+  prefs.adoptTheme(theme.get());             // テーマは設定タブでだけ選ぶ(案件 58)。前の版で記憶していたテーマを引き継ぐ
+  theme.set(prefs.get('theme').value);
   applyAnalytics(prefs.analytics);          // 利用状況の送信(Web 版の公開用ビルドで、オンのときだけ)
   settingsApi = mountSettingsView(settingsEl, prefs, (key) => {
-    if (key === 'theme') { if (!prefs.get('theme').remember) theme.set(prefs.get('theme').value); }
+    if (key === 'theme') theme.set(prefs.get('theme').value);
     else if (key === 'analytics') applyAnalytics(prefs.analytics);
     else if (key !== 'autoLoad' && key !== 'startAbout') compare?.applyPref(key);
   }, () => {            // 「アプリを初期状態に戻す」: 保存したものをすべて消して、画面を読み直す(一時保存も消し、元に戻さない)
@@ -217,7 +213,6 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
   const syncToast = bindToast(mountToast(root), session);
   session.subscribe(syncToast);
   syncToast();
-  theme.subscribe(renderTop);
   renderTop();
   navigate('import');
   // 更新の知らせ(案件 50): 更新された直後(前回開いた版と違う)と、新しい版が待機中になったとき。初めて使うときは出さない

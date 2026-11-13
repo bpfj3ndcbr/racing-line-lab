@@ -230,13 +230,15 @@ describe('枠・開閉・タブ・テーマ', () => {
     expect(root.querySelector('.cur')!.textContent).toContain('オートポリス');
   });
 
-  it('テーマ切り替え: html の data-theme が変わり、保存される', () => {
+  it('テーマ切り替え: ヘッダーには無く(案件 58)、設定タブで選ぶと html の data-theme が変わり、保存される', () => {
+    expect(root.querySelector('.top [data-act="theme"]')).toBeNull();
     const initial = theme.get();
     const other = initial === 'dark' ? 'light' : 'dark';
-    root.querySelector<HTMLButtonElement>(`[data-act="theme"][data-theme="${other}"]`)!.click();
+    root.querySelector<HTMLButtonElement>('[data-act="nav"][data-view="settings"]')!.click();
+    root.querySelector<HTMLButtonElement>(`[data-set="theme"][data-v="${other}"]`)!.click();
     expect(document.documentElement.dataset.theme).toBe(other);
-    expect(root.querySelector(`[data-theme="${other}"]`)!.getAttribute('aria-pressed')).toBe('true');
-    expect(root.querySelector(`[data-theme="${initial}"]`)!.getAttribute('aria-pressed')).toBe('false');
+    expect(theme.get()).toBe(other);
+    expect(root.querySelector(`[data-set="theme"][data-v="${other}"]`)!.getAttribute('aria-checked')).toBe('true');
   });
 });
 

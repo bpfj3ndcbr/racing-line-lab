@@ -217,6 +217,10 @@ export function mountSettingsView(root: HTMLElement, prefs: Prefs, onChange: (ke
         }
         if (!('key' in r)) return '';
         const it = prefs.get(r.key);
+        if (r.key === 'theme') {            // テーマは設定タブでだけ選ぶので、「記憶する」は無い(案件 58)
+          return `<div class="srow" data-key="${r.key}"><div class="sname">${r.name}</div><div class="sctl">${control(r, it.value, false)}</div><div class="srem"></div>
+          ${r.hint ? `<div class="shint">${r.hint}</div>` : ''}</div>`;
+        }
         return `<div class="srow${it.remember ? ' remembered' : ''}" data-key="${r.key}"><div class="sname">${r.name}</div>
           <div class="sctl">${control(r, it.value, it.remember)}</div>
           <label class="srem"><input type="checkbox" data-rem="${r.key}"${it.remember ? ' checked' : ''}> 最後の状態を記憶する</label>
