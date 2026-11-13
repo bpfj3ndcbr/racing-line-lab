@@ -301,9 +301,10 @@ describe('前回の状態の保存と自動読み込み(セット)', () => {
   it('読み込み中は、案内(何件中何件目)が出る', async () => {
     await prepare();
     boot(true);
-    expect($('#msg').textContent).toContain('前回のファイルを読み込み中');
+    expect($('.toast').textContent).toContain('前回のファイルを読み込み中');       // 画面の下の通知(案件 53)
+    expect($<HTMLElement>('.toast').hidden).toBe(false);
     await flush();
-    expect($('#msg').textContent).toBe('');
+    expect($<HTMLElement>('.toast').hidden).toBe(true);
   });
 
   it('セットごとの使用するサーキットも戻る', async () => {

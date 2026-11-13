@@ -24,6 +24,8 @@
   --good: #0a7a3d;         /* ベストタイム */
   --bsec: #7a35c9;         /* セクター最速 */
   --warn: #8a5a00;
+  --alert: #c62828;        /* 通知(読み込めなかったなど)の地色(案件 53) */
+  --alert-on: #ffffff;
   --focus: #1f6fd1;
   --row-assigned: #e2edfb;
   --set-open-head: color-mix(in srgb, var(--accent) 14%, var(--surface));   /* 開いた比較セットの見出しの行(案件 27。% で濃さを調整) */
@@ -60,6 +62,8 @@
   --good: #4be09a;
   --bsec: #c792ff;
   --warn: #ffc83d;
+  --alert: #ff6b6b;
+  --alert-on: #2b0d0d;
   --focus: #6cb6ff;
   --row-assigned: #2f3b4a;
   --set-open-head: color-mix(in srgb, var(--accent) 30%, var(--surface));
@@ -148,7 +152,6 @@ details[open]>summary .chev{transform:rotate(45deg)}
 .toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .sel{display:flex;align-items:center;gap:8px;color:var(--muted)}
 select{min-height:44px;padding:0 10px;background:var(--surface);border:1px solid var(--btn-border);border-radius:var(--r-s)}
-.msg{min-height:18px;color:var(--warn);font-size:12px}
 
 .circ-form{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .circ-form label{display:flex;align-items:center;gap:8px;color:var(--muted)}
@@ -614,12 +617,19 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .brand .subttl{font-size:10px;color:var(--muted);font-weight:400}
 .top .brand{align-self:center}
 
+/* 画面の下の通知(案件 53。z-index は地図の上のボタン 1100・ダイアログ 2000 より上) */
+.toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:2500;display:flex;align-items:flex-start;gap:12px;box-sizing:border-box;width:max-content;max-width:min(580px,calc(100vw - 24px));padding:11px 10px 11px 14px;background:var(--accent);color:var(--accent-on);border:1px solid var(--accent);border-radius:var(--r-l);box-shadow:0 6px 20px rgba(20,30,50,.45);font-size:14px;font-weight:600;line-height:1.5}
+.toast.warn{background:var(--alert);color:var(--alert-on);border-color:var(--alert)}
+.toast.busy{background:var(--surface);color:var(--text);border-color:var(--border-strong);font-weight:400}
+.toast-text{flex:1;min-width:0;overflow-wrap:anywhere}
+.toast-x{flex:none;width:26px;height:26px;margin:-2px 0;padding:0;border:0;background:transparent;color:inherit;font-size:20px;line-height:1;cursor:pointer;border-radius:var(--r-m);opacity:.85}
+.toast-x:hover{background:rgba(255,255,255,.22);opacity:1}
+
 /* 比較セット 1〜5 */
 .slots{flex-direction:column;align-items:stretch;gap:8px}
 .slots-title{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
 .slots-title b{color:var(--text);font-size:13px}
 .slots-row{display:flex;gap:12px;align-items:center}
-.sets-head{display:flex;flex-direction:column;gap:8px}
 .set-sec .badge{margin-left:4px}
 .set-shown{display:inline-flex;align-items:center;min-width:88px;margin-left:16px}
 .set-badge.has-logs{color:var(--good);border-color:var(--good);font-weight:700}

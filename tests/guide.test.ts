@@ -71,7 +71,8 @@ describe('.vbo のドロップ', () => {
     modal.querySelector<HTMLButtonElement>('[data-dialog="ok"]')!.click();
     await flush(); await flush();
     expect(session.sets[0].logs).toHaveLength(1);
-    expect($('#msg').textContent).toContain('1 件は .vbo ではないため追加しませんでした');
+    expect($('.toast').textContent).toContain('1 件は .vbo ではないため追加しませんでした');       // 画面の下の通知(案件 53)
+    expect($<HTMLElement>('.toast').hidden).toBe(false);
   });
 
   it('枠の上にファイルを持ってくると強調され、離れると戻る', () => {

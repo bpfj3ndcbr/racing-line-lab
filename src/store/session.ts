@@ -101,7 +101,10 @@ export class Session {
   sets: WorkSet[] = Array.from({ length: SET_COUNT }, () => new WorkSet());
   /** 比較画面に出す(表示する)セットの番号(0 始まり) */
   activeIndex = 0;
+  /** 画面の下の通知(案件 53)に出す案内文。warn = 読み込めなかったなど、閉じるまで残すもの。seq は案内を出すたびに増える(同じ文でも出し直せる) */
   message = '';
+  messageWarn = false;
+  messageSeq = 0;
   /** 前回の走行データを読み込んでいる間の案内(読み込み中でなければ空) */
   loading = '';
 
@@ -247,7 +250,8 @@ export class Session {
       }
       const a = saved.active;
       if (typeof a === 'number' && a >= 0 && a < SET_COUNT) this.activeIndex = a;
-      this.message = failed.length ? `前回のファイルを読み込めませんでした: ${Array.from(new Set(failed)).join('、')}` : '';
+      if (failed.length) this.tell(`前回のファイルを読み込めませんでした: ${Array.from(new Set(failed)).join('、')}`, true);
+      else this.message = '';
     } finally { this.restoring = false; this.loading = ''; }
     this.emit();
   }
@@ -310,7 +314,7 @@ export class Session {
         this.applyAssignment(w, si, sv.assignment);
       });
       if (typeof st.active === 'number' && st.active >= 0 && st.active < SET_COUNT) this.activeIndex = st.active;
-      if (n) this.message = '前の画面の状態を元に戻しました。';
+      if (n) this.tell('前の画面の状態を元に戻しました。');
     } finally { this.restoring = false; this.loading = ''; }
     this.emit();
     return n;
@@ -327,7 +331,7 @@ export class Session {
       if (path) this.paths.set(id, path);
       this.addLog(log, id, set);
     } catch (e) {
-      this.message = `${file.name}: 読み込めませんでした(${e instanceof Error ? e.message : e})`;
+      this.tell(`${file.name}: 読み込めませんでした(${e instanceof Error ? e.message : e})`, true);
       this.emit();
     }
   }
@@ -359,8 +363,9 @@ export class Session {
     return n;
   }
 
-  /** 画面に出す案内文(読み込み失敗などと同じ場所) */
-  say(text: string): void { this.message = text; this.emit(); }
+  /** 画面の下の通知に出す案内文。warn = 読み込めなかったなど、閉じるまで残すもの */
+  say(text: string, warn = false): void { this.tell(text, warn); this.emit(); }
+  private tell(text: string, warn = false): void { this.message = text; this.messageWarn = warn; this.messageSeq++; }
   /** 読み込み中の案内(空文字で消す)。一時保存から元に戻す間など(案件 30) */
   setLoading(text: string): void { this.loading = text; this.notify(); }
 
@@ -377,7 +382,7 @@ export class Session {
     if (set !== undefined && this.sets[set] && this.shownIndex === null) this.activeIndex = set;
     const w = this.ws(set);
     if (w.logs.some((l) => l.id === id)) {
-      this.message = `${log.fileName} は読み込み済みです。`;
+      this.tell(`${log.fileName} は読み込み済みです。`);
       this.emit();
       return;
     }
@@ -441,7 +446,7 @@ export class Session {
     this.saveOffsets();
     if (lost.length) {
       const multi = new Set(lost.map((x) => x.set)).size > 1 || lost.some((x) => x.set !== this.activeIndex);
-      this.message = `位置補正で ${lost.map((x) => `${multi ? this.setName(x.set) + ' の ' : ''}${x.slot}(LAP ${x.lap})`).join('、')} のラップが無くなったため、割り当てを解除しました。`;
+      this.tell(`位置補正で ${lost.map((x) => `${multi ? this.setName(x.set) + ' の ' : ''}${x.slot}(LAP ${x.lap})`).join('、')} のラップが無くなったため、割り当てを解除しました。`, true);
     }
     this.emit();
     return lost;
@@ -512,7 +517,7 @@ export class Session {
     try { data = JSON.parse(text); } catch { data = null; }
     const src = (data as { offsets?: unknown } | null)?.offsets;
     if (!src || typeof src !== 'object' || (data as { kind?: unknown }).kind !== 'offsets') {
-      this.message = '位置補正データとして読み込めませんでした。';
+      this.tell('位置補正データとして読み込めませんでした。', true);
       this.emit();
       return { ok: false, applied: 0, total: 0, message: this.message };
     }
@@ -527,7 +532,7 @@ export class Session {
       else this.offsets[id] = off;
     }
     this.saveOffsets();
-    this.message = `位置補正データを読み込みました(${total} 件、うち読み込み済みのログに適用 ${applied} 件)。`;
+    this.tell(`位置補正データを読み込みました(${total} 件、うち読み込み済みのログに適用 ${applied} 件)。`);
     this.emit();
     return { ok: true, applied, total, message: this.message };
   }
@@ -573,7 +578,7 @@ export class Session {
     this.saveCircuits();
     this.resolveAll();
     const message = `「${name}」を登録しました(セクター ${sectors.length} 本)。`;
-    if (announce) this.message = message;
+    if (announce) this.tell(message);
     this.emit();
     return { ok: true, message };
   }

@@ -48,7 +48,7 @@ export function createOffsets(root: HTMLElement, session: Session): OffsetsPart 
       if (t.id !== 'offsets-input') return;
       const f = input.files?.[0];
       input.value = '';
-      if (f && !hasExt(f.name, '.json')) session.say(wrongExtMessage(f.name, '.json'));
+      if (f && !hasExt(f.name, '.json')) session.say(wrongExtMessage(f.name, '.json'), true);
       else if (f) session.importOffsets(await f.text());
     },
   };

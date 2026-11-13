@@ -7,6 +7,7 @@ import { SLOTS, escapeHtml as esc } from '../core';
 import { Prefs } from '../store/prefs';
 import { mountSettingsView } from './settingsView';
 import { logoSvg } from './logo';
+import { bindToast, mountToast } from './toast';
 import { showAbout } from './aboutView';
 import { mountHelpView } from './helpView';
 import { applyAnalytics } from '../io/analytics';
@@ -187,7 +188,7 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
   if (resume) {
     // 走行ログ本体は、読み込んだときにそのつど保存する
     session.logHooks = {
-      added: (id, log) => { void resume.putLog(id, log).catch(() => session.say(RESUME_SAVE_FAILED)); },
+      added: (id, log) => { void resume.putLog(id, log).catch(() => session.say(RESUME_SAVE_FAILED, true)); },
       removed: (id) => { void resume.deleteLog(id).catch(() => { /* 残っても、元に戻すときに使われない */ }); },
     };
     // 割り当てなどの小さな状態と開いている画面は、画面が隠れるときに保存する
@@ -212,6 +213,10 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
 
   importApi = mountImportView(importEl, session, { onCompare: () => void leaveTo('compare'), onWorkChange: renderNav, mapFactory, theme, zoom: () => prefs.get('zoom').value as number });
   session.subscribe(renderTop);
+  // 画面の下の通知(案件 53): 読み込みの失敗・結果などの案内と、読み込み中の案内
+  const syncToast = bindToast(mountToast(root), session);
+  session.subscribe(syncToast);
+  syncToast();
   theme.subscribe(renderTop);
   renderTop();
   navigate('import');
@@ -235,10 +240,10 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
   if (takeShared) {
     void restored.then(() => takeShared()).then(async (files) => {
       if (!files) return;
-      if (!files.length) { session.say('共有されたファイルを受け取れませんでした。'); return; }
+      if (!files.length) { session.say('共有されたファイルを受け取れませんでした。', true); return; }
       autoNavigate('import');
       await importApi?.addShared(files);
-    }).catch(() => session.say('共有されたファイルを受け取れませんでした。'));
+    }).catch(() => session.say('共有されたファイルを受け取れませんでした。', true));
   }
   // ファイルを枠の外に落としても、ブラウザがそのファイルを開いてしまわないようにする(追加は、ドロップ枠に落としたときだけ)
   const stopDrop = (e: DragEvent) => { if (Array.from(e.dataTransfer?.types ?? []).includes('Files')) e.preventDefault(); };

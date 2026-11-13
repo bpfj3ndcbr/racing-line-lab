@@ -54,17 +54,14 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
     <div id="work" class="work" hidden></div>
     <div class="body" id="import-body">${CIRCUITS_HTML}
 ${OFFSETS_HTML}
-
-      <div class="sets-head">
-        <div id="msg" class="msg" role="status"></div>
-      </div>${SETS_HTML}
+${SETS_HTML}
     </div>
     <input id="vbo-input" type="file" multiple accept=".vbo" hidden>
     <input id="reload-input" type="file" hidden>
     <input id="offsets-input" type="file" accept=".json,application/json" hidden>`;
 
   const $ = <T extends HTMLElement>(id: string) => root.querySelector<T>('#' + id)!;
-  const slotsEl = $('slots'), msgEl = $('msg');
+  const slotsEl = $('slots');
   const vboInput = $<HTMLInputElement>('vbo-input');
   let addTarget = 0;                       // 「走行ログを追加」を押したセット
 
@@ -95,7 +92,6 @@ ${OFFSETS_HTML}
     guide.render();
     circuits.render();
     offsets.render();
-    msgEl.textContent = session.loading || session.message;
     sets.render();
     if (focusKey) {
       const el = Array.from(root.querySelectorAll<HTMLElement>('[data-fk]')).find((e) => e.dataset.fk === focusKey);
@@ -174,7 +170,7 @@ ${OFFSETS_HTML}
     }
     const before = new Set((session.sets[set]?.logs ?? []).map((l) => l.id));
     if (vbo.length) await session.addVboFiles(vbo.map((file) => ({ file, path: window.rllNative?.getPathForFile(file) || undefined })), set);
-    if (skipped.length) session.say(`${skipped.length} 件は .vbo ではないため追加しませんでした。`);
+    if (skipped.length) session.say(`${skipped.length} 件は .vbo ではないため追加しませんでした。`, true);
     const added = (session.sets[set]?.logs ?? []).filter((l) => !before.has(l.id)).map((l) => l.id);
     if (added.length) await checkLoaded(set, added, before.size === 0, undefined, true);
   }
@@ -184,7 +180,7 @@ ${OFFSETS_HTML}
     // .vbo が 1 つも無ければ、セットは聞かずに、いつもの「読み込めるのは .vbo ファイルだけです」を出す
     if (!files.some((f) => hasExt(f.name, '.vbo'))) { await addFiles(files, session.activeIndex); return; }
     const set = await chooseShareSet(files.filter((f) => hasExt(f.name, '.vbo')).length);
-    if (set === null) { session.say('共有された走行ログは追加しませんでした。'); return; }
+    if (set === null) { session.say('共有された走行ログは追加しませんでした。', true); return; }
     sets.scrollToSet(set);
     await addFiles(files, set);
   }
@@ -257,7 +253,7 @@ ${OFFSETS_HTML}
       // ファイルの計測ラインとセクターは、そのまま(ダイアログで直したなら、直した線で)登録して、ラップの割り当てに進む
       const c = o.candidate;
       const r = session.registerCircuitLines(name, control ?? c.control, sectors ?? c.sectors, { announce: true });   // 表示位置は決めない(走行ラインに合わせて表示)
-      if (!r.ok) { session.say(r.message); return; }
+      if (!r.ok) { session.say(r.message, true); return; }
       session.setCircuit(session.circuits[session.circuits.length - 1].id, set);
       sets.scrollToSet(set);
     }
