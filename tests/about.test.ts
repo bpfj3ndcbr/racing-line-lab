@@ -22,6 +22,8 @@ describe('About', () => {
     expect(dlg.querySelector('h3')!.textContent).toBe('About');
     expect(dlg.textContent).toContain('個人開発');
     expect(dlg.textContent).toContain('悪しからず');
+    expect(dlg.textContent).toContain('2本目に繋げる');
+    expect(dlg.querySelector('b')!.textContent).toContain('1本目を走った後');
     expect(dlg.textContent).toContain('© 2026 bpfj3ndcbr');
     const { version } = JSON.parse(readFileSync('package.json', 'utf8')) as { version: string };
     expect(dlg.querySelector('.about-ver')!.textContent).toBe(`バージョン ${version}`);         // package.json の版
