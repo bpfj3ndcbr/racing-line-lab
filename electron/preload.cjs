@@ -21,4 +21,6 @@ contextBridge.exposeInMainWorld('rllNative', {
   tilesRemove: (list) => ipcRenderer.invoke('tiles:remove', list),
   tilesClear: () => ipcRenderer.invoke('tiles:clear'),
   tilesPrefetch: (list) => ipcRenderer.invoke('tiles:prefetch', list),
+  /** 新しい版の確認(案件 52): 押したときだけ、GitHub のタグの名前の一覧を取る。{ ok, tags? } */
+  checkUpdate: () => ipcRenderer.invoke('update:check'),
 });

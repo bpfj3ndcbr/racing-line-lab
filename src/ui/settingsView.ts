@@ -7,6 +7,7 @@ import { openAreaEditor } from './areaEditor';
 import { confirmDialog } from './dialog';
 import type { MapFactory } from './mapTypes';
 import type { UpdateWatcher } from '../io/pwa';
+import { checkDesktopUpdate, UPDATE_GUIDE_URL } from '../io/desktopUpdate';
 
 const ZOOM_STOPS = [0, ...ZOOM_CHOICES];   // スライダーの位置 → 倍率(0 = サーキット全体)
 const zoomText = (z: number) => (z === 0 ? 'サーキット全体' : `Z${z}`);
@@ -55,7 +56,7 @@ const GROUPS: { title: string; rows: (Row | Plain)[] }[] = [
     { name: '最後の走行データを自動で読み込む', kind: 'autoload', hint: '前回読み込んだファイルと、A〜D の割り当てを元に戻します。ファイルの場所を覚えるので、Electron 版のみ使えます。移動・削除したファイルは読み込まれません。' },
   ] },
   { title: 'アプリの更新', rows: [
-    { name: '新しい版', kind: 'update', hint: 'インストールした Web 版では、新しい版は裏で取得され、アプリを完全に終了して開き直したときから使われます。「更新する」を押すと、すぐに切り替えて読み直します(読み込んだ走行ログと割り当ては残ります)。ネットが必要です。' },
+    { name: '新しい版', kind: 'update', hint: 'インストールした Web 版では、新しい版は裏で取得され、アプリを完全に終了して開き直したときから使われます。「更新する」を押すと、すぐに切り替えて読み直します(読み込んだ走行ログと割り当ては残ります)。ネットが必要です。デスクトップ版では、「更新を確認する」を押したときだけ、GitHub に新しい版があるかを問い合わせます(自動では確認しません。送るのは、通信に必要な情報だけです)。新しい版があれば、更新の手順を開けます。' },
   ] },
   { title: 'プライバシー', rows: [
     { name: '利用状況の送信', kind: 'analytics', hint: 'Web 版では、アプリの改善のため、Google アナリティクスで利用状況(ページの表示、使っている環境など)を送ります。走行ログの中身や位置、ファイル名は送りません。オフにすると送りません。デスクトップ版(Electron)では送りません。' },
@@ -73,7 +74,7 @@ const mb = (bytes: number) => (bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).t
 
 export function mountSettingsView(root: HTMLElement, prefs: Prefs, onChange: (key: PrefKey | 'yRange' | 'startPos' | 'autoLoad' | 'analytics' | 'smooth' | 'startAbout') => void, onFactoryReset: () => void = () => {}, mapSave?: MapSaveDeps, updates: UpdateWatcher | null = null): { refresh(): void } {
   let resetArmed = false;
-  let updBusy = false, updMsg = '';
+  let updBusy = false, updMsg = '', newerVer = '';
   let wipeArmed = false;
   const tiles = mapSave?.store ?? null;
   /** 保存範囲ごとの、保存したタイルの枚数と容量(集計中は null) */
@@ -163,6 +164,12 @@ export function mountSettingsView(root: HTMLElement, prefs: Prefs, onChange: (ke
           return `<div class="srow"><div class="sname">${r.name}</div><div class="sctl"><button type="button" role="switch" class="switch${on ? ' on' : ''}" data-autoload aria-checked="${on}" aria-label="${r.name}"${can ? '' : ' disabled'}><i></i></button>`
             + `<span class="swl">${on ? '有効' : '無効'}${can ? '' : '(Electron 版のみ)'}</span></div><div class="srem"></div>${r.hint ? `<div class="shint">${r.hint}</div>` : ''}</div>`;
         }
+        if (r.kind === 'update' && window.rllNative?.checkUpdate) {
+          // デスクトップ版(案件 52): 押したときだけ GitHub の最新の版を調べる。新しい版があれば、更新の手順を開くボタンを出す
+          const link = newerVer ? `<a class="btn pri" href="${UPDATE_GUIDE_URL}" target="_blank" rel="noopener noreferrer">更新の手順を開く</a>` : '';
+          return `<div class="srow"><div class="sname">${r.name}</div><div class="sctl"><button type="button" class="btn" data-update-native${updBusy ? ' disabled' : ''}>${updBusy ? '確認中…' : '更新を確認する'}</button>${link}`
+            + `<span class="swl" role="status">${esc(updMsg)}</span></div><div class="srem"></div>${r.hint ? `<div class="shint">${r.hint}</div>` : ''}</div>`;
+        }
         if (r.kind === 'update') {
           const label = updates?.waiting ? '更新する' : updBusy ? '確認中…' : '更新を確認する';
           const text = !updates ? '(インストールした Web 版のみ)' : updates.waiting ? '新しい版があります' : updMsg;
@@ -234,6 +241,18 @@ export function mountSettingsView(root: HTMLElement, prefs: Prefs, onChange: (ke
     if (sp) { resetArmed = false; prefs.setStartPos(sp.dataset.startpos as 'center' | 'control'); onChange('startPos'); render(); return; }
     const al = t.closest<HTMLButtonElement>('[data-autoload]');
     if (al && !al.disabled) { resetArmed = false; prefs.setAutoLoad(!prefs.autoLoad); onChange('autoLoad'); render(); return; }
+    const un = t.closest<HTMLButtonElement>('[data-update-native]');
+    if (un && !un.disabled) {
+      resetArmed = false;
+      updBusy = true; updMsg = ''; newerVer = ''; render();
+      void checkDesktopUpdate(window.rllNative, __APP_VERSION__).then((r) => {
+        updBusy = false;
+        if (r.status === 'newer') { newerVer = r.latest; updMsg = `新しい版 ${r.latest} があります(今の版は ${__APP_VERSION__})`; }
+        else updMsg = r.status === 'latest' ? `最新です(バージョン ${__APP_VERSION__})` : '確認できませんでした(ネットにつながっているか確かめてください)';
+        render();
+      });
+      return;
+    }
     const up = t.closest<HTMLButtonElement>('[data-update]');
     if (up && !up.disabled && updates) {
       resetArmed = false;

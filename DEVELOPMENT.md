@@ -144,6 +144,7 @@ Web 版は PWA です(`public/manifest.webmanifest`、`src/sw/sw.ts`、`src/io/p
 - 保存先は、ユーザーデータの `tiles/{z}/{x}/{y}.jpg` です(一時ファイルに書いてから置き換える)。取れなかったタイル(ネットが無いなど)は保存せず、画面では空白になります。
 - 画面からの操作(保存範囲を渡す・一覧・削除・概略の地図の先読み・すべて削除)は、`src/io/tileStore.ts` の `openNativeTileStore` が窓口(`tilesSetAreas` など。IPC `tiles:*`)を呼びます。設定画面は Web 版と同じものを使い、「保存したデータを消されにくくする」だけは押せません(`TileStore.durable`)。
 - preload は sandbox で動き、自前のファイルを読めないので、`tileUrl` の値は `electron/tileCache.cjs` の `TILE_URL` から書き写しています(同じであることをテストで確かめる)。
+- 新しい版の確認(案件 52): 設定の「更新を確認する」を押すと、`window.rllNative.checkUpdate`(メインの `update:check`)が GitHub のタグの一覧(`api.github.com/repos/bpfj3ndcbr/racing-line-lab/tags`)を取り、画面側(`src/io/desktopUpdate.ts`、版の比べ方は `src/core/version.ts`)が今の版と比べます。押したときだけで、自動では確認しません。.app は配布しないので、更新そのものはせず、README のインストール方法を開く案内だけです。
 
 ## 比較画面の再生
 

@@ -46,6 +46,8 @@ export interface NativeBridge {
   tilesRemove?(list: TileId[]): Promise<number>;
   tilesClear?(): Promise<boolean>;
   tilesPrefetch?(list: TileId[]): Promise<{ saved: number; failed: number }>;
+  /** 新しい版の確認(案件 52): GitHub のタグの名前の一覧を取る。取れなければ ok: false。古い窓口には無い */
+  checkUpdate?(): Promise<{ ok: boolean; tags?: string[] }>;
 }
 declare global { interface Window { rllNative?: NativeBridge } }
 
