@@ -8,7 +8,10 @@ import { MemoryResumeStore } from '../src/io/resume';
 import { Session } from '../src/store/session';
 import { mountApp } from '../src/ui/app';
 import { ThemeController } from '../src/ui/theme';
-import { FakeMap } from './helpers';
+import { FakeMap, autoTrim } from './helpers';
+
+// ファイルの追加で出る取り込み範囲の画面(案件 59)は、そのまま「次へ」で進める
+autoTrim();
 
 // Android の共有の画面から受け取る(案件 45)。走行ログのファイルが無くても動く、人工の .vbo で確かめる
 

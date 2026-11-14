@@ -97,6 +97,7 @@ npm run build        # 型チェック + ビルド(dist/)
 | `circuits` | 登録したサーキット |
 | `offsets` | 位置補正の値(ファイルごと) |
 | `lapEnds` | ラップ一覧の「終端の調整」の値(ファイルごと。ラップ番号 → ラップ開始からの秒) |
+| `trims` | 走行ログの取り込まない区間(ファイルごと。元のログの先頭からの秒 `from`〜`to` の並び)。読み込むたびに当てはめる(`src/core/trim.ts`) |
 | `lastSession` | 比較セット1〜5のファイルの場所・割り当て・サーキット指定(自動読み込み用) |
 | `theme` | テーマ(ライト/ダーク) |
 | `ui.prefs` | 設定タブの値と「記憶する」の選択 |
@@ -119,7 +120,7 @@ npm run build        # 型チェック + ビルド(dist/)
 | sessionStorage `rll.resumeTab` | タブの印。同じタブの読み直しでは残り、新しいタブ・閉じたタブには無い。これがあれば元に戻す |
 | sessionStorage `rll.resumeState` | 比較セットごとの走行ログ(id と Run 番号)・割り当て・設定、表示中の比較セット、開いていた画面 |
 | IndexedDB `rll-resume` の `state` | 上と同じ内容と保存時刻(タブごと) |
-| IndexedDB `rll-resume` の `logs` | 走行ログの中身(タブ・id ごと) |
+| IndexedDB `rll-resume` の `logs` | 走行ログの中身(タブ・id ごと)。画面と計算で使わない配列(向き・高度・加速度)は省く(`storableLog`。値の丸め・間引きはしない) |
 
 - 走行ログは読み込んだときに保存し、どの比較セットからも外したら消します。小さな状態は、画面が隠れるとき(`visibilitychange` の hidden・`pagehide`)に保存します。
 - ページを閉じる・読み直す瞬間に始めた IndexedDB の書き込みは中止されることがあるため、小さな状態は同期的に書ける sessionStorage にも写し、元に戻すときはこちらを優先します。

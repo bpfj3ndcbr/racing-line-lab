@@ -19,8 +19,8 @@ export const HEAT_WIDTH = 4;
 export const WIDTH_REF_ZOOM = 19;
 export const MIN_LINE_WIDTH = 1;
 
-export function lineWidth(zoom: number, base: number): number {
-  return Math.max(MIN_LINE_WIDTH, Math.min(base, base * 2 ** (zoom - WIDTH_REF_ZOOM)));
+export function lineWidth(zoom: number, base: number, min = MIN_LINE_WIDTH): number {
+  return Math.max(min, Math.min(Math.max(base, min), base * 2 ** (zoom - WIDTH_REF_ZOOM)));
 }
 
 /**
@@ -93,8 +93,8 @@ export const createLeafletMap: MapFactory = (el): TrackMap => {
   const labels = new Map<Slot, L.Marker>();
   let bounds: L.LatLngBounds | null = null;
   let lineBounds: L.LatLngBounds | null = null;
-  let widthLayers: { layer: L.Polyline; base: number }[] = [];
-  const applyWidths = () => { const z = map.getZoom(); for (const t of widthLayers) t.layer.setStyle({ weight: lineWidth(z, t.base) }); };
+  let widthLayers: { layer: L.Polyline; base: number; min?: number }[] = [];
+  const applyWidths = () => { const z = map.getZoom(); for (const t of widthLayers) t.layer.setStyle({ weight: lineWidth(z, t.base, t.min) }); };
   map.on('zoom', applyWidths);
   map.on('zoomend', applyWidths);
 
@@ -180,7 +180,7 @@ export const createLeafletMap: MapFactory = (el): TrackMap => {
           }
         } else {
           const layer = L.polyline(ll, { color: t.color, weight: LINE_WIDTH, opacity: 1, interactive: false }).addTo(trackLayer);
-          widthLayers.push({ layer, base: LINE_WIDTH });
+          widthLayers.push({ layer, base: LINE_WIDTH, min: t.minWidth });
         }
         const b = L.latLngBounds(ll);
         bounds = bounds ? bounds.extend(b) : b;

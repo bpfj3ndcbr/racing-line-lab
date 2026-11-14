@@ -67,7 +67,7 @@ export function checkLoop(log: TrackLog): LoopCheck | null {
  * つなぎ目の時間は、終点から始点までの距離を、その速度で進む時間とする(1 周のタイム = 記録時間 + その時間)。
  */
 export function closeLoop(log: TrackLog): TrackLog {
-  if (log.loop) return log;
+  if (log.loop || log.gaps?.length) return log;      // 途中を取り込まなかったログ(案件 59)は、つながった 1 周ではない
   const c = checkLoop(log);
   if (!c?.closed) return log;
   const n = log.t.length;

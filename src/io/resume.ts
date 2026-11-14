@@ -1,4 +1,4 @@
-import type { TrackLog } from '../core';
+import { storableLog, type TrackLog } from '../core';
 
 /**
  * Web 版の一時保存(案件 30)。スマホのスリープやアプリの切り替えで、ブラウザがページを読み込み直したとき
@@ -79,7 +79,8 @@ export function openResumeStore(now = () => Date.now()): ResumeStore | null {
 
   return {
     resumed,
-    putLog: (id, log) => tx(['logs'], 'readwrite', (t) => { t.objectStore('logs').put({ key: `${me}\u0000${id}`, tab: me, id, at: now(), log }); }),
+    // 走行ログは、使わない配列を省いて保存する(案件 59)
+    putLog: (id, log) => tx(['logs'], 'readwrite', (t) => { t.objectStore('logs').put({ key: `${me}\u0000${id}`, tab: me, id, at: now(), log: storableLog(log) }); }),
     deleteLog: (id) => tx(['logs'], 'readwrite', (t) => { t.objectStore('logs').delete(`${me}\u0000${id}`); }),
     putState(state) {
       let copied = false;
@@ -123,7 +124,8 @@ export class MemoryResumeStore implements ResumeStore {
   logs = new Map<string, TrackLog>();
   state: unknown = null;
   constructor(public resumed = false) {}
-  async putLog(id: string, log: TrackLog) { this.logs.set(id, log); }
+  /** IndexedDB の保存先と同じく、使わない配列を省いて持つ(案件 59) */
+  async putLog(id: string, log: TrackLog) { this.logs.set(id, storableLog(log)); }
   async deleteLog(id: string) { this.logs.delete(id); }
   async putState(state: unknown) { this.state = state; }
   async load() { return this.state === null ? null : { state: this.state, logs: new Map(this.logs) }; }

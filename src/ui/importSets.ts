@@ -204,7 +204,26 @@ export function createSets(root: HTMLElement, session: Session, actions: ImportA
       const head = l.hasHead
         ? `<div class="row ex head" style="${grid}"><div class="num">—</div><div></div><div></div>${showSec ? '<div></div>'.repeat(ns) : ''}<div class="sub">始点が無いので非表示</div><div></div></div>`
         : '';
-      rows = head + laps.map((lap) => {
+      // 取り込み範囲で切った所をまたぐので出さなかったラップ: 番号の順のときだけ、その位置に灰色の行で出す
+      // (続いた番号は 1 行にまとめる)
+      // タイム・Delta・(セクター)・説明の欄を 1 つにつないで、左寄せで書く(スマホの並びでも、番号のすぐ右から)
+      const skipRow = (from: number, to: number) => `<div class="row ex skip" style="${grid}"><div class="num">${from === to ? from : `${from}〜${to}`}</div><div class="sub" style="grid-column:span ${3 + (showSec ? ns : 0)}">${from === to ? `LAP ${from} は取り込み範囲外` : `LAP ${from} から ${to} までは取り込み範囲外`}</div><div></div></div>`;
+      const groups: [number, number][] = [];
+      for (const n of [...l.cutLaps].sort((a, b) => a - b)) {
+        const g = groups[groups.length - 1];
+        if (g && g[1] === n - 1) g[1] = n; else groups.push([n, n]);
+      }
+      const byLap = key === 'lap' && groups.length > 0;
+      /** ラップ番号 n の行の前に入れる「取り込み範囲外」の行(昇順なら n より小さく、まだ出していないもの) */
+      let gi = dir === 1 ? 0 : groups.length - 1;
+      const skipsBefore = (n: number) => {
+        let out = '';
+        if (!byLap) return out;
+        if (dir === 1) while (gi < groups.length && groups[gi][1] < n) { out += skipRow(...groups[gi]); gi++; }
+        else while (gi >= 0 && groups[gi][0] > n) { out += skipRow(...groups[gi]); gi--; }
+        return out;
+      };
+      rows = head + laps.map((lap) => skipsBefore(lap.number) + ((): string => {
         const d = lap.duration - best;
         const assigned = SLOTS.some((s) => w.assignment[s]?.logId === l.id && w.assignment[s]?.lap === lap.number);
         const ex = lap.duration > best * SLOW_RATIO;
@@ -224,7 +243,7 @@ export function createSets(root: HTMLElement, session: Session, actions: ImportA
           ${secCells}
           <div class="sub lap-note"${joined(l, lap) ? ` title="${JOINED_TITLE}"` : ''}>${noteOf(l, lap, i, best, showSec)}</div>
           <div class="pk">${btns}</div></div>`;
-      }).join('');
+      })()).join('') + skipsBefore(dir === 1 ? Infinity : -Infinity);
     }
 
     const secHead = showSec ? Array.from({ length: ns }, (_, i) => `<div>S${i + 1}</div>`).join('') : '';

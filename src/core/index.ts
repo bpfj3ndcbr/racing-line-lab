@@ -19,3 +19,4 @@ export * from './format';
 export * from './lapEnd';
 export * from './trackPreview';
 export * from './version';
+export * from './trim';

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
-import { detectLaps, formatJst, parseCln, parseSci, parseVbo } from '../src/core';
+import { detectLaps, formatJst, parseCln, parseSci, parseVbo, storableLog } from '../src/core';
 
 const fx = (n: string) => `fixtures/${n}`;
 const control = parseCln(readFileSync(fx('cl_autopolis.cln'), 'utf8'))[0];
@@ -66,6 +66,16 @@ describe.skipIf(!existsSync(bigPath))('RaceChrono .vbo (10Hz・30列・連続ロ
   it('LAP7 のセクター通過時刻', () => {
     const exp = [0.2, 28.5, 42.3, 54.3, 76.6, 102.1, 124.4];
     exp.forEach((v, i) => expect(laps[6].sectorTimes[i]).toBeCloseTo(v, 0));
+  });
+
+  it('保存用の写し(案件 59): 向き・高度・加速度を省き、位置・速度・時刻はそのまま。ラップの検出も同じ', () => {
+    const s = storableLog(log);
+    expect([s.heading, s.height, s.longAcc, s.latAcc]).toEqual([undefined, undefined, undefined, undefined]);
+    expect(s.t).toBe(log.t); expect(s.lat).toBe(log.lat); expect(s.lon).toBe(log.lon); expect(s.speed).toBe(log.speed);
+    expect(s.laptiming).toEqual(log.laptiming); expect(s.startEpochMs).toBe(log.startEpochMs);
+    expect(log.longAcc).toBeDefined();                 // 元のログは変えない
+    const again = detectLaps(s, control, sectors);
+    expect(again.map((l) => [l.duration, l.sectorTimes])).toEqual(laps.map((l) => [l.duration, l.sectorTimes]));
   });
 
   it('位置補正(ライン側を逆方向にずらす)でも通過時刻が極端に変わらない', () => {

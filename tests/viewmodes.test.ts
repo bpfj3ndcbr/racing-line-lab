@@ -64,6 +64,10 @@ describe('地図の線と車両アイコン', () => {
     expect(lineWidth(15, 4)).toBe(MIN_LINE_WIDTH);       // 細くなりすぎない
     expect(lineWidth(10, 4)).toBe(MIN_LINE_WIDTH);
     for (let z = 10; z < 20; z++) expect(lineWidth(z + 1, 4)).toBeGreaterThanOrEqual(lineWidth(z, 4));
+    // 下限を指定した線(取り込み範囲の画面の、選んでいる範囲): 縮小しても下限より細くしない。拡大したときは同じ
+    expect(lineWidth(15, 4, 2)).toBe(2);
+    expect(lineWidth(18, 4, 2)).toBe(2);
+    expect(lineWidth(19, 4, 2)).toBe(4);
   });
 
   it('車両には進行方向(度)が渡される。引き出しの文字は、トグルを入れるまで渡さない', () => {

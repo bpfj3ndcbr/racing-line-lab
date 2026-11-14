@@ -72,3 +72,14 @@ export class FakeMap implements TrackMap {
   invalidate() { this.invalidated++; }
   destroy() { this.destroyed = true; }
 }
+
+/**
+ * 走行ログの取り込み範囲の画面(案件 59)が出たら、そのまま「次へ」を押す(候補はチェックありのまま取り込む)。
+ * ファイルの追加から先の動作を試すテストで、読み込みを今までどおり進めるために、テストファイルの先頭で 1 回呼ぶ。
+ * 画面そのものは tests/trim-dialog.test.ts で試す
+ */
+export function autoTrim(): () => void {
+  const ob = new MutationObserver(() => document.querySelector<HTMLButtonElement>('.modal.tr [data-trim="next"]')?.click());
+  ob.observe(document.body, { childList: true, subtree: true });
+  return () => ob.disconnect();
+}

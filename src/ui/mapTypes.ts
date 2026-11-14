@@ -3,7 +3,11 @@ import type { GeoBox, GeoLine, Slot } from '../core';
 /** 地図に引く走行ライン。色は呼び出し側が CSS 変数から読んで渡す(地図の線は CSS で色を変えられないため)。 */
 /** ヒートマップ用の色分け区間(points の from〜to 番目を color で描く) */
 export interface HeatRun { from: number; to: number; color: string }
-export interface MapTrack { slot: Slot; points: [number, number][]; color: string; heat?: HeatRun[] }
+export interface MapTrack {
+  slot: Slot; points: [number, number][]; color: string; heat?: HeatRun[];
+  /** 線の太さの下限(px)。縮小しても、これより細くしない(無ければ MIN_LINE_WIDTH) */
+  minWidth?: number;
+}
 export interface MapLine {
   label: string; line: GeoLine; kind: 'sector' | 'control';
   /** 編集中に選んでいるライン(目立つ色で描く) */ selected?: boolean;

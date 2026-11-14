@@ -7,6 +7,7 @@
 | install-03-dmg.png | .dmg を開いた画面(Applications へドラッグ) |
 | usage-00-start.png | 起動した直後の画面(はじめかたの手順 1 が「いまここ」) |
 | usage-00-start-load-vbo.png | はじめかたの手順 1 の「走行ログ(.vbo)を追加…」で、ファイルを選ぶところ |
+| usage-01-trim-range.png | 「走行ログの取り込み範囲」の画面(PC。オートポリスの 2 時間 17 分のログ、範囲1〜4) |
 | usage-01-logs-added.png | 走行ログを 2 つ追加したところ(サーキット未判定、はじめかたの手順 2) |
 | usage-02-map-register.png | 「地図で登録…」で開いた、地図による登録の画面 |
 | usage-03-draw-control.png | 計測ラインを引いたところ(拡大、「確定」の前) |

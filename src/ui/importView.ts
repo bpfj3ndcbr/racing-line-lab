@@ -1,7 +1,8 @@
-import { nameExists } from '../core';
-import type { Session } from '../store/session';
+import { type TrimCut, nameExists } from '../core';
+import type { ReadLog, Session } from '../store/session';
 import { mountCircuitEditor, type CircuitEditor } from './circuitEditor';
 import { loadDialog, planLoad } from './loadDialog';
+import { trimDialog } from './trimDialog';
 import { mountCorrectView, type CorrectView } from './correctView';
 import { alertDialog, customDialog } from './dialog';
 import { hasExt } from './fileKind';
@@ -169,10 +170,35 @@ ${SETS_HTML}
       await alertDialog({ title: '読み込めるのは .vbo ファイルだけです', detail: `${names}は追加しませんでした。` });
     }
     const before = new Set((session.sets[set]?.logs ?? []).map((l) => l.id));
-    if (vbo.length) await session.addVboFiles(vbo.map((file) => ({ file, path: window.rllNative?.getPathForFile(file) || undefined })), set);
+    if (vbo.length && !(await loadVbo(vbo, set))) return;
     if (skipped.length) session.say(`${skipped.length} 件は .vbo ではないため追加しませんでした。`, true);
     const added = (session.sets[set]?.logs ?? []).filter((l) => !before.has(l.id)).map((l) => l.id);
     if (added.length) await checkLoaded(set, added, before.size === 0, undefined, true);
+  }
+
+  /**
+   * 走行ログを読み、まだ読み込んでいないものは 1 本ずつ取り込み範囲の画面(案件 59)を出してから、まとめて追加する。
+   * 「全ての読み込みを止める」なら何も追加せず false
+   */
+  async function loadVbo(files: File[], set: number): Promise<boolean> {
+    const read: { r: ReadLog; path?: string }[] = [];
+    for (const file of files) {
+      const r = await session.readVboFile(file);
+      if (r) read.push({ r, path: window.rllNative?.getPathForFile(file) || undefined });
+    }
+    const total = read.filter((x) => !x.r.known).length;
+    const ok: { r: ReadLog; path?: string; cuts?: TrimCut[] }[] = [];
+    let step = 0, skipped = 0;
+    for (const x of read) {
+      if (x.r.known) { ok.push(x); continue; }
+      const res = await trimDialog(x.r.log, { mapFactory: opts.mapFactory, step: ++step, total, saved: session.trimOf(x.r.id) });
+      if (res.kind === 'abort') { session.say('走行ログの読み込みを止めました。'); return false; }
+      if (res.kind === 'skip') { skipped++; continue; }
+      ok.push({ ...x, cuts: res.cuts });
+    }
+    for (const x of ok) session.addReadLog(x.r, set, x.path, x.cuts);
+    if (skipped) session.say(`${skipped} 件の走行ログは読み込みませんでした。`);
+    return true;
   }
 
   // ---------- 共有の画面から受け取る(案件 45) ----------

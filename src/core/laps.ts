@@ -25,8 +25,10 @@ export function findCrossings(log: TrackLog, line: GeoLine, opts: CrossingOption
   const minLon = Math.min(L.a.lon, L.b.lon) - pad, maxLon = Math.max(L.a.lon, L.b.lon) + pad;
   const { lat, lon, t, speed } = log;
   const all: Crossing[] = [];
+  const gaps = log.gaps?.length ? new Set(log.gaps) : null;   // 取り込まなかった区間をまたぐつなぎ目(案件 59)
 
   for (let k = 0; k < lat.length - 1; k++) {
+    if (gaps?.has(k + 1)) continue;
     const y0 = lat[k], y1 = lat[k + 1], x0 = lon[k], x1 = lon[k + 1];
     if ((y0 > maxLat && y1 > maxLat) || (y0 < minLat && y1 < minLat)) continue;
     if ((x0 > maxLon && x1 > maxLon) || (x0 < minLon && x1 < minLon)) continue;
@@ -68,6 +70,8 @@ export interface LapRun {
   laps: Lap[];
   /** 最初の通過より前に、走行中の区間がある(一覧に「始点が無いので非表示」と出す) */
   hasHead: boolean;
+  /** 取り込み範囲で切った所をまたぐので出さなかったラップの番号(一覧に「取り込み範囲外」と出す) */
+  cutLaps: number[];
 }
 
 /** 時刻 time 以前の最後のサンプル番号 */
@@ -119,11 +123,13 @@ export function detectLapRun(
       if (!last) {
         if (end - log.t[0] > 1) laps.push(makeLap(log, 1, log.t[0], end, false));        // 通過が無い: 全体を参考値に
       } else if (laps.length === 0 || movingSec(log, last.index + 1, n - 1) >= EDGE_MIN_MOVING_SEC) {
-        // 最後の通過〜: 最初に止まった時点(無ければ記録の終わり)まで
-        const stop = firstStop(log, last.index + 1, n - 1) ?? end;
+        // 最後の通過〜: 最初に止まった時点(無ければ記録の終わり)まで。取り込み範囲で切った所(時刻が飛ぶ所)は越えない
+        const g = log.gaps?.find((k) => k > last.index + 1);
+        const limit = g !== undefined ? log.t[g - 1] : end;
+        const stop = Math.min(firstStop(log, last.index + 1, n - 1) ?? end, limit);
         if (stop - last.time > 1) {
           const lap = makeLap(log, laps.length + 1, last.time, stop, false);
-          lap.maxDuration = Math.max(lap.duration, Math.min(TAIL_MAX_SEC, end - last.time));
+          lap.maxDuration = Math.max(lap.duration, Math.min(TAIL_MAX_SEC, limit - last.time));
           laps.push(lap);
         }
       }
@@ -131,13 +137,20 @@ export function detectLapRun(
     }
   }
 
+  // 取り込み範囲で切った所(時刻が飛ぶ所)をまたぐラップは出さない。ほかのラップの番号は変えない
+  // (割り当て・終端の調整はラップの番号で覚えているため。番号は飛ぶ)。通過が無いときの全体の参考値は除かない
+  const kept = cross.length ? laps.filter((l) => !spansGap(log, l)) : laps;
+  const cutLaps = laps.filter((l) => !kept.includes(l)).map((l) => l.number);
+  laps.length = 0;
+  laps.push(...kept);
+
   for (const lap of laps) {
     const want = opts.ends?.[lap.number];
     if (want !== undefined) adjustEnd(log, lap, want);
   }
   const sectorCross = sectors.map((s) => findCrossings(log, s, opts));
   for (const lap of laps) lap.sectorTimes = computeSectorTimes(lap, sectorCross);
-  return { laps, hasHead };
+  return { laps, hasHead, cutLaps };
 }
 
 /** 終端をラップ開始から sec 秒にする。本来の終点より前なら参考値になる(本来の終点を指したときは、そのまま) */
@@ -155,6 +168,11 @@ function movingSec(log: TrackLog, i0: number, i1: number): number {
   let s = 0;
   for (let i = Math.max(0, i0); i < i1; i++) if (log.speed[i] >= EDGE_MOVING_KMH) s += log.t[i + 1] - log.t[i];
   return s;
+}
+
+/** ラップが、取り込み範囲で切った所(TrackLog.gaps。時刻が飛ぶ所)をまたぐか */
+function spansGap(log: TrackLog, lap: Lap): boolean {
+  return !!log.gaps?.some((g) => log.t[g - 1] >= lap.startTime && log.t[g] <= lap.endTime);
 }
 
 /** i0〜i1 番の区間で、STOP_KMH 未満が STOP_SEC 以上続いた最初の区間の、止まり始めた時刻。無ければ null */
