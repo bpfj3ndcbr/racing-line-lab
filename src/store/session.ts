@@ -18,6 +18,8 @@ export interface LoadedLog {
   laps: Lap[];
   /** 最初の通過より前に走行がある(一覧に「始点が無いので非表示」と出す) */
   hasHead: boolean;
+  /** 取り込み範囲で切った所をまたぐので出さなかったラップの番号(一覧に「取り込み範囲外」と出す) */
+  cutLaps: number[];
   /**
    * 比較セットのサーキットが決まっていて、このログがその計測ラインを通らないとき、そのサーキット(ラップ無しのログ)。
    * このとき circuit は null。比較セットのサーキットは 1 つ(案件 3)
@@ -81,6 +83,9 @@ export interface SetPrefs {
   assignment?: Partial<Record<Slot, LapRef | null>>; circuitId?: string | null;
   sort?: SortState; showSectors?: boolean; sectorMode?: 'split' | 'cumulative';
 }
+
+/** 読んだ走行ログ(まだ追加していない)。known = どこかのセットに読み込み済み(取り込み範囲は当てはめ済み) */
+export interface ReadLog { id: string; log: TrackLog; known: boolean }
 
 /** Web 版の一時保存(案件 30)の、小さな状態 */
 export interface ResumeState {
@@ -327,16 +332,41 @@ export class Session {
   /** どこかのセットに読み込み済みのファイルなら、その中身(同じファイルを別のセットに入れるとき、読み直さない) */
   private knownLog(id: string): TrackLog | null { return this.knownEntry(id)?.log ?? null; }
 
+  /** 保存した取り込み範囲を当てはめて、走行ログを追加する(取り込み範囲の画面を通さないとき) */
   async addVboFile(file: File, path?: string, set?: number): Promise<void> {
+    const r = await this.readVboFile(file);
+    if (r) this.addReadLog(r, set, path);
+  }
+
+  /**
+   * 走行ログのファイルを読む(まだ追加しない)。どこかのセットに読み込み済みなら、その中身(known)。
+   * 読めなければ案内を出して null。取り込み範囲の画面(案件 59)は、known でないものだけに出す
+   */
+  async readVboFile(file: File): Promise<ReadLog | null> {
+    const id = `${file.name}:${file.size}`;
+    const known = this.knownLog(id);
+    if (known) return { id, log: known, known: true };
     try {
-      const id = `${file.name}:${file.size}`;
-      const log = this.knownLog(id) ?? this.trimmed(parseVbo(await file.text(), file.name), id);
-      if (path) this.paths.set(id, path);
-      this.addLog(log, id, set);
+      return { id, log: parseVbo(await file.text(), file.name), known: false };
     } catch (e) {
       this.tell(`${file.name}: 読み込めませんでした(${e instanceof Error ? e.message : e})`, true);
       this.emit();
+      return null;
     }
+  }
+
+  /**
+   * readVboFile で読んだ走行ログを追加する。cuts = 取り込まない区間(取り込み範囲の画面で決めたもの。保存して当てはめる)。
+   * 省くと、保存してある区間を当てはめる。読み込み済み(known)のものは、そのまま使う
+   */
+  addReadLog(r: ReadLog, set?: number, path?: string, cuts?: readonly TrimCut[]): void {
+    let log = r.log;
+    if (!r.known) {
+      if (cuts) this.setTrim(r.id, cuts);
+      log = this.trimmed(log, r.id);
+    }
+    if (path) this.paths.set(r.id, path);
+    this.addLog(log, r.id, set);
   }
 
   /** 複数のファイルをまとめて追加する(割り当ては自動では行わない。「はじめかた」などで、速いものから自動 / 手動を選ぶ) */
@@ -403,7 +433,7 @@ export class Session {
     const full = known?.log ?? closeLoop(log);
     const entry: LoadedLog = {
       id, no: w.nextNo++, log: full, offset: this.offsets[id] ?? { east: 0, north: 0 },
-      circuit: null, auto: true, laps: [], hasHead: false, outside: null,
+      circuit: null, auto: true, laps: [], hasHead: false, cutLaps: [], outside: null,
       candidate: known ? known.candidate : lineCandidate(full),
     };
     w.logs.push(entry);
@@ -727,6 +757,7 @@ export class Session {
       : null;
     l.laps = run?.laps ?? [];
     l.hasHead = run?.hasHead ?? false;
+    l.cutLaps = run?.cutLaps ?? [];
   }
 
   // ---- 表示・割り当て(set を省くと、表示セット) ----

@@ -6,7 +6,10 @@ import { Prefs } from '../src/store/prefs';
 import { Session } from '../src/store/session';
 import { mountApp } from '../src/ui/app';
 import { ThemeController } from '../src/ui/theme';
-import { FakeMap, headOf } from './helpers';
+import { FakeMap, autoTrim, headOf } from './helpers';
+
+// ファイルの追加で出る取り込み範囲の画面(案件 59)は、そのまま「次へ」で進める
+autoTrim();
 
 const cln = readFileSync('fixtures/cl_autopolis.cln', 'utf8');
 const sci = readFileSync('fixtures/autopolis.sci', 'utf8');

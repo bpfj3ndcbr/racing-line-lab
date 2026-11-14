@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
-import { parseVbo } from '../src/core';
+import { applyCuts, parseVbo, stopCandidates } from '../src/core';
 import { MemoryStore } from '../src/io/storage';
 import { Session } from '../src/store/session';
 import { mountApp } from '../src/ui/app';
@@ -109,6 +109,21 @@ describe('読み込み画面', () => {
     expect(lapNums().slice(0, 2)).toEqual(['5', '6']);             // 長い順
     root.querySelector<HTMLButtonElement>('[data-act="sort"][data-key="lap"]')!.click();
     expect(lapNums()[0]).toBe('1');
+  });
+
+  it.skipIf(!existsSync(bigPath))('取り込み範囲で切った所をまたぐラップは、番号の順のときだけ、その位置に「取り込み範囲外」の灰色の行で出す', () => {
+    session.registerCircuit('オートポリス', cln, sci);
+    const raw = parseVbo(readFileSync(bigPath, 'utf8'), 'big.vbo');
+    session.addLog(applyCuts(raw, stopCandidates(raw)), 'big');    // ピットで止まった LAP 5 をまたいで切る
+    expect(session.sets[0].logs[0].cutLaps).toEqual([5]);
+    const all = () => Array.from(root.querySelectorAll('.file .row:not(.hd):not(.head)')).map((r) =>
+      (r.classList.contains('skip') ? `[${r.firstElementChild!.textContent!.trim()}]` : r.firstElementChild!.textContent!.trim()));
+    expect(all().slice(2, 6)).toEqual(['3', '4', '[5]', '6']);
+    expect(root.querySelector('.file .row.skip')!.textContent).toContain('LAP 5 は取り込み範囲外');
+    root.querySelector<HTMLButtonElement>('[data-act="sort"][data-key="lap"]')!.click();          // 降順
+    expect(all().slice(6, 10)).toEqual(['7', '6', '[5]', '4']);
+    root.querySelector<HTMLButtonElement>('[data-act="sort"][data-key="time"]')!.click();         // タイム順では出さない
+    expect(root.querySelector('.file .row.skip')).toBeNull();
   });
 
   it.skipIf(!existsSync(bigPath))('2ファイルで A/B を別ファイルに割り当てられる', () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import {
-  type TrackLog, applyCuts, closeLoop, detectLaps, findCrossings, normalizeCuts, parseCln, parseSci, parseVbo, stopCandidates,
+  type TrackLog, applyCuts, closeLoop, detectLapRun, detectLaps, findCrossings, normalizeCuts, parseCln, parseSci, parseVbo, stopCandidates,
 } from '../src/core';
 import { MemoryStore } from '../src/io/storage';
 import { Session } from '../src/store/session';
@@ -74,6 +74,16 @@ describe('区間を取り込まないログ(applyCuts)', () => {
     expect(findCrossings(out, line)).toHaveLength(0);    // 通過したあたりを消すと、飛んだ所では数えない
     expect(closeLoop(out)).toBe(out);
   });
+
+  it('最後の通過からの参考値のラップは、つなぎ目の手前で切り、終端の調整でもつなぎ目を越えない', () => {
+    const run = makeLog([[400, 80], [100, 0]]);
+    const x = 131 + 50 * 80 / 3.6 / 93000;              // 50 秒目に通過
+    const line = { a: { lat: 32.999, lon: x }, b: { lat: 33.001, lon: x } };
+    const [whole] = detectLaps(run, line);
+    expect([whole.complete, Math.round(whole.endTime)]).toEqual([false, 400]);       // 止まった所まで
+    const [cut] = detectLaps(applyCuts(run, [{ from: 200, to: 300 }]), line);       // 走っている途中を消す
+    expect([cut.complete, cut.endTime, cut.maxDuration]).toEqual([false, 199, 199 - cut.startTime]);
+  });
 });
 
 const bigPath = fx('session_20260506_094550_autopolis.vbo');
@@ -82,18 +92,21 @@ describe.skipIf(!existsSync(bigPath))('実ログ(オートポリス、13 ラッ�
   const sectors = parseSci(readFileSync(fx('autopolis.sci'), 'utf8')).map((s) => s.line);
   const log = parseVbo(readFileSync(bigPath, 'utf8'), 'a.vbo');
 
-  it('停止の候補をすべて取り込まなくても、ラップの数・タイム・セクタータイムは変わらない', () => {
+  it('停止の候補をすべて取り込まないと、切った所をまたぐラップは出さない。ほかのラップは番号・タイム・セクタータイムとも変わらない', () => {
     const cands = stopCandidates(log);
     expect(cands.map((c) => c.kind)).toEqual(['head', 'middle', 'middle', 'middle', 'tail']);
     const out = applyCuts(log, cands);
     expect(out.t.length).toBeLessThan(log.t.length * 0.6);
     const before = detectLaps(log, control, sectors), after = detectLaps(out, control, sectors);
-    expect(after).toHaveLength(13);
-    after.forEach((l, i) => {
-      expect(l.duration).toBeCloseTo(before[i].duration, 6);
-      l.sectorTimes.forEach((s, k) => expect(s).toBeCloseTo(before[i].sectorTimes[k]!, 6));
+    expect(after.map((l) => l.number)).toEqual([1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13]);
+    expect(detectLapRun(out, control, sectors).cutLaps).toEqual([5]);
+    after.forEach((l) => {
+      const b = before.find((x) => x.number === l.number)!;
+      expect(l.duration).toBeCloseTo(b.duration, 6);
+      l.sectorTimes.forEach((s, k) => expect(s).toBeCloseTo(b.sectorTimes[k]!, 6));
     });
-    expect(after[4].duration).toBeCloseTo(4775.3, 0);    // ピットで止まった LAP 5 も、経過時間はそのまま
+    expect(after.map((l) => l.number)).not.toContain(5);  // ピットで止まった LAP 5(4775 秒)は、切った所をまたぐので出さない
+    expect(before[4].duration).toBeCloseTo(4775.3, 0);
   });
 });
 

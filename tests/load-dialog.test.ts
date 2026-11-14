@@ -5,7 +5,10 @@ import { MemoryStore } from '../src/io/storage';
 import { Session } from '../src/store/session';
 import { mountApp } from '../src/ui/app';
 import { ThemeController } from '../src/ui/theme';
-import { FakeMap } from './helpers';
+import { FakeMap, autoTrim } from './helpers';
+
+// ファイルの追加で出る取り込み範囲の画面(案件 59)は、そのまま「次へ」で進める
+autoTrim();
 
 // 読み込みの確認ダイアログと、候補を置いた登録画面(案件 3)。走行ログのファイルが無くても動く、人工の .vbo で確かめる
 
@@ -72,6 +75,8 @@ function drop(set: number, files: File[]) {
   root.querySelector(`#sec-set-${set} .dropbox`)!.dispatchEvent(e);
 }
 const dialog = () => document.querySelector<HTMLElement>('.modal.ld');
+/** 読み込みの確認のプレビューの地図(先に出る取り込み範囲の画面の地図は、閉じたときに片付く) */
+const previewMap = () => maps.filter((m) => !m.destroyed)[0];
 const rowOf = (name: string) => Array.from(document.querySelectorAll<HTMLElement>('.ld-row')).find((r) => r.textContent!.includes(name))!;
 
 const pick = (key: string) => {
@@ -354,7 +359,7 @@ describe('計測ラインの修正(案件 15)', () => {
     expect($('.ld-cur').textContent).toContain('計測ライン: 修正あり(角度 +4.0°・移動 0.0 m)');
     expect(statusOf('plain.vbo')).toBe('通ります(ラップあり)');
     await flush();
-    const prev = maps[0];
+    const prev = previewMap();
     expect(lineBearing(prev.lines[0].line)).toBeCloseTo(4, 6);
     // もう一度開くと、直した線から続けられる(補正前は候補の線のまま)
     $<HTMLButtonElement>('.ld-prev-fix').click();
@@ -503,7 +508,7 @@ describe('セクターの修正・追加(案件 17)', () => {
     expect($('.ld-cur').textContent).toContain('計測ライン: ファイルのまま(修正なし)');
     expect($('.ld-cur').textContent).toContain('セクター: 修正あり(2 本。修正 1・追加 1・削除 1)');
     await flush();
-    expect(maps[0].lines.filter((l) => l.kind === 'sector').map((l) => [l.label, degOf(l.line)])).toEqual([['S1', 180], ['S2', 0]]);   // プレビュー
+    expect(previewMap().lines.filter((l) => l.kind === 'sector').map((l) => [l.label, degOf(l.line)])).toEqual([['S1', 180], ['S2', 0]]);   // プレビュー
     // もう一度開くと、直した状態から続けられる
     btn('.ld-prev-fix').click();
     expect(names()).toEqual(['計測ライン', 'S1', 'S2']);
