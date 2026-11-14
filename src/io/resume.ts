@@ -1,54 +1,68 @@
 import { storableLog, type TrackLog } from '../core';
+import { LocalStorageStore, type KeyValueStore } from './storage';
 
 /**
- * Web 版の一時保存(案件 30)。スマホのスリープやアプリの切り替えで、ブラウザがページを読み込み直したとき
- * (同じタブの中の読み直し)に、読み込んだ走行ログと画面の状態を元に戻すためのもの。
+ * Web 版・PWA 版の状態の保存(案件 30 → 案件 60 でアプリ全体で 1 つに作り替えた)。
+ * 更新したときも、閉じて開き直したときも、読み込んだ走行ログと画面の状態を元に戻すためのもの。
  * - 走行ログ本体は、読み込んだときにそのつど保存する(画面が隠れる瞬間には大きなものを書かない)
  * - 割り当て・設定・開いている画面などの小さな状態は、画面が隠れるときに保存する
- * - タブごとに 1 つだけ持つ。タブの見分けは sessionStorage(同じタブの読み直しでは残り、新しいタブ・閉じたタブでは無い)
+ * - アプリ全体で 1 つだけ持つ。同時に開ける窓は 1 つだけ(instance.ts)なので、ほかの窓と書き合うことはない
+ * - 保存の形には版の印(RESUME_SCHEMA)を付け、一致しないものは捨てる
  */
 export interface ResumeStore {
-  /** このタブで前に保存していたか(同じタブの中の読み直しか) */
-  readonly resumed: boolean;
   putLog(id: string, log: TrackLog): Promise<void>;
   deleteLog(id: string): Promise<void>;
   putState(state: unknown): Promise<void>;
-  /** このタブの保存を読む。無ければ null */
+  /** 保存を読む。無い・版の印が合わないときは null(合わないものは消す) */
   load(): Promise<{ state: unknown; logs: Map<string, TrackLog> } | null>;
-  /** このタブの保存を消し、次の読み直しで元に戻さないようにする(「アプリを初期状態に戻す」など) */
+  /** keep に無い走行ログを消す(元に戻したあと、使われなかった走行ログの掃除) */
+  prune(keep: Iterable<string>): Promise<void>;
+  /** 保存をすべて消す(「アプリを初期状態に戻す」など) */
   forget(): Promise<void>;
-  /**
-   * ほかのタブ(窓)のうち、いちばん新しく保存した状態を、このタブのものとして引き継ぐ(元の分は移すので残らない)。無ければ null。
-   * Android の共有の画面から開くと、アプリが新しい窓で開き直されるので、直前の状態を続けて使うため(案件 45)
-   */
-  adoptLatest(): Promise<{ state: unknown; logs: Map<string, TrackLog> } | null>;
 }
 
-const TAB_KEY = 'rll.resumeTab';
-/** 小さな状態の写し。ページを閉じる・読み直す瞬間(pagehide)に始めた IndexedDB の書き込みは中止されるので、同期的に書ける sessionStorage にも置く */
-const STATE_KEY = 'rll.resumeState';
-const DB_NAME = 'rll-resume';
-const MAX_AGE_MS = 24 * 60 * 60 * 1000;          // 閉じたタブの分は、1 日たったら消す
+/**
+ * 保存の形の版。走行ログ(storableLog)や小さな状態(Session.resumeState)の形を、前の版のアプリが読めない形に変えたら上げる。
+ * 上げると、前の版で保存したものは捨てる(元に戻さない)。形を変えたときは tests/resume-schema.test.ts が落ちるので、
+ * 上げるか(または読み替えを足すか)を決めてから、テストの記録を直す。
+ * 1 = タブごとの一時保存(案件 30〜59)、2 = アプリ全体で 1 つ(案件 60)
+ */
+export const RESUME_SCHEMA = 2;
 
-/** IndexedDB の保存先。使えない環境(IndexedDB・sessionStorage が無い)では null */
-export function openResumeStore(now = () => Date.now()): ResumeStore | null {
-  let tab: string | null = null, resumed = false;
-  try {
-    if (typeof indexedDB === 'undefined' || typeof sessionStorage === 'undefined') return null;
-    tab = sessionStorage.getItem(TAB_KEY);
-    resumed = !!tab;
-    if (!tab) { tab = `${now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`; sessionStorage.setItem(TAB_KEY, tab); }
-  } catch { return null; }
-  const me = tab;
+/** 小さな状態の写しの保存キー(KeyValueStore。ページを閉じる・読み直す瞬間に始めた IndexedDB の書き込みは中止されるので、同期的に書ける方にも置く) */
+const COPY_KEY = 'resumeState';
+const DB_NAME = 'rll-resume';
+const DB_VERSION = 2;
+const STATE_ID = 'app';
+
+interface SavedState { schema: number; at: number; app?: string; state: unknown }
+
+const isSaved = (v: unknown): v is SavedState =>
+  !!v && typeof v === 'object' && typeof (v as SavedState).schema === 'number' && typeof (v as SavedState).at === 'number';
+
+/** 2 つの写し(IndexedDB と KeyValueStore)のうち、新しい方を選ぶ */
+export function newerState(a: unknown, b: unknown): SavedState | null {
+  const x = isSaved(a) ? a : null, y = isSaved(b) ? b : null;
+  if (!x || !y) return x ?? y;
+  return y.at > x.at ? y : x;
+}
+
+/** IndexedDB の保存先。使えない環境(IndexedDB が無い)では null */
+export function openResumeStore(copy: KeyValueStore = new LocalStorageStore(), now = () => Date.now()): ResumeStore | null {
+  try { if (typeof indexedDB === 'undefined') return null; } catch { return null; }
+  // 1 の版(タブごと)の写しは、sessionStorage にあった。使わないので消しておく
+  try { sessionStorage.removeItem('rll.resumeTab'); sessionStorage.removeItem('rll.resumeState'); } catch { /* 無視 */ }
 
   let dbp: Promise<IDBDatabase> | null = null;
   let opened: IDBDatabase | null = null;           // 開いたあとは、待たずに使う(ページが隠れる・閉じる直前の書き込みを、その場で始めるため)
   const db = () => dbp ??= new Promise<IDBDatabase>((res, rej) => {
-    const r = indexedDB.open(DB_NAME, 1);
+    const r = indexedDB.open(DB_NAME, DB_VERSION);
     r.onupgradeneeded = () => {
+      // 前の形(タブごと)のものは引き継がない。入れ物ごと作り直す
       const d = r.result;
-      d.createObjectStore('state', { keyPath: 'tab' });
-      d.createObjectStore('logs', { keyPath: 'key' }).createIndex('tab', 'tab');
+      for (const name of Array.from(d.objectStoreNames)) d.deleteObjectStore(name);
+      d.createObjectStore('state', { keyPath: 'id' });
+      d.createObjectStore('logs', { keyPath: 'id' });
     };
     r.onsuccess = () => { opened = r.result; res(r.result); };
     r.onerror = () => rej(r.error);
@@ -60,84 +74,50 @@ export function openResumeStore(now = () => Date.now()): ResumeStore | null {
     await new Promise<void>((res, rej) => { t.oncomplete = () => res(); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error); });
   };
   const req = <T>(r: IDBRequest<T>) => new Promise<T>((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
-  const removeTab = (t: IDBTransaction, which: string) => {
-    t.objectStore('state').delete(which);
-    const idx = t.objectStore('logs').index('tab');
-    const c = idx.openKeyCursor(IDBKeyRange.only(which));
-    c.onsuccess = () => { const cur = c.result; if (cur) { t.objectStore('logs').delete(cur.primaryKey); cur.continue(); } };
+  const readCopy = (): unknown => { try { const c = copy.get(COPY_KEY); return c ? JSON.parse(c) : null; } catch { return null; } };
+  const clearAll = async () => {
+    copy.set(COPY_KEY, '');
+    await tx(['state', 'logs'], 'readwrite', (t) => { t.objectStore('state').clear(); t.objectStore('logs').clear(); });
   };
 
-  // 閉じたタブの古い保存を消す(起動のたび、裏で)
-  void (async () => {
-    try {
-      const d = await db();
-      const all = await req(d.transaction('state').objectStore('state').getAll()) as { tab: string; at: number }[];
-      const old = all.filter((s) => s.tab !== me && now() - s.at > MAX_AGE_MS).map((s) => s.tab);
-      if (old.length) await tx(['state', 'logs'], 'readwrite', (t) => old.forEach((o) => removeTab(t, o)));
-    } catch { /* 使えなければ何もしない */ }
-  })();
-
   return {
-    resumed,
-    // 走行ログは、使わない配列を省いて保存する(案件 59)
-    putLog: (id, log) => tx(['logs'], 'readwrite', (t) => { t.objectStore('logs').put({ key: `${me}\u0000${id}`, tab: me, id, at: now(), log: storableLog(log) }); }),
-    deleteLog: (id) => tx(['logs'], 'readwrite', (t) => { t.objectStore('logs').delete(`${me}\u0000${id}`); }),
+    putLog: (id, log) => tx(['logs'], 'readwrite', (t) => { t.objectStore('logs').put({ id, at: now(), log: storableLog(log) }); }),
+    deleteLog: (id) => tx(['logs'], 'readwrite', (t) => { t.objectStore('logs').delete(id); }),
     putState(state) {
+      const rec: SavedState = { schema: RESUME_SCHEMA, at: now(), app: __APP_VERSION__, state };
       let copied = false;
-      try { sessionStorage.setItem(STATE_KEY, JSON.stringify(state)); copied = true; } catch { /* IndexedDB のほうだけ */ }
-      const p = tx(['state'], 'readwrite', (t) => { t.objectStore('state').put({ tab: me, at: now(), state }); });
+      try { copy.set(COPY_KEY, JSON.stringify(rec)); copied = true; } catch { /* IndexedDB のほうだけ */ }
+      const p = tx(['state'], 'readwrite', (t) => { t.objectStore('state').put({ id: STATE_ID, ...rec }); });
       return copied ? p.catch(() => { /* 写しは書けた */ }) : p;
     },
     async load() {
       const d = await db();
-      const t = d.transaction(['state', 'logs']);
-      const s = await req(t.objectStore('state').get(me)) as { state: unknown } | undefined;
-      let state: unknown = s?.state ?? null;
-      try { const c = sessionStorage.getItem(STATE_KEY); if (c) state = JSON.parse(c); } catch { /* IndexedDB のほうを使う */ }
-      if (state === null) return null;
-      const rows = await req(t.objectStore('logs').index('tab').getAll(IDBKeyRange.only(me))) as { id: string; log: TrackLog }[];
-      return { state, logs: new Map(rows.map((r) => [r.id, r.log])) };
+      const fromDb = await req(d.transaction('state').objectStore('state').get(STATE_ID)) as unknown;
+      const saved = newerState(fromDb, readCopy());
+      if (!saved) return null;
+      if (saved.schema !== RESUME_SCHEMA) { await clearAll().catch(() => { /* 消せなくても、使わない */ }); return null; }
+      const rows = await req(d.transaction('logs').objectStore('logs').getAll()) as { id: string; log: TrackLog }[];
+      return { state: saved.state, logs: new Map(rows.map((r) => [r.id, r.log])) };
     },
-    async forget() {
-      try { sessionStorage.removeItem(TAB_KEY); sessionStorage.removeItem(STATE_KEY); } catch { /* 無視 */ }
-      await tx(['state', 'logs'], 'readwrite', (t) => removeTab(t, me));
-    },
-    async adoptLatest() {
+    async prune(keep) {
+      const k = new Set(keep);
       const d = await db();
-      const all = await req(d.transaction('state').objectStore('state').getAll()) as { tab: string; at: number; state: unknown }[];
-      const prev = all.filter((s) => s.tab !== me && now() - s.at <= MAX_AGE_MS).sort((a, b) => b.at - a.at)[0];
-      if (!prev) return null;
-      const rows = await req(d.transaction('logs').objectStore('logs').index('tab').getAll(IDBKeyRange.only(prev.tab))) as { id: string; log: TrackLog }[];
-      await tx(['state', 'logs'], 'readwrite', (t) => {
-        removeTab(t, prev.tab);
-        t.objectStore('state').put({ tab: me, at: now(), state: prev.state });
-        for (const r of rows) t.objectStore('logs').put({ key: `${me}\u0000${r.id}`, tab: me, id: r.id, at: now(), log: r.log });
-      });
-      try { sessionStorage.setItem(STATE_KEY, JSON.stringify(prev.state)); } catch { /* IndexedDB のほうだけ */ }
-      return { state: prev.state, logs: new Map(rows.map((r) => [r.id, r.log])) };
+      const ids = await req(d.transaction('logs').objectStore('logs').getAllKeys()) as string[];
+      const drop = ids.filter((id) => !k.has(id));
+      if (drop.length) await tx(['logs'], 'readwrite', (t) => drop.forEach((id) => t.objectStore('logs').delete(id)));
     },
+    forget: () => clearAll(),
   };
 }
 
-/** テスト用: メモリに持つ保存先 */
+/** テスト用: メモリに持つ保存先(走行ログは、IndexedDB の保存先と同じく storableLog の形で持つ) */
 export class MemoryResumeStore implements ResumeStore {
   logs = new Map<string, TrackLog>();
   state: unknown = null;
-  constructor(public resumed = false) {}
-  /** IndexedDB の保存先と同じく、使わない配列を省いて持つ(案件 59) */
   async putLog(id: string, log: TrackLog) { this.logs.set(id, storableLog(log)); }
   async deleteLog(id: string) { this.logs.delete(id); }
   async putState(state: unknown) { this.state = state; }
   async load() { return this.state === null ? null : { state: this.state, logs: new Map(this.logs) }; }
-  async forget() { this.logs.clear(); this.state = null; this.resumed = false; }
-  /** ほかのタブの保存(adoptLatest で引き継ぐもの) */
-  previous: { state: unknown; logs: Map<string, TrackLog> } | null = null;
-  async adoptLatest() {
-    const p = this.previous;
-    if (!p) return null;
-    this.previous = null;
-    this.state = p.state;
-    this.logs = new Map(p.logs);
-    return { state: p.state, logs: new Map(p.logs) };
-  }
+  async prune(keep: Iterable<string>) { const k = new Set(keep); for (const id of [...this.logs.keys()]) if (!k.has(id)) this.logs.delete(id); }
+  async forget() { this.logs.clear(); this.state = null; }
 }

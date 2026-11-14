@@ -9,7 +9,7 @@ import { mountApp, RESUME_SAVE_FAILED } from '../src/ui/app';
 import { ThemeController } from '../src/ui/theme';
 import { FakeMap } from './helpers';
 
-// Web 版の一時保存(案件 30): 同じタブの中の読み直しで、走行ログと画面の状態を元に戻す
+// Web 版・PWA 版の状態の保存(案件 30・60): 読み直したとき・閉じて開き直したときに、走行ログと画面の状態を元に戻す
 const fx = (n: string) => `fixtures/${n}`;
 const cln = readFileSync(fx('cl_autopolis.cln'), 'utf8');
 const sci = readFileSync(fx('autopolis.sci'), 'utf8');
@@ -28,16 +28,15 @@ function boot(opts: { resume?: ResumeStore | null; reload?: () => void } = {}) {
   app = mountApp(root, session, new ThemeController(store), () => new FakeMap(), { resume: resume, ...opts });
   return session;
 }
-/** 同じタブの中の読み直し(スリープ・アプリの切り替え・手での再読み込み) */
-function reloadSameTab() {
+/** 読み直し・開き直し(スリープ・アプリの切り替え・手での再読み込み・閉じて開き直す。保存はアプリ全体で 1 つ) */
+function reopen() {
   window.dispatchEvent(new Event('pagehide'));
-  resume.resumed = true;
   return boot();
 }
 const view = (v: string) => root.querySelector<HTMLElement>(`#view-${v}`)!;
 const nav = (v: string) => root.querySelector<HTMLButtonElement>(`[data-act="nav"][data-view="${v}"]`)!.click();
 
-beforeEach(() => { store = new MemoryStore(); resume = new MemoryResumeStore(false); });
+beforeEach(() => { store = new MemoryStore(); resume = new MemoryResumeStore(); });
 afterEach(() => { app?.dispose(); app = null; delete (window as { rllNative?: NativeBridge }).rllNative; });
 
 describe('Session の一時保存(resumeState / restoreResume)', () => {
@@ -60,7 +59,7 @@ describe('Session の一時保存(resumeState / restoreResume)', () => {
     expect(s2.sets[2].logs.map((l) => l.id)).toEqual(['a']);
     expect(s2.activeIndex).toBe(2);
     expect(s2.assignment.B).toEqual({ logId: 'a', lap: 1 });
-    expect(s2.message).toBe('前の画面の状態を元に戻しました。');
+    expect(s2.message).toBe('前回の状態を元に戻しました。');
   });
 
   it('中身の無い走行ログは飛ばし、その割り当ても戻さない。走行ログがすでにあれば何もしない', () => {
@@ -100,18 +99,18 @@ describe('画面の一時保存(Web 版)', () => {
     return s;
   }
 
-  it('同じタブで読み直すと、走行ログ・割り当てと、開いていた「比較」の画面に戻る', async () => {
+  it('読み直す・開き直すと、走行ログ・割り当てと、開いていた「比較」の画面に戻る', async () => {
     const s1 = await firstRun();
     const id = s1.logs[0].id;
     expect(resume.logs.has(id)).toBe(true);           // 走行ログは読み込んだときに保存
     nav('compare');
-    const s2 = reloadSameTab();
-    expect(s2.loading).toBe('前の画面の状態を元に戻しています…');
+    const s2 = reopen();
+    expect(s2.loading).toBe('前回の状態を元に戻しています…');
     await flush();
     expect(s2.loading).toBe('');
     expect(s2.logs.map((l) => l.id)).toEqual([id]);
     expect(s2.assignment.B).toEqual({ logId: id, lap: 1 });
-    expect(s2.message).toBe('前の画面の状態を元に戻しました。');
+    expect(s2.message).toBe('前回の状態を元に戻しました。');
     expect(view('compare').hidden).toBe(false);
   });
 
@@ -123,7 +122,7 @@ describe('画面の一時保存(Web 版)', () => {
     expect([saved.heading, saved.height, saved.longAcc, saved.latAcc]).toEqual([undefined, undefined, undefined, undefined]);
     expect(saved.t).toEqual(parseVbo(vbo, 'a.vbo').t);    // 間引かない(1 周分のログは、輪につなぐ前のまま)
     nav('compare');
-    const s2 = reloadSameTab();
+    const s2 = reopen();
     await flush();
     expect(s2.logs[0].laps.map((l) => l.duration)).toEqual(s1.logs[0].laps.map((l) => l.duration));
     expect(s2.assignment.B).toEqual({ logId: id, lap: 1 });
@@ -136,28 +135,36 @@ describe('画面の一時保存(Web 版)', () => {
     document.dispatchEvent(new Event('visibilitychange'));
     delete (document as { visibilityState?: string }).visibilityState;
     expect((resume.state as { view: string }).view).toBe('import');
-    resume.resumed = true;
     const s2 = boot();
     await flush();
     expect(s2.logs).toHaveLength(1);
     expect(view('import').hidden).toBe(false);
   });
 
-  it('新しいタブ(このタブで保存していない)では、初期状態で始まる', async () => {
-    await firstRun();
+  it('保存が無ければ(初めて開いたとき)、初期状態で始まる', async () => {
+    const s = boot();
+    await flush();
+    expect(s.logs).toHaveLength(0);
+    expect(s.loading).toBe('');
+    expect(s.message).toBe('');
+  });
+
+  it('元に戻したあと、どの比較セットにも使われていない走行ログは保存から消す', async () => {
+    const s1 = await firstRun();
+    const id = s1.logs[0].id;
     window.dispatchEvent(new Event('pagehide'));
-    resume.resumed = false;
+    await resume.putLog('orphan', s1.logs[0].log);     // 状態を保存する前に閉じた、などで残ったもの
     const s2 = boot();
     await flush();
-    expect(s2.logs).toHaveLength(0);
-    expect(s2.loading).toBe('');
+    expect(s2.logs.map((l) => l.id)).toEqual([id]);
+    expect([...resume.logs.keys()]).toEqual([id]);
   });
 
   it('走行ログを外すと、一時保存からも消える', async () => {
     const s1 = await firstRun();
     s1.removeLog(s1.logs[0].id);
     expect(resume.logs.size).toBe(0);
-    const s2 = reloadSameTab();
+    const s2 = reopen();
     await flush();
     expect(s2.logs).toHaveLength(0);
   });
@@ -182,7 +189,6 @@ describe('画面の一時保存(Web 版)', () => {
     window.dispatchEvent(new Event('pagehide'));     // 読み直すときの pagehide でも、保存し直さない
     expect(resume.state).toBeNull();
     expect(resume.logs.size).toBe(0);
-    expect(resume.resumed).toBe(false);
   });
 
   it('デスクトップ版(Electron)では使わない', async () => {

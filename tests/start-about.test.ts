@@ -65,13 +65,15 @@ describe('起動時の About', () => {
     expect(dialog()).toBeNull();
   });
 
-  it('Web 版の同じタブの読み直し(一時保存から戻すとき)では出ない', () => {
-    boot({ resume: new MemoryResumeStore(true) });
-    expect(dialog()).toBeNull();
+  it('前回の状態に戻すとき(読み直し・開き直し)も、設定どおりに出す(案件 60)', async () => {
+    const resume = new MemoryResumeStore();
+    await resume.putState({ ...new Session(store).resumeState(), view: 'import' });
+    boot({ resume });
+    expect(dialog()).not.toBeNull();
   });
 
   it('共有の画面から開いたときは出ない', () => {
-    boot({ resume: new MemoryResumeStore(false), sharedLaunch: true });
+    boot({ resume: new MemoryResumeStore(), sharedLaunch: true });
     expect(dialog()).toBeNull();
   });
 
