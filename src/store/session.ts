@@ -322,7 +322,7 @@ export class Session {
         this.applyAssignment(w, si, sv.assignment);
       });
       if (typeof st.active === 'number' && st.active >= 0 && st.active < SET_COUNT) this.activeIndex = st.active;
-      if (n) this.tell('前の画面の状態を元に戻しました。');
+      if (n) this.tell('前回の状態を元に戻しました。');
     } finally { this.restoring = false; this.loading = ''; }
     this.emit();
     return n;

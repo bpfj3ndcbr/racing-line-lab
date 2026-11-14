@@ -117,13 +117,14 @@ describe('共有の画面から受け取る(案件 45)', () => {
     expect(btns[0].textContent).not.toContain('(');
   });
 
-  it('共有で開いた新しい窓では、直前の窓の状態(走行ログと割り当て)を引き継いでから、追加する', async () => {
-    // 直前の窓: 比較セット1 に走行ログが 1 本
+  it('共有で開いた窓でも、保存した前回の状態(走行ログと割り当て)に戻してから、追加する(案件 60。保存はアプリ全体で 1 つ)', async () => {
+    // 前回: 比較セット1 に走行ログが 1 本
     const before = new Session(new MemoryStore());
     const log = parseVbo(vboText(), 'local.vbo');
     before.addLog(log, 'local', 0);
-    const resume = new MemoryResumeStore(false);
-    resume.previous = { state: JSON.parse(JSON.stringify({ ...before.resumeState(), view: 'compare' })), logs: new Map([['local', log]]) };
+    const resume = new MemoryResumeStore();
+    await resume.putState(JSON.parse(JSON.stringify({ ...before.resumeState(), view: 'compare' })));
+    await resume.putLog('local', log);
 
     const { session } = boot([file('rc.vbo', vboText())], { resume, sharedLaunch: true });
     await flush();
@@ -132,17 +133,17 @@ describe('共有の画面から受け取る(案件 45)', () => {
     setButtons()[0].click();
     await flush();
     expect(session.sets[0].logs).toHaveLength(2);
-    expect(resume.previous).toBeNull();                 // 引き継いだ分は、この窓のものになる
+    expect([...resume.logs.keys()].sort()).toEqual(['local', session.sets[0].logs[1].id].sort());     // 追加した分も保存する
   });
 
-  it('共有で開いたのでなければ、ほかの窓の状態は引き継がない', async () => {
-    const before = new Session(new MemoryStore());
-    before.addLog(parseVbo(vboText(), 'local.vbo'), 'local', 0);
-    const resume = new MemoryResumeStore(false);
-    resume.previous = { state: before.resumeState(), logs: new Map() };
-    const { session } = boot(null, { resume, sharedLaunch: false });
+  it('共有で開いた窓で、保存が無ければ、初期状態のまま追加する', async () => {
+    const resume = new MemoryResumeStore();
+    const { session } = boot([file('rc.vbo', vboText())], { resume, sharedLaunch: true });
     await flush();
-    expect(session.sets[0].logs).toHaveLength(0);
-    expect(resume.previous).not.toBeNull();
+    expect(setButtons()[0].textContent).not.toContain('走行ログ');     // どの比較セットも空
+    setButtons()[0].click();
+    await flush();
+    expect(session.sets[0].logs).toHaveLength(1);
+    expect(resume.logs.size).toBe(1);
   });
 });

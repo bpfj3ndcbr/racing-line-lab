@@ -107,7 +107,7 @@ describe('画面の知らせ', () => {
 
   it('更新して読み直したとき、前の画面に戻す切り替えでは知らせを消さない(「更新しました」が見える)', async () => {
     new Session(store).setSetting('seenVersion', '0.0.1');
-    const resume = new MemoryResumeStore(true);
+    const resume = new MemoryResumeStore();
     await resume.putState({ ...new Session(store).resumeState(), view: 'settings' });
     app?.dispose();
     document.body.innerHTML = '<div id="app"></div>';

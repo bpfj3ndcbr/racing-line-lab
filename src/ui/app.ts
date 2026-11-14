@@ -27,12 +27,12 @@ const INFO_ICON = '<svg class="ico" width="11" height="11" viewBox="0 0 16 16" a
 /** スマホを横向きにしたとき、比較以外の画面に重ねる案内のアイコン(縦向きのスマホ。表示は CSS の @media で決める。案件 46) */
 const PHONE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/></svg>';
 
-/** 一時保存(案件 30)に失敗したときの案内 */
-export const RESUME_SAVE_FAILED = '走行ログが大きいため、一時保存できませんでした(読み込み直されると元に戻りません)。';
+/** 状態の保存(案件 30・60)に失敗したときの案内 */
+export const RESUME_SAVE_FAILED = '走行ログが大きいため、保存できませんでした(次に開いたときに元に戻りません)。';
 
 /**
  * アプリ全体の枠: 上部バー(画面の切り替え・サーキット名・テーマ)と、使い方 / データ管理 / 比較 / 設定の 4 画面。
- * opts.resume: Web 版の一時保存の保存先(案件 30)。省略すると IndexedDB(使えなければ無し)。null で使わない。
+ * opts.resume: Web 版・PWA 版の状態の保存先(案件 30・60)。省略すると IndexedDB(使えなければ無し)。null で使わない。
  * デスクトップ版(window.rllNative がある)では使わない
  */
 export function mountApp(root: HTMLElement, session: Session, theme: ThemeController, mapFactory: MapFactory, opts: { reload?: () => void; resume?: ResumeStore | null; tiles?: TileStore | null; takeShared?: () => Promise<File[] | null>; sharedLaunch?: boolean; startupAbout?: boolean; updates?: UpdateWatcher | null } = {}): { dispose(): void } {
@@ -166,10 +166,10 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
   }
 
   // 前回の走行データの自動読み込み(Electron のみ。ファイルの場所を覚えているので読み直せる)
-  // Web 版の一時保存(案件 30)。同じタブの中の読み直し(スリープ・アプリの切り替え・手での再読み込み)で元に戻す
+  // Web 版・PWA 版の状態の保存(案件 30・60)。起動のたびに、前回の状態(走行ログ・割り当て・開いていた画面)に戻す
   const resume: ResumeStore | null = native ? null : opts.resume !== undefined ? opts.resume : openResumeStore();
   let forgotten = false;
-  /** 一時保存から元に戻し終わるまで(共有の画面から受け取ったファイルは、そのあとで追加する) */
+  /** 保存から元に戻し終わるまで(共有の画面から受け取ったファイルは、そのあとで追加する) */
   let restored: Promise<void> = Promise.resolve();
   let unhook = () => {};
   if (native && prefs.autoLoad) {
@@ -193,18 +193,17 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
     document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('pagehide', saveState);
     unhook = () => { document.removeEventListener('visibilitychange', onVisibility); window.removeEventListener('pagehide', saveState); session.logHooks = null; };
-    // 共有の画面から開いた新しい窓(案件 45): Android は窓を開き直すので、直前に使っていた窓の状態を引き継ぐ
-    const sharedLaunch = opts.sharedLaunch ?? isSharedLaunch();
-    const loadSaved = resume.resumed ? () => resume.load() : sharedLaunch ? () => resume.adoptLatest() : null;
-    if (loadSaved) {
-      session.setLoading('前の画面の状態を元に戻しています…');
-      restored = loadSaved().then((saved) => {
-        if (!saved) return;
+    // 保存はアプリ全体で 1 つ(案件 60)。共有の画面から開いた窓(案件 45)も、同じ保存を読む
+    session.setLoading('前回の状態を元に戻しています…');
+    restored = resume.load().then((saved) => {
+      if (saved) {
         session.restoreResume(saved.state, saved.logs);
         const v = (saved.state as { view?: unknown } | null)?.view;
         if (current === 'import' && (v === 'compare' || v === 'help' || v === 'settings')) autoNavigate(v);
-      }).catch(() => { /* 戻せなければ初期状態のまま */ }).finally(() => { if (session.loading) session.setLoading(''); });
-    }
+      }
+      // 元に戻さなかった走行ログ(保存の途中で閉じた・外したあとに残ったもの)は消す
+      void resume.prune(session.sets.flatMap((w) => w.logs.map((l) => l.id))).catch(() => { /* 次の機会に */ });
+    }).catch(() => { /* 戻せなければ初期状態のまま */ }).finally(() => { if (session.loading) session.setLoading(''); });
   }
 
   importApi = mountImportView(importEl, session, { onCompare: () => void leaveTo('compare'), onWorkChange: renderNav, mapFactory, theme, zoom: () => prefs.get('zoom').value as number });
@@ -226,8 +225,9 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
     opts.updates.subscribe(showWaiting);
     if (opts.updates.waiting) showWaiting();
   }
-  // 起動時の About(案件 49。main.ts だけが有効にする)。同じタブの読み直し(Web 版の一時保存から戻すとき)と、共有の画面から開いたときは出さない
-  if (opts.startupAbout && prefs.startAbout && !resume?.resumed && !(opts.sharedLaunch ?? isSharedLaunch())) {
+  // 起動時の About(案件 49。main.ts だけが有効にする)。設定の「起動時に About を表示する」に従う(読み直したときも。案件 60)。
+  // 共有の画面から開いたとき(ファイルを読み込みに来たとき)は出さない
+  if (opts.startupAbout && prefs.startAbout && !(opts.sharedLaunch ?? isSharedLaunch())) {
     void showAbout(document.body, (hide) => { prefs.setStartAbout(!hide); settingsApi?.refresh(); });
   }
   // Android の共有の画面から受け取ったファイル(案件 45。Web 版のみ)。元に戻し終わってから、データ管理で追加する
