@@ -25,8 +25,10 @@ export function findCrossings(log: TrackLog, line: GeoLine, opts: CrossingOption
   const minLon = Math.min(L.a.lon, L.b.lon) - pad, maxLon = Math.max(L.a.lon, L.b.lon) + pad;
   const { lat, lon, t, speed } = log;
   const all: Crossing[] = [];
+  const gaps = log.gaps?.length ? new Set(log.gaps) : null;   // 取り込まなかった区間をまたぐつなぎ目(案件 59)
 
   for (let k = 0; k < lat.length - 1; k++) {
+    if (gaps?.has(k + 1)) continue;
     const y0 = lat[k], y1 = lat[k + 1], x0 = lon[k], x1 = lon[k + 1];
     if ((y0 > maxLat && y1 > maxLat) || (y0 < minLat && y1 < minLat)) continue;
     if ((x0 > maxLon && x1 > maxLon) || (x0 < minLon && x1 < minLon)) continue;

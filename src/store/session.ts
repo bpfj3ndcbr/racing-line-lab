@@ -1,6 +1,6 @@
 import {
-  type Assignment, type Circuit, type GeoLine, type Lap, type LapRef, type LineCandidate, type MapView, type Offset, type Slot, type TrackLog,
-  SLOTS, clearLog, closeLoop, detectLapRun, emptyAssignment, findCrossings, lineCandidate, matchCircuit, matchLap, nameExists, parseCln, parseSci, parseVbo,
+  type Assignment, type Circuit, type GeoLine, type Lap, type LapRef, type LineCandidate, type MapView, type Offset, type Slot, type TrackLog, type TrimCut,
+  SLOTS, applyCuts, clearLog, closeLoop, detectLapRun, emptyAssignment, findCrossings, lineCandidate, matchCircuit, matchLap, nameExists, parseCln, parseSci, parseVbo,
   roundLine, toggleAssign,
 } from '../core';
 import type { KeyValueStore } from '../io/storage';
@@ -125,12 +125,15 @@ export class Session {
   private offsets: Record<string, Offset>;
   /** 「終端の調整」の値(ファイル → ラップ番号 → ラップ開始からの秒) */
   private lapEnds: Record<string, Record<string, number>>;
+  /** 取り込まない区間(案件 59。ファイル → 元のログの時刻の区間) */
+  private trims: Record<string, TrimCut[]>;
   private listeners = new Set<() => void>();
 
   constructor(private store: KeyValueStore) {
     this.circuits = readJson<Circuit[]>(store, 'circuits', []);
     this.offsets = readJson<Record<string, Offset>>(store, 'offsets', {});
     this.lapEnds = readJson<Record<string, Record<string, number>>>(store, 'lapEnds', {});
+    this.trims = readJson<Record<string, TrimCut[]>>(store, 'trims', {});
   }
 
   /** アプリを初期状態に戻す: 保存したものをすべて消す(画面は呼び出し側で読み直す) */
@@ -238,7 +241,7 @@ export class Session {
           try {
             if (!cache.has(f.id)) {
               const text = await read(f.path);
-              cache.set(f.id, text === null ? null : parseVbo(text, name));
+              cache.set(f.id, text === null ? null : this.trimmed(parseVbo(text, name), f.id));
             }
             const log = cache.get(f.id);
             if (!log) { failed.push(name); continue; }
@@ -327,7 +330,7 @@ export class Session {
   async addVboFile(file: File, path?: string, set?: number): Promise<void> {
     try {
       const id = `${file.name}:${file.size}`;
-      const log = this.knownLog(id) ?? parseVbo(await file.text(), file.name);
+      const log = this.knownLog(id) ?? this.trimmed(parseVbo(await file.text(), file.name), id);
       if (path) this.paths.set(id, path);
       this.addLog(log, id, set);
     } catch (e) {
@@ -486,6 +489,23 @@ export class Session {
     this.saveLapEnds();
     for (const w of this.sets) { const l = w.logs.find((x) => x.id === id); if (l) this.computeLaps(l); }
     this.emit();
+  }
+  /** ファイル id の取り込まない区間(案件 59。無ければ空) */
+  trimOf(id: string): TrimCut[] { return (this.trims[id] ?? []).map((c) => ({ ...c })); }
+  /**
+   * ファイル id の取り込まない区間を保存する(空で消す)。次にそのファイルを読み込むときから当てはめる
+   * (デスクトップ版の前回のファイルの読み直しも)。読み込み済みのログは変えない
+   */
+  setTrim(id: string, cuts: readonly TrimCut[]): void {
+    const list = cuts.map((c) => ({ from: Math.round(c.from * 10) / 10, to: Math.round(c.to * 10) / 10 })).filter((c) => c.to > c.from);
+    if (list.length) this.trims[id] = list; else delete this.trims[id];
+    this.store.set('trims', JSON.stringify(this.trims));
+  }
+  /** 解析したばかりのログに、保存した取り込み範囲を当てはめる(当てはめられなければ、そのまま) */
+  private trimmed(log: TrackLog, id: string): TrackLog {
+    const cuts = this.trims[id];
+    if (!cuts?.length) return log;
+    try { return applyCuts(log, cuts); } catch { return log; }
   }
   /** ラップ番号 lap の「終端の調整」の値(調整していなければ null) */
   lapEnd(id: string, lap: number): number | null { return this.lapEnds[id]?.[lap] ?? null; }

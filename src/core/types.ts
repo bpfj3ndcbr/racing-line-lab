@@ -19,7 +19,7 @@ export interface TrackLog {
   sessionName?: string;
   /** [laptiming] の計測ライン(Start / Split)。無ければ undefined */
   laptiming?: TimingLine[];
-  /** 秒(先頭=0、単調増加。日跨ぎは補正済み) */
+  /** 秒(先頭=0、単調増加。日跨ぎは補正済み。取り込まなかった区間があると、その所で飛ぶ) */
   t: Float64Array;
   lat: Float64Array;
   lon: Float64Array;
@@ -34,6 +34,11 @@ export interface TrackLog {
    * 0〜n-1 番が元のログ、n 番以降がつないだ部分。period は 1 周の時間(秒)
    */
   loop?: { n: number; period: number };
+  /**
+   * 取り込まなかった区間(案件 59)をはさむ、サンプルのつなぎ目。i があれば、i-1 番と i 番のあいだは連続していない
+   * (時刻が飛ぶ)。計測ラインの通過には数えない
+   */
+  gaps?: number[];
 }
 
 export interface Lap {
