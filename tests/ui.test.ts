@@ -272,11 +272,24 @@ describe('登録済みサーキットのタブ', () => {
     expect(tabBtn('list').getAttribute('aria-selected')).toBe('true');
     expect(root.querySelector<HTMLElement>('#panel-list')!.hidden).toBe(false);
     expect(root.querySelector<HTMLElement>('#panel-reg')!.hidden).toBe(true);
+    // 案件 66: 一覧は 1 行 1 件(選ぶラジオボタン)。操作のボタンは選んでいる 1 件分だけ、一覧の下に 1 か所
     const items = root.querySelectorAll('#circuit-list .citem');
     expect(items).toHaveLength(2);
-    const labels = Array.from(items[0].querySelectorAll('button')).map((b) => b.textContent);
-    expect(labels).toEqual(['編集(地図)…', '名前を変更', 'コントロールラインの再読み込み', 'セクターの再読み込み', '削除']);
+    expect(items[0].querySelector('input[type="radio"]')).not.toBeNull();
     expect(items[0].textContent).toContain('セクター 7 本');
+    const ops = root.querySelector<HTMLElement>('#circuit-list .cops')!;
+    const labels = Array.from(ops.querySelectorAll('button')).map((b) => b.textContent);
+    expect(labels).toEqual(['編集(地図)…', '名前を変更', 'コントロールラインの再読み込み', 'セクターの再読み込み', '削除']);
+    expect(root.querySelectorAll('#circuit-list [data-act="del-circuit"]')).toHaveLength(1);
+  });
+
+  it('一覧で選ぶサーキットが替わると、操作の欄のボタンもそのサーキットを指す', () => {
+    const second = root.querySelectorAll<HTMLInputElement>('#circuit-list .citem input')[1];
+    second.checked = true;
+    second.dispatchEvent(new Event('change', { bubbles: true }));
+    const ops = root.querySelector<HTMLElement>('#circuit-list .cops')!;
+    expect(ops.querySelector('.badge')!.textContent).toBe('鈴鹿');
+    expect(ops.querySelector('[data-act="del-circuit"]')!.getAttribute('data-id')).toBe(session.circuits[1].id);
   });
 
   it('←→ キーでタブを切り替えられる', () => {
@@ -286,8 +299,24 @@ describe('登録済みサーキットのタブ', () => {
     expect(tabBtn('reg').getAttribute('aria-selected')).toBe('true');
   });
 
-  it('削除', () => {
+  it('削除: 名前を示して確かめ、キャンセルなら消さない', async () => {
     root.querySelector<HTMLButtonElement>('[data-act="del-circuit"]')!.click();
+    await flush();
+    expect(dlg()!.textContent).toContain('サーキット「オートポリス」を削除しますか?');
+    expect(dlgBtn('ok').classList.contains('pri')).toBe(true);   // 青い既定は「削除する」(利用者の希望)
+    expect(document.activeElement).toBe(dlgBtn('ok'));
+    dlgBtn('cancel').click();
+    await flush();
+    expect(dlg()).toBeNull();
+    expect(session.circuits.map((c) => c.name)).toEqual(['オートポリス', '鈴鹿']);
+  });
+
+  it('削除: 「削除する」を押したときだけ消す', async () => {
+    root.querySelector<HTMLButtonElement>('[data-act="del-circuit"]')!.click();
+    await flush();
+    dlgBtn('ok').click();
+    await flush();
+    expect(dlg()).toBeNull();
     expect(session.circuits.map((c) => c.name)).toEqual(['鈴鹿']);
   });
 

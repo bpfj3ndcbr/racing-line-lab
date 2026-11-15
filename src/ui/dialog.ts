@@ -91,14 +91,16 @@ export function alertDialog(o: Base & { ok?: string }, host: HTMLElement = docum
 
 /**
  * はい / いいえ を選んでもらうダイアログ。ok を押せば true、cancel・Esc なら false。
- * 初めは cancel(取り消せない操作をしない側)にフォーカスする。ok は左、cancel は右の青いボタン
+ * 初めは cancel(取り消せない操作をしない側)にフォーカスする。ok は左、cancel は右の青いボタン。
+ * primary: 青い既定のボタン(初めにフォーカスする側)。省くと cancel。
  */
-export function confirmDialog(o: Base & { ok: string; cancel: string }, host: HTMLElement = document.body): Promise<boolean> {
+export function confirmDialog(o: Base & { ok: string; cancel: string; primary?: 'ok' | 'cancel' }, host: HTMLElement = document.body): Promise<boolean> {
   return open<boolean>((box, close) => {
     head(box, o);
-    const ok = button(o.ok);
+    const okIsPrimary = o.primary === 'ok';
+    const ok = button(o.ok, okIsPrimary ? 'pri' : '');
     ok.dataset.dialog = 'ok';
-    const cancel = button(o.cancel, 'pri');
+    const cancel = button(o.cancel, okIsPrimary ? '' : 'pri');
     cancel.dataset.dialog = 'cancel';
     ok.addEventListener('click', () => close(true));
     cancel.addEventListener('click', () => close(false));
@@ -106,7 +108,7 @@ export function confirmDialog(o: Base & { ok: string; cancel: string }, host: HT
     row.className = 'modal-actions';
     row.append(ok, cancel);
     box.appendChild(row);
-    return { focus: cancel };
+    return { focus: okIsPrimary ? ok : cancel };
   }, false, host);
 }
 
