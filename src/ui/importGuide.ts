@@ -26,7 +26,7 @@ export function createGuide(el: HTMLElement, session: Session, actions: ImportAc
     const pri = (act: string) => act === 'guide-add' || act === 'guide-cand' || (act === 'guide-map' && !candLog) || act === 'guide-auto' || act === 'guide-compare';
     const btn = (act: string, label: string, extra = '') => `<button class="btn sm${pri(act) ? ' pri' : ''}" data-act="${act}" data-fk="${act}"${extra}>${label}</button>`;
     const steps = [
-      { t: 'ログを追加', d: 'RaceChrono などの .vbo ファイルを、比較セットの枠のドロップ欄にドラッグ&ドロップします。',
+      { t: 'ログを追加', d: 'RaceChrono などの .vbo ファイルを、「走行ログを追加」のボタンで選びます。',
         b: btn('guide-add', '走行ログ(.vbo)を追加…') },
       { t: 'サーキットを用意', d: '計測ライン(ゴールライン)を決めて、サーキットを登録します(1 回だけ)。走行ログに計測ラインの情報があれば、それを使えます。無ければ地図の上で引くか、.cln / .sci ファイルで登録します。',
         b: (candLog ? btn('guide-cand', 'ログの計測ラインで登録…') : '') + btn('guide-map', '地図で登録…') + btn('guide-file', '.cln / .sci ファイルで登録…')

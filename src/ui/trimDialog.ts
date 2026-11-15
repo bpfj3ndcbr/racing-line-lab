@@ -121,6 +121,7 @@ export function trimDialog(log: TrackLog, deps: TrimDialogDeps = {}, host: HTMLE
     box.classList.add('wide', 'tr');
     const step = deps.total && deps.total > 1 ? `<span class="tr-step">${deps.step ?? 1} / ${deps.total}</span>` : '';
     box.innerHTML = `<div class="tr-h"><h3 id="tr-t">走行ログの取り込み範囲</h3>${step}</div>
+      <div class="tr-body">
       <div class="tr-file"></div>
       <p class="tr-desc"></p>
       <div class="tr-main">
@@ -131,6 +132,7 @@ export function trimDialog(log: TrackLog, deps: TrimDialogDeps = {}, host: HTMLE
           <div class="tr-cap"><span class="tr-det-cap"></span><span class="tr-det-r"><span class="tr-hint" role="status"></span><button type="button" class="btn sm tr-add" data-trim="include" title="選んだ取り込まない区間を、取り込む範囲にします(前後の範囲とは 1 つにつなぎます)">取り込み範囲にする</button><button type="button" class="btn sm tr-add" data-trim="split" title="グラフで押した位置に 1 分の取り込まない区間を入れて、2 つに分けます">範囲を分ける</button></span></div>
           <div class="tr-edges">${EDGES.map((e) => `<div class="tr-edge" data-edge="${e}"><div class="tr-cap"><span><span class="tr-e-l"></span> <b class="tr-e-t"></b></span><span>表示の幅 ${EDGE_WIN_SEC / 60} 分</span></div><div class="tr-g tr-zoom"></div></div>`).join('')}</div>
         </div>
+      </div>
       </div>
       <div class="modal-actions tr-actions"><button type="button" class="btn" data-trim="abort">全ての読み込みを止める</button><button type="button" class="btn" data-trim="skip">このファイルの読み込みを止める</button><span class="sp"></span><button type="button" class="btn pri" data-trim="next">次へ</button></div>`;
     box.setAttribute('aria-labelledby', 'tr-t');

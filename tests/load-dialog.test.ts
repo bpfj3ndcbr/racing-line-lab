@@ -69,10 +69,11 @@ beforeEach(() => {
   mountApp(root, session, new ThemeController(new MemoryStore()), () => { const m = new FakeMap(); maps.push(m); return m; });
 });
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
-function drop(set: number, files: File[]) {
-  const e = new Event('drop', { bubbles: true, cancelable: true });
-  Object.defineProperty(e, 'dataTransfer', { value: { files, types: ['Files'] } });
-  root.querySelector(`#sec-set-${set} .dropbox`)!.dispatchEvent(e);
+function addFiles(set: number, files: File[]) {
+  root.querySelector<HTMLButtonElement>(`#sec-set-${set} [data-act="add"]`)!.click();
+  const inp = root.querySelector<HTMLInputElement>('#vbo-input')!;
+  Object.defineProperty(inp, 'files', { value: files, configurable: true });
+  inp.dispatchEvent(new Event('change', { bubbles: true }));
 }
 const dialog = () => document.querySelector<HTMLElement>('.modal.ld');
 /** 読み込みの確認のプレビューの地図(先に出る取り込み範囲の画面の地図は、閉じたときに片付く) */
@@ -90,14 +91,14 @@ const ok = () => $<HTMLButtonElement>('.modal.ld [data-dialog="ok"]');
 describe('読み込みの確認ダイアログ', () => {
   it('全部判定できたときは出さない', async () => {
     session.registerCircuit('サーキットA', formatCln([northLine(A)]), '');
-    drop(0, [file('a.vbo', vboText(A, false))]);
+    addFiles(0, [file('a.vbo', vboText(A, false))]);
     await flush();
     expect(session.sets[0].logs).toHaveLength(1);
     expect(dialog()).toBeNull();
   });
 
   it('判定できないログがあれば出す。計測ラインは全体で 1 つを選び、各ファイルには、選んだ線を通るかを出す', async () => {
-    drop(0, [file('rc.vbo', vboText(A, true)), file('plain.vbo', vboText(A, false)), file('far.vbo', vboText(B, true, '遠いサーキット'))]);
+    addFiles(0, [file('rc.vbo', vboText(A, true)), file('plain.vbo', vboText(A, false)), file('far.vbo', vboText(B, true, '遠いサーキット'))]);
     await flush();
     expect(dialog()).not.toBeNull();
     // 初期値は、通るログが最も多い候補(rc.vbo の計測ライン)
@@ -125,7 +126,7 @@ describe('読み込みの確認ダイアログ', () => {
   });
 
   it('「あとで」(Esc)なら、未判定のまま', async () => {
-    drop(0, [file('rc.vbo', vboText(A, true))]);
+    addFiles(0, [file('rc.vbo', vboText(A, true))]);
     await flush();
     pick('later');
     ok().click();
@@ -136,7 +137,7 @@ describe('読み込みの確認ダイアログ', () => {
   });
 
   it('右上に、選んだ計測ラインのプレビュー(計測ラインと、その付近の走行ライン)を出す。「セクター」で範囲を広げる。地図・あとでを選ぶとプレビューは無し', async () => {
-    drop(0, [file('rc.vbo', vboText(A, true)), file('plain.vbo', vboText(A, false))]);
+    addFiles(0, [file('rc.vbo', vboText(A, true)), file('plain.vbo', vboText(A, false))]);
     await flush(); await flush();
     const prev = maps.at(-1)!;
     expect(prev.lines.map((l) => l.label)).toEqual(['計測ライン']);
@@ -160,7 +161,7 @@ describe('読み込みの確認ダイアログ', () => {
   });
 
   it('候補で登録: 登録画面は開かずにその場で登録し、通るログもまとめて判定される(比較セットのサーキットになる)', async () => {
-    drop(0, [file('rc.vbo', vboText(A, true)), file('plain.vbo', vboText(A, false))]);
+    addFiles(0, [file('rc.vbo', vboText(A, true)), file('plain.vbo', vboText(A, false))]);
     await flush();
     const name = $<HTMLInputElement>('#ld-name');
     name.value = '';
@@ -182,14 +183,14 @@ describe('読み込みの確認ダイアログ', () => {
 
   it('登録済みと同じ名前は使えない', async () => {
     session.registerCircuit('テストサーキット', formatCln([northLine(B)]), '');
-    drop(0, [file('rc.vbo', vboText(A, true))]);
+    addFiles(0, [file('rc.vbo', vboText(A, true))]);
     await flush();
     expect(ok().disabled).toBe(true);
     expect($('#ld-name-msg').textContent).toContain('既に名前が存在します');
   });
 
   it('地図で登録: 登録画面が開き(A〜D のカードは隠れる)、登録するとそのサーキットが比較セットのサーキットになる', async () => {
-    drop(0, [file('plain.vbo', vboText(A, false))]);
+    addFiles(0, [file('plain.vbo', vboText(A, false))]);
     await flush();
     expect($('.ld-cur').textContent).toContain('地図で計測ラインを引いて登録');      // 候補が無ければ、地図が初期値
     ok().click();
@@ -211,7 +212,7 @@ describe('読み込みの確認ダイアログ', () => {
   it('空のセットに 2 つのサーキットのログを読み込むと出す。「登録済みのサーキット」の行で選ぶと、そのサーキットを使う', async () => {
     session.registerCircuit('サーキットA', formatCln([northLine(A)]), '');
     session.registerCircuit('サーキットB', formatCln([northLine(B)]), '');
-    drop(0, [file('a.vbo', vboText(A, false)), file('b1.vbo', vboText(B, false)), file('b2.vbo', vboText(B, false))]);
+    addFiles(0, [file('a.vbo', vboText(A, false)), file('b1.vbo', vboText(B, false)), file('b2.vbo', vboText(B, false))]);
     await flush();
     expect($('.ld-cur').textContent).toContain('登録済みのサーキット: サーキットB');        // 通るログが多い方が初期値
     expect(statusOf('a.vbo')).toBe('選択中の計測ラインを通りません(ラップ無し)');
@@ -228,9 +229,9 @@ describe('読み込みの確認ダイアログ', () => {
 
   it('サーキットが決まったセットに、通らないログを足すと、ダイアログは出さずにラップ無しで入る(枠に説明)', async () => {
     session.registerCircuit('サーキットA', formatCln([northLine(A)]), '');
-    drop(0, [file('a.vbo', vboText(A, false))]);
+    addFiles(0, [file('a.vbo', vboText(A, false))]);
     await flush();
-    drop(0, [file('b.vbo', vboText(B, true))]);
+    addFiles(0, [file('b.vbo', vboText(B, true))]);
     await flush();
     expect(dialog()).toBeNull();
     const b = session.sets[0].logs[1];
@@ -257,14 +258,14 @@ describe('計測ラインの修正(案件 15)', () => {
   const key = (k: string, shiftKey = false) =>
     fixEl().dispatchEvent(new KeyboardEvent('keydown', { key: k, shiftKey, bubbles: true, cancelable: true }));
   async function openFix() {
-    drop(0, [file('rc.vbo', vboText(A, true)), file('plain.vbo', vboText(A, false))]);
+    addFiles(0, [file('rc.vbo', vboText(A, true)), file('plain.vbo', vboText(A, false))]);
     await flush(); await flush();
     $<HTMLButtonElement>('.ld-prev-fix').click();
     return maps.at(-1)!;
   }
 
   it('「計測ラインを修正」は候補を選んだときだけ。押すと、ダイアログの中身が修正の画面に切り替わる', async () => {
-    drop(0, [file('rc.vbo', vboText(A, true))]);
+    addFiles(0, [file('rc.vbo', vboText(A, true))]);
     await flush(); await flush();
     expect($('.ld-prev-fix').hidden).toBe(false);
     expect($('.ld-cur').textContent).toContain('計測ライン: ファイルのまま(修正なし)');
@@ -415,7 +416,7 @@ describe('セクターの修正・追加(案件 17)', () => {
     return Math.round(((Math.atan2((c.lat - A.lat) * m.lat, (c.lon - A.lon) * m.lon) * 180) / Math.PI + 360) % 360);
   };
   async function openSectors(splits = [270, 180]) {
-    drop(0, [file('rc.vbo', vboText(A, true, 'テストサーキット', splits))]);
+    addFiles(0, [file('rc.vbo', vboText(A, true, 'テストサーキット', splits))]);
     await flush(); await flush();
     btn('.ld-prev-mode [data-zoom="all"]').click();
     btn('.ld-prev-fix').click();
@@ -449,7 +450,7 @@ describe('セクターの修正・追加(案件 17)', () => {
   });
 
   it('「計測ラインを修正」から開いたときは、計測ラインを選んだ状態', async () => {
-    drop(0, [file('rc.vbo', vboText(A, true, 'テストサーキット', [180]))]);
+    addFiles(0, [file('rc.vbo', vboText(A, true, 'テストサーキット', [180]))]);
     await flush(); await flush();
     btn('.ld-prev-fix').click();
     expect(names()).toEqual(['計測ライン', 'S1']);
@@ -535,7 +536,7 @@ describe('セクターの修正・追加(案件 17)', () => {
   });
 
   it('セクターの無い候補(計算した計測ライン)でも、セクターを足して登録できる', async () => {
-    drop(0, [file('loop.vbo', vboText(A, false, '', [], 360))]);                     // 1 周分だけのログ(計測ラインを計算する)
+    addFiles(0, [file('loop.vbo', vboText(A, false, '', [], 360))]);                     // 1 周分だけのログ(計測ラインを計算する)
     await flush(); await flush();
     expect($('.ld-cur').textContent).toContain('計算した計測ライン');
     expect($('.ld-cur').textContent).toContain('セクター: なし');
@@ -560,7 +561,7 @@ describe('読み込みの取り消し(案件 22)', () => {
   const esc = () => dialog()!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
 
   it('読み込んだ直後の確認画面に「読み込みを取り消す」が出て、押すと、いま読み込んだログを外して閉じる', async () => {
-    drop(0, [file('rc.vbo', vboText(A, true)), file('b.vbo', vboText(B, true, 'サーキットB'))]);
+    addFiles(0, [file('rc.vbo', vboText(A, true)), file('b.vbo', vboText(B, true, 'サーキットB'))]);
     await flush(); await flush();
     expect(dialog()).not.toBeNull();
     expect(undoBtn()!.hidden).toBe(false);
@@ -574,13 +575,13 @@ describe('読み込みの取り消し(案件 22)', () => {
   });
 
   it('前から入っていたログは残す。Esc は今までどおり「あとで」(読み込みは残る)', async () => {
-    drop(0, [file('rc.vbo', vboText(A, true))]);
+    addFiles(0, [file('rc.vbo', vboText(A, true))]);
     await flush(); await flush();
     esc();
     await flush();
     expect(dialog()).toBeNull();
     expect(session.sets[0].logs.map((l) => l.log.fileName)).toEqual(['rc.vbo']);
-    drop(0, [file('b.vbo', vboText(B, true, 'サーキットB'))]);
+    addFiles(0, [file('b.vbo', vboText(B, true, 'サーキットB'))]);
     await flush(); await flush();
     undoBtn()!.click();
     await flush();
@@ -589,7 +590,7 @@ describe('読み込みの取り消し(案件 22)', () => {
   });
 
   it('修正の画面を開いている間は出さない', async () => {
-    drop(0, [file('rc.vbo', vboText(A, true))]);
+    addFiles(0, [file('rc.vbo', vboText(A, true))]);
     await flush(); await flush();
     $<HTMLButtonElement>('.ld-prev-fix').click();
     expect(undoBtn()!.hidden).toBe(true);
@@ -598,7 +599,7 @@ describe('読み込みの取り消し(案件 22)', () => {
   });
 
   it('ログの枠の「ログの計測ラインで登録…」から開いたとき(前に読み込んだログ)は出さない', async () => {
-    drop(0, [file('rc.vbo', vboText(A, true))]);
+    addFiles(0, [file('rc.vbo', vboText(A, true))]);
     await flush(); await flush();
     esc();
     await flush();
@@ -615,7 +616,7 @@ describe('修正の画面の、反映し忘れの確認(案件 23)', () => {
   const confirmBtn = (k: 'ok' | 'cancel') => document.querySelector<HTMLButtonElement>(`.modal:not(.ld) [data-dialog="${k}"]`)!;
   const escFix = () => fixEl().dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
   async function open() {
-    drop(0, [file('rc.vbo', vboText(A, true, 'テストサーキット', [180]))]);
+    addFiles(0, [file('rc.vbo', vboText(A, true, 'テストサーキット', [180]))]);
     await flush(); await flush();
     $<HTMLButtonElement>('.ld-prev-fix').click();
   }

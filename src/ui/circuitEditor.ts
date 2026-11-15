@@ -40,8 +40,6 @@ export function mountCircuitEditor(root: HTMLElement, session: Session, deps: Ci
         <div class="ce-head">
           <span class="ce-head-t" id="ce-title">サーキットの登録</span><span class="ce-head-s">計測ライン・セクターの設定</span><span class="grow"></span>
           <label class="ce-head-name"><span>サーキット名:</span><input id="ce-name" type="text" placeholder="例: オートポリス" aria-label="サーキット名"></label>
-          <button class="btn pri" id="ce-save" data-act="ce-save">登録完了</button>
-          <button class="btn" id="ce-cancel" data-act="ce-cancel">キャンセル</button>
         </div>
         <div class="map" id="ce-map"></div>
         <div class="map-ov corr-pad-map" id="ce-pad-map" role="group" aria-label="矢印で動かす(地図の上)" hidden>
@@ -106,6 +104,10 @@ export function mountCircuitEditor(root: HTMLElement, session: Session, deps: Ci
           </div>
         </section>
         <div class="sub">地図を動かして拡大率と位置を決めてください。いま地図に出ている範囲が、このサーキットの表示位置として保存されます。</div>
+        <div class="fix-foot">
+          <button class="btn pri" id="ce-save" data-act="ce-save">登録完了</button>
+          <button class="btn" id="ce-cancel" data-act="ce-cancel">キャンセル</button>
+        </div>
       </aside>
     </div>`;
 

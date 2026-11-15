@@ -118,11 +118,6 @@ ${SETS_HTML}
   });
   root.addEventListener('keyup', (e) => { if ((e.target as HTMLElement).closest('.alias-input')) e.stopPropagation(); });
   root.addEventListener('click', (e) => sets.onClickGuard(e));   // 見出しの別名の操作・タブのときの見出しでは、折りたたみを開閉しない
-  // ドロップ枠の Enter / Space は、クリックと同じ
-  root.addEventListener('keydown', (e) => {
-    const box = (e.target as HTMLElement).closest<HTMLElement>('.dropbox');
-    if (box && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); box.click(); }
-  });
   // タブのキーボード操作(←→ / Home / End)
   root.addEventListener('keydown', (e) => {
     if ((e.target as HTMLElement).closest('[role="tab"]')) circuits.onTabKey(e);
@@ -139,25 +134,6 @@ ${SETS_HTML}
       await addFiles(files, target);
       vboInput.value = '';
     }
-  });
-
-  // ---------- .vbo のドラッグ&ドロップ(開いているセットの追加の枠に、正確に落としたときだけ追加する) ----------
-  const boxOf = (e: Event) => (e.target as HTMLElement | null)?.closest?.<HTMLElement>('.dropbox') ?? null;
-  const hasFiles = (e: DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes('Files');
-  root.addEventListener('dragover', (e) => {
-    const box = boxOf(e);
-    if (!box || !hasFiles(e)) return;
-    e.preventDefault();
-    box.classList.add('over');
-  });
-  root.addEventListener('dragleave', (e) => { boxOf(e)?.classList.remove('over'); });
-  root.addEventListener('drop', async (e) => {
-    const box = boxOf(e);
-    if (!box) return;
-    e.preventDefault();
-    box.classList.remove('over');
-    const files = Array.from(e.dataTransfer?.files ?? []);
-    await addFiles(files, Number(box.dataset.set ?? 0));
   });
 
   /** .vbo だけを選んで、そのセットに追加する(2 つ以上なら、ベストラップを空き枠に順に割り当てる) */

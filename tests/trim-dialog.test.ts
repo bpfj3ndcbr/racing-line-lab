@@ -399,15 +399,16 @@ describe('ファイルの追加で、取り込み範囲の画面を 1 本ずつ�
     session = new Session(store);
     mountApp(document.getElementById('app')!, session, new ThemeController(new MemoryStore()), () => new FakeMap());
   });
-  function drop(set: number, files: File[]) {
-    const e = new Event('drop', { bubbles: true, cancelable: true });
-    Object.defineProperty(e, 'dataTransfer', { value: { files, types: ['Files'] } });
-    document.querySelector(`#sec-set-${set} .dropbox`)!.dispatchEvent(e);
+  function addFiles(set: number, files: File[]) {
+    document.querySelector<HTMLButtonElement>(`#sec-set-${set} [data-act="add"]`)!.click();
+    const inp = document.querySelector<HTMLInputElement>('#vbo-input')!;
+    Object.defineProperty(inp, 'files', { value: files, configurable: true });
+    inp.dispatchEvent(new Event('change', { bubbles: true }));
   }
   const B = vboText([[50, 0], [300, 80], [100, 0]]);
 
   it('「次へ」で、取り込まない区間を保存して、切り取ったログを追加する', async () => {
-    drop(0, [file('a.vbo', STOPS), file('b.vbo', B)]);
+    addFiles(0, [file('a.vbo', STOPS), file('b.vbo', B)]);
     await flush();
     expect($('.tr-step').textContent).toBe('1 / 2');
     expect($('.tr-file').textContent).toContain('a.vbo');
@@ -423,7 +424,7 @@ describe('ファイルの追加で、取り込み範囲の画面を 1 本ずつ�
   });
 
   it('「このファイルの読み込みを止める」はそのファイルだけ、「全ての読み込みを止める」は 1 本も追加しない', async () => {
-    drop(0, [file('a.vbo', STOPS), file('b.vbo', B)]);
+    addFiles(0, [file('a.vbo', STOPS), file('b.vbo', B)]);
     await flush();
     act('skip');
     await flush();
@@ -432,7 +433,7 @@ describe('ファイルの追加で、取り込み範囲の画面を 1 本ずつ�
     expect(session.sets[0].logs.map((l) => l.id)).toEqual([`b.vbo:${B.length}`]);
     expect(session.message).toBe('1 件の走行ログは読み込みませんでした。');
 
-    drop(1, [file('a.vbo', STOPS), file('c.vbo', B + '\r\n')]);
+    addFiles(1, [file('a.vbo', STOPS), file('c.vbo', B + '\r\n')]);
     await flush();
     act('next');
     await flush();
@@ -443,11 +444,11 @@ describe('ファイルの追加で、取り込み範囲の画面を 1 本ずつ�
   });
 
   it('ほかの比較セットに読み込み済みのファイルは、画面を出さずに同じ中身で追加する', async () => {
-    drop(0, [file('a.vbo', STOPS)]);
+    addFiles(0, [file('a.vbo', STOPS)]);
     await flush();
     act('next');
     await flush();
-    drop(1, [file('a.vbo', STOPS)]);
+    addFiles(1, [file('a.vbo', STOPS)]);
     await flush();
     expect(q('.modal.tr')).toBeNull();
     expect(session.sets[1].logs[0].log).toBe(session.sets[0].logs[0].log);
