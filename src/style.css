@@ -26,6 +26,7 @@
   --warn: #8a5a00;
   --alert: #c62828;        /* 通知(読み込めなかったなど)の地色(案件 53) */
   --alert-on: #ffffff;
+  --danger: #b3261e;       /* 削除など、取り返しのつかない操作のボタンの文字・枠(案件 66) */
   --focus: #1f6fd1;
   --row-assigned: #e2edfb;
   --set-open-head: color-mix(in srgb, var(--accent) 14%, var(--surface));   /* 開いた比較セットの見出しの行(案件 27。% で濃さを調整) */
@@ -64,6 +65,7 @@
   --warn: #ffc83d;
   --alert: #ff6b6b;
   --alert-on: #2b0d0d;
+  --danger: #ff8a80;
   --focus: #6cb6ff;
   --row-assigned: #2f3b4a;
   --set-open-head: color-mix(in srgb, var(--accent) 30%, var(--surface));
@@ -214,12 +216,21 @@ select{min-height:44px;padding:0 10px;background:var(--surface);border:1px solid
   border:1px solid var(--border-strong);border-radius:var(--r-m)}
 .tab-body[hidden]{display:none}
 
-/* 登録済みサーキットの一覧 */
-.clist{list-style:none;margin:0;padding:0;border:1px solid var(--cell-line);border-radius:var(--r-m);overflow:hidden}
-.citem{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid var(--cell-line)}
+/* 登録済みサーキットの一覧(案件 66): 1 行 1 件。一覧だけをスクロールし、下の操作の欄は動かさない */
+.clist{margin:0;max-height:202px;overflow-y:auto;   /* 5 行ぶん(1 行 40px × 5 + 枠 2px)。6 件目からスクロール */
+overscroll-behavior:contain;border:1px solid var(--cell-line);border-radius:var(--r-m)}
+.citem{display:flex;align-items:center;gap:10px;min-height:40px;padding:6px 12px;border-bottom:1px solid var(--cell-line);cursor:pointer}
 .citem:last-child{border-bottom:0}
-.cinfo{flex:1;min-width:180px;display:flex;flex-direction:column}
-.cact{display:flex;gap:8px;flex-wrap:wrap}
+.citem input{margin:0;width:16px;height:16px;flex:none;accent-color:var(--accent)}
+.citem .cname{flex:1;min-width:0;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.citem .sub{white-space:nowrap}
+/* 選んでいるサーキットの操作の欄: ボタンは同じ格子に並ぶ(幅に応じて、PC は 1 行・スマホは 2 列)。
+   削除は同じ格子の右端の列に置き、目立ちすぎないよう小さく、文字と枠を赤系にする(案件 66) */
+.cops{margin-top:12px;padding:12px;display:flex;flex-direction:column;gap:10px;border:1px solid var(--border-strong);border-radius:var(--r-m);background:var(--surface-2)}
+.cops-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.cact{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}   /* PC は 1 行(スマホは下の @media で 2 列) */
+.cact .btn{justify-content:center;text-align:center;white-space:normal;word-break:keep-all;line-height:1.3;min-height:44px;padding:6px 4px;font-size:12px}   /* 3 列の幅に収めるため左右の余白は小さく。「コントロールライン」は <wbr> の位置で折る */
+.cact .btn.del{grid-column:-2 / -1;align-self:center;min-height:32px;padding:4px 8px;color:var(--danger);border-color:var(--danger)}   /* 格子の右端の列 */
 
 /* ダイアログ */
 .modal-back{position:fixed;inset:0;z-index:2000;   /* 地図(Leaflet の部品 400〜1000、地図の上のボタン 1100)より上に出す */display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.45)}
@@ -654,13 +665,13 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .sets-group-sub{font-size:11px;color:var(--muted)}
 .sets-group .set-sec{border:0;border-radius:0;box-shadow:none;border-top:1px solid var(--border)}
 .sets-group .set-sec:first-of-type{border-top:0}
-.sets-group .set-sec>.sec-h{border-radius:0;min-height:44px;background:var(--surface)}
+.sets-group .set-sec>.sec-h{border-radius:0;min-height:34px;background:var(--surface)}   /* 上下の余白を半分に(案件 66 のあと): 44 → 34 */
 .sets-group .set-sec:nth-of-type(even)>.sec-h{background:var(--surface-2)}
 .sets-group .set-sec>.sec-h h2{font-size:15px}
 .sets-group .set-sec.set-active{border-color:var(--border);box-shadow:inset 4px 0 0 var(--accent)}
 .sets-group .set-sec.set-active>.sec-h{box-shadow:inset 4px 0 0 var(--accent)}
 .sets-group .set-sec[open]{background:var(--set-open-bg)}
-.sets-group .set-sec[open]>.sec-h{min-height:52px;background:var(--set-open-head);border-bottom:2px solid var(--accent);border-radius:0}
+.sets-group .set-sec[open]>.sec-h{min-height:38px;background:var(--set-open-head);border-bottom:2px solid var(--accent);border-radius:0}
 .sets-group .set-sec[open]>.sec-h h2{font-size:17px}
 .sets-group .set-sec[open]>.sec-body{margin:12px 16px 16px 40px;border:1px solid var(--border-strong);border-radius:var(--r-m);background:var(--sec-bg)}
 .set-sum{display:inline-flex;align-items:center;gap:16px;margin-left:12px;font-size:12px}
@@ -1031,6 +1042,8 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
   .slot-pen,.slot .lapno{display:none}   /* 幅が足りないので、「LAP n:」は省き、タイムだけ出す */
   .slot.editing{grid-column:1/-1}
   .sec-h{flex-wrap:wrap;padding:6px 10px;gap:6px 10px}
+  .sets-group .set-sec>.sec-h{padding-top:3px;padding-bottom:3px}   /* 比較セットの見出し行の上下の余白を半分に(スマホ) */
+  .cact{grid-template-columns:repeat(3,minmax(0,1fr))}   /* 操作の欄: スマホは 3 列(1 行目 = 編集・名前・コントロール、2 行目 = セクター・(空き)・削除) */
   .sec-hint{display:none}
   .tablist .tab{padding:6px 8px;font-size:12px;white-space:nowrap}
   .sets-group-sub{display:none}
@@ -1125,10 +1138,6 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
   .marea{grid-template-columns:minmax(0,1fr) auto}
   .marea-btns{grid-column:1 / 3;justify-content:flex-end}
   .area-ed-map{height:50vh;height:50dvh}
-
-  /* データ管理 → サーキット: 登録済みサーキットのボタンを、同じ幅の 2 列にそろえる(長い名前は折り返す) */
-  .cact{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%}
-  .cact .btn{justify-content:center;text-align:center;white-space:normal;word-break:keep-all;line-height:1.3;padding:6px 10px}   /* 折り返しは <wbr> の位置で */
 
   /* データ管理 → サーキット → ファイルによる登録: 項目名を上、入力欄を下に縦に並べ、左にそろえる */
   .circ-form{align-items:stretch}

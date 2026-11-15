@@ -1,6 +1,6 @@
 import { escapeHtml as esc } from '../core';
 import type { Session } from '../store/session';
-import { duplicateNameAlert, promptDialog } from './dialog';
+import { confirmDialog, duplicateNameAlert, promptDialog } from './dialog';
 import { hasExt, wrongExtMessage } from './fileKind';
 import { type CircuitTab, type ImportActions, type ImportPart, SEC_HINT } from './importParts';
 
@@ -69,20 +69,45 @@ export function createCircuits(root: HTMLElement, session: Session, actions: Imp
     }
   }
 
+  /** 一覧で選んでいるサーキットの id(案件 66)。消えたとき・初めは先頭のサーキット */
+  let selId: string | null = null;
+
+  function currentCircuit() {
+    return session.circuits.find((c) => c.id === selId) ?? session.circuits[0] ?? null;
+  }
+
+  /** 選んでいるサーキットの操作の欄(案件 66)。一覧はスクロールし、この欄はスクロールさせない */
+  function renderOps() {
+    const ops = listEl.querySelector<HTMLElement>('.cops');
+    const c = currentCircuit();
+    if (!ops || !c) return;
+    const id = esc(c.id);
+    ops.innerHTML = `
+      <div class="cops-h"><b>選択中のサーキットを操作</b><span class="badge">${esc(c.name)}</span></div>
+      <div class="cact">
+        <button class="btn sm" data-act="edit-circuit" data-id="${id}" title="大きな画面で、地図を見ながら編集します">編集(地図)…</button>
+        <button class="btn sm" data-act="rename-circuit" data-id="${id}">名前を変更</button>
+        <button class="btn sm" data-act="reload-control" data-id="${id}">コントロール<wbr>ライン<br>の再読み込み</button>
+        <button class="btn sm" data-act="reload-sectors" data-id="${id}">セクター<br>の再読み込み</button>
+        <button class="btn sm del" data-act="del-circuit" data-id="${id}">削除</button>
+      </div>`;
+  }
+
   function render() {
     $('circuit-badge').textContent = session.circuits.length ? `登録 ${session.circuits.length} 件` : '未登録';
-    listEl.innerHTML = session.circuits.length
-      ? `<ul class="clist">${session.circuits.map((c) => `
-        <li class="citem">
-          <div class="cinfo"><b>${esc(c.name)}</b><span class="sub">セクター ${c.sectors.length} 本</span></div>
-          <div class="cact">
-            <button class="btn sm" data-act="edit-circuit" data-id="${esc(c.id)}" data-fk="edt-${esc(c.id)}" title="大きな画面で、地図を見ながら編集します">編集(地図)…</button>
-            <button class="btn sm" data-act="rename-circuit" data-id="${esc(c.id)}" data-fk="ren-${esc(c.id)}">名前を変更</button>
-            <button class="btn sm" data-act="reload-control" data-id="${esc(c.id)}" data-fk="rlc-${esc(c.id)}">コントロールライン<wbr>の再読み込み</button>
-            <button class="btn sm" data-act="reload-sectors" data-id="${esc(c.id)}" data-fk="rls-${esc(c.id)}">セクター<wbr>の再読み込み</button>
-            <button class="btn sm" data-act="del-circuit" data-id="${esc(c.id)}" data-fk="del-${esc(c.id)}">削除</button>
-          </div></li>`).join('')}</ul>`
-      : '<div class="empty">登録済みのサーキットはありません。「ファイルによる登録」「地図による登録」タブから登録してください。</div>';
+    if (!session.circuits.length) {
+      listEl.innerHTML = '<div class="empty">登録済みのサーキットはありません。「ファイルによる登録」「地図による登録」タブから登録してください。</div>';
+      return;
+    }
+    const cur = currentCircuit()!;
+    listEl.innerHTML = `
+      <div class="clist" role="radiogroup" aria-label="登録済みのサーキット">${session.circuits.map((c) => `
+        <label class="citem">
+          <input type="radio" name="circ-sel" value="${esc(c.id)}"${c.id === cur.id ? ' checked' : ''}>
+          <span class="cname">${esc(c.name)}</span><span class="sub">セクター ${c.sectors.length} 本</span>
+        </label>`).join('')}</div>
+      <div class="cops"></div>`;
+    renderOps();
   }
 
   async function renameFlow(id: string) {
@@ -98,6 +123,22 @@ export function createCircuits(root: HTMLElement, session: Session, actions: Imp
       await duplicateNameAlert(v);
       value = v;
     }
+  }
+
+  /** 削除: 名前を示して確かめ、「削除する」を押したときだけ消す(案件 66)。キャンセル・Esc なら何もしない */
+  async function deleteFlow(id: string) {
+    const c = session.circuits.find((x) => x.id === id);
+    if (!c) return;
+    const ok = await confirmDialog({
+      title: `サーキット「${c.name}」を削除しますか?`,
+      detail: 'この操作は取り消せません。比較セットでこのサーキットを使っていた場合は、そのセットの指定も外れます。',
+      ok: '削除する',
+      cancel: 'キャンセル',
+      primary: 'ok',   // 青い既定は「削除する」(利用者の希望。Enter で消える)
+    });
+    if (!ok || !session.circuits.some((x) => x.id === id)) return;
+    session.deleteCircuit(id);
+    listMsg.textContent = '';
   }
 
   /** ファイルによる登録 */
@@ -133,7 +174,7 @@ export function createCircuits(root: HTMLElement, session: Session, actions: Imp
       switch (act) {
         case 'edit-circuit': actions.openWork('circuit', d.id!); return true;
         case 'open-circuit-editor': actions.openWork('circuit', null); return true;
-        case 'del-circuit': session.deleteCircuit(d.id!); listMsg.textContent = ''; return true;
+        case 'del-circuit': void deleteFlow(d.id!); return true;
         case 'ctab': ctab = d.tab as CircuitTab; applyTabs(); return true;
         case 'rename-circuit': void renameFlow(d.id!); return true;
         case 'reload-control':
@@ -147,6 +188,8 @@ export function createCircuits(root: HTMLElement, session: Session, actions: Imp
       }
     },
     async onChange(t) {
+      // 一覧で選ぶサーキットが替わったら、操作の欄だけ作り直す(案件 66)
+      if (t instanceof HTMLInputElement && t.name === 'circ-sel') { selId = t.value; renderOps(); return; }
       // コントロールライン・セクターの欄: 種類の違うファイルは、選んだ時点で外す(案件 29)
       if (t.id === 'c-cln' || t.id === 'c-sci') {
         const f = (t as HTMLInputElement).files?.[0];
