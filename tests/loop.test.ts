@@ -97,6 +97,35 @@ describe('1 周分のログ(輪)のラップ', () => {
   it('計測ラインを通らないときは、今までと同じく全体を参考値のラップにする', () => {
     const ring = ride(0, 360);
     const far: GeoLine = { a: { lat: 34, lon: 132 }, b: { lat: 34.001, lon: 132.001 } };
-    expect(detectLaps(closeLoop(ring), far)).toEqual(detectLaps(ring, far));
+    const laps = detectLaps(closeLoop(ring), far);
+    expect(laps).toEqual(detectLaps(ring, far));
+    expect(laps).toHaveLength(1);                                               // 空どうしの比較にならないよう、件数も確かめる
+    expect(laps[0].complete).toBe(false);
+    expect(laps[0].duration).toBeCloseTo(ring.t[ring.t.length - 1], 1);
+  });
+
+  it('元のログの中の通過が 0 回(始点が計測ラインをわずかに越えている)でも、1 周分の完了ラップになる', () => {
+    // 始点のサンプルが計測ラインの手前(進む向きで先)にあると、ログの先頭の通過は数えられない。
+    // つなぎ目の通過だけが残り、元のログの中の通過が 0 回になる(案件 64)
+    const ring = ride(0, 360);
+    const laps = detectLaps(closeLoop(ring), lineAt(-0.0005));
+    expect(laps).toHaveLength(1);
+    expect(laps[0]).toMatchObject({ number: 1, complete: true });
+    expect(laps[0].duration).toBeCloseTo(PERIOD, 0);
+  });
+
+  it('計測ラインを輪の上のどこに置いても(つなぎ目の前後を細かく含めて)、1 周分の完了ラップが 1 つできる', () => {
+    const ring = ride(0, 360);
+    const closed = closeLoop(ring);
+    const last = ((closed.loop!.n - 1) * V * 0.1 / R) * (180 / Math.PI);       // 終点の角度
+    const degs: number[] = [];
+    for (let d = 0; d < 360; d += 7) degs.push(d);
+    for (const base of [0, last, 360]) for (const e of [-1, -0.1, -0.01, -0.001, -0.0001, 0, 0.0001, 0.001, 0.01, 0.1, 1]) degs.push(base + e);
+    for (const deg of degs) {
+      const laps = detectLaps(closed, lineAt(deg));
+      expect(laps, `角度 ${deg}`).toHaveLength(1);
+      expect(laps[0].complete, `角度 ${deg}`).toBe(true);
+      expect(Math.abs(laps[0].duration - PERIOD), `角度 ${deg}`).toBeLessThan(0.5);
+    }
   });
 });
