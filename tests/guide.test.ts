@@ -383,8 +383,8 @@ describe('簡易のはじめかた(案件 65)', () => {
     expect(cells()[0].querySelector('.gn')!.textContent).toBe('✓');
     expect(cells().findIndex((c) => c.classList.contains('cur'))).toBeGreaterThan(0);
   });
-  it('「閉じる ×」でカードの下の簡易表示も消える。カードは 1 行で、見出し行・「比較画面へ」は無い', () => {
-    expect(root.querySelector('#slots .slots-title')).toBeNull();
+  it('「閉じる ×」でカードの下の簡易表示も消える。カードは 1 行。「表示中 比較セット」の見出し行はあり、「比較画面へ」は無い', () => {
+    expect(root.querySelector('#slots .slots-title')).not.toBeNull();
     expect(root.querySelector('#slots [data-act="goto-compare"]')).toBeNull();
     $<HTMLButtonElement>('[data-act="guide-close"]').click();
     expect(cells()).toHaveLength(0);

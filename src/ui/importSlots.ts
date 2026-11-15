@@ -1,6 +1,7 @@
 import { SLOTS, type Slot, formatLapTime, escapeHtml as esc } from '../core';
 import { SLOT_ALIAS_MAX, type Session } from '../store/session';
 import { type ImportPart, dateOf } from './importParts';
+import { SHOWN_MARK } from './marks';
 
 /** 「データ管理」の上部: 表示中の比較セットの A〜D のカード(1 行の小さなカード)と、カード名(A〜D の別名)の編集 */
 export interface SlotsPart extends ImportPart {
@@ -39,7 +40,12 @@ export function createSlots(el: HTMLElement, session: Session): SlotsPart {
       const tap = r && !edit ? ` data-act="slot-alias-edit" data-slot="${s}"` : '';          // スマホでは鉛筆を出さず、カードを押して名前を編集する
       return `<div class="slot slot-${s.toLowerCase()}${edit ? ' editing' : ''}"${tip}${tap}><span class="chip s${s.toLowerCase()}">${s}</span><div class="slot-main">${body}</div>${pen}</div>`;
     }).join('');
-    el.innerHTML = `<div class="slots-row">${cards}</div>`;
+    // 見出し行: どの比較セットのカードかを示す(カードと、その下のタブとの境目の目印にもなる)。表示中が無いときは、表示予定のセットの名前
+    const shownI = session.shownIndex;
+    const title = shownI === null
+      ? `<span>表示予定</span><b>${esc(session.setName(session.activeIndex))}</b>`
+      : `${SHOWN_MARK}<b>${esc(session.setName(shownI))}</b>${session.aliasOf(shownI) ? ` <span class="sub">(${session.setLabel(shownI)})</span>` : ''}`;
+    el.innerHTML = `<div class="slots-title">${title}</div><div class="slots-row">${cards}</div>`;
     const inp = el.querySelector<HTMLInputElement>('.slot-alias-input');
     if (inp && draftText !== undefined && draft) { inp.value = draftText; inp.focus(); inp.setSelectionRange(draftText.length, draftText.length); }
   }

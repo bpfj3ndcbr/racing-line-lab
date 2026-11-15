@@ -46,7 +46,8 @@ describe('比較セット 1〜5', () => {
     expect(Array.from(root.querySelectorAll<HTMLElement>('.set-sec .set-shown')).map((e) => e.textContent)).toEqual(Array(5).fill('表示中にする'));
     expect(Array.from(root.querySelectorAll<HTMLButtonElement>('[data-act="set-active"]')).every((b) => b.disabled)).toBe(true);
     expect(session.shownIndex).toBeNull();
-    expect($('#slots .slots-title')).toBeNull();                                           // 見出し行・案内は無い(案件 65)
+    expect($('#slots .slots-title').textContent).toBe('表示予定比較セット1');                    // 「表示中の比較セットはありません…」の案内は無い(案件 65)
+    expect($('#slots .slots-title .shown-mark')).toBeNull();
     expect($('#guide').textContent).toContain('表示予定のセット(比較セット1)');
   });
 
@@ -58,12 +59,15 @@ describe('比較セット 1〜5', () => {
     session.toggleAssignment('A', { logId: 'u', lap: 1 }, 0);
     expect(session.shownIndex).toBe(0);
     expect($('#sec-set-0 .set-shown .shown-mark')).not.toBeNull();
+    expect($('#slots .slots-title').textContent).toBe('表示中比較セット1');
+    expect($('#slots .slots-title .shown-mark')).not.toBeNull();
     expect($('#guide').textContent).toContain('表示中のセット(比較セット1)');
     expect($<HTMLButtonElement>('#sec-set-2 [data-act="set-active"]').disabled).toBe(true);   // 割り当てが無いので押せない
     session.toggleAssignment('B', { logId: 'u', lap: 1 }, 2);                                 // 割り当てると、その比較セットが表示中
     expect(session.shownIndex).toBe(2);
     $<HTMLButtonElement>('#sec-set-0 [data-act="set-active"]').click();
     expect(session.shownIndex).toBe(0);
+    expect($('#slots .slots-title').textContent).toBe('表示中比較セット1');
     session.toggleAssignment('A', { logId: 'u', lap: 1 }, 0);                                 // 割り当てを外すと、表示中が無い状態に戻る
     expect(session.shownIndex).toBeNull();
   });
@@ -169,7 +173,7 @@ describe('セットは独立している(位置補正だけが共通)', () => {
     $<HTMLButtonElement>('#sec-set-1 [data-act="assign"][data-slot="C"]').click();
     expect(session.activeIndex).toBe(1);
     expect(session.assignment.C).toEqual({ logId: 'u', lap: 1 });
-    expect($('#guide').textContent).toContain('比較セット2');
+    expect($('#slots .slots-title').textContent).toContain('比較セット2');
     expect(session.sets[0].assignment.C).toBeNull();
   });
 
