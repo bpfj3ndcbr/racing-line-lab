@@ -41,21 +41,27 @@ function drop(target: Element, files: File[]) {
 const curStep = () => Array.from(root.querySelectorAll('#guide .gstep')).findIndex((s) => s.classList.contains('cur'));
 const nav = (v: string) => $<HTMLButtonElement>(`[data-act="nav"][data-view="${v}"]`).click();
 
-describe('.vbo のドロップ', () => {
-  it('各セットにドロップ枠がある。ログがあるセットの枠は小さい', () => {
-    expect(root.querySelectorAll('.set-drop .dropbox')).toHaveLength(5);
-    expect($('#sec-set-0 .dropbox').textContent).toContain('ここに .vbo ファイルをドラッグ&ドロップ');
-    session.addLog(parseOne(), 'u', 0);
-    expect($('#sec-set-0 .dropbox').classList.contains('compact')).toBe(true);
+/** 「走行ログを追加」のボタンから、ファイル選択の結果を渡す */
+function addFiles(set: number, files: File[]) {
+  $<HTMLButtonElement>(`#sec-set-${set} [data-act="add"]`).click();
+  const inp = $<HTMLInputElement>('#vbo-input');
+  Object.defineProperty(inp, 'files', { value: files, configurable: true });
+  inp.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+describe('.vbo の追加', () => {
+  it('ドラッグ&ドロップの枠は無い(案件 63)', () => {
+    expect(root.querySelector('.dropbox')).toBeNull();
+    expect(root.textContent).not.toContain('ここに .vbo ファイルをドラッグ&ドロップ');
   });
 
-  it('枠に落とした .vbo は、その枠のセットに入る', async () => {
-    drop($('#sec-set-2 .dropbox'), [file('a.vbo', vbo)]);
+  it('「走行ログを追加」で選んだ .vbo は、そのセットに入る', async () => {
+    addFiles(2, [file('a.vbo', vbo)]);
     await flush();
     expect(session.sets.map((w) => w.logs.length)).toEqual([0, 0, 1, 0, 0]);
   });
 
-  it('枠の外(セットの中・ほかの場所)に落としても追加されない。ブラウザがファイルを開かないよう、既定の動作は止める', async () => {
+  it('画面にファイルを落としても追加されない。ブラウザがファイルを開かないよう、既定の動作は止める', async () => {
     const e1 = drop($('#sec-set-0 .files'), [file('a.vbo', vbo)]);
     const e2 = drop($('#sec-set-0 .set-bar'), [file('a.vbo', vbo)]);
     const e3 = drop(document.body, [file('a.vbo', vbo)]);
@@ -65,7 +71,7 @@ describe('.vbo のドロップ', () => {
   });
 
   it('.vbo 以外は追加せず、確認の画面と案内を出す(案件 29)', async () => {
-    drop($('#sec-set-0 .dropbox'), [file('a.vbo', vbo), file('memo.txt', 'x')]);
+    addFiles(0, [file('a.vbo', vbo), file('memo.txt', 'x')]);
     await flush();
     const modal = document.querySelector<HTMLElement>('.modal')!;
     expect(modal.textContent).toContain('読み込めるのは .vbo ファイルだけです');
@@ -78,21 +84,10 @@ describe('.vbo のドロップ', () => {
     expect($<HTMLElement>('.toast').hidden).toBe(false);
   });
 
-  it('枠の上にファイルを持ってくると強調され、離れると戻る', () => {
-    const box = $('#sec-set-0 .dropbox');
-    const over = new Event('dragover', { bubbles: true, cancelable: true });
-    Object.defineProperty(over, 'dataTransfer', { value: { types: ['Files'] } });
-    box.dispatchEvent(over);
-    expect(box.classList.contains('over')).toBe(true);
-    expect(over.defaultPrevented).toBe(true);
-    box.dispatchEvent(new Event('dragleave', { bubbles: true }));
-    expect(box.classList.contains('over')).toBe(false);
-  });
-
-  it('枠のクリックで、そのセットに追加するファイル選択が開く', () => {
+  it('「走行ログを追加」のクリックで、そのセットに追加するファイル選択が開く', () => {
     let opened = 0;
     $<HTMLInputElement>('#vbo-input').click = () => { opened++; };
-    $('#sec-set-3 .dropbox').click();
+    $<HTMLButtonElement>('#sec-set-3 [data-act="add"]').click();
     expect(opened).toBe(1);
   });
 });
@@ -148,7 +143,7 @@ describe('割り当て: 速いものから自動 / 手動', () => {
   });
 
   it('手順 3 に「速いものから A に自動で割り当て」と「手動で割り当て」が並ぶ。複数ファイルを追加しても手順 3 のまま選べる', async () => {
-    drop($('#sec-set-0 .dropbox'), [file('a.vbo', vbo), file('b.vbo', vbo2)]);
+    addFiles(0, [file('a.vbo', vbo), file('b.vbo', vbo2)]);
     await flush();
     expect(curStep()).toBe(2);
     expect(Array.from(root.querySelectorAll('#guide .gstep.cur button')).map((b) => b.textContent))
@@ -156,7 +151,7 @@ describe('割り当て: 速いものから自動 / 手動', () => {
   });
 
   it('どちらを選んでも、その比較セットがスクロール領域の一番上に来る', async () => {
-    drop($('#sec-set-2 .dropbox'), [file('a.vbo', vbo), file('b.vbo', vbo2)]);
+    addFiles(2, [file('a.vbo', vbo), file('b.vbo', vbo2)]);
     await flush();
     session.setActive(2);
     const calls: HTMLElement[] = [];
@@ -349,9 +344,10 @@ describe('文字の大きさ(CSS)', () => {
   it('全体の文字は 13px', () => {
     expect(css).toMatch(/^body\{[^}]*font:13px\/1\.5/m);
   });
-  it('データ管理は、ヘッダー・A〜D のカード・はじめかたを固定して、その下だけスクロールする', () => {
-    expect(css).toContain('#view-import{display:flex;flex-direction:column;height:calc(100vh - var(--top-h))');
-    expect(css).toMatch(/#view-import>\.body\{[^}]*overflow:auto/);
+  it('データ管理は、ヘッダーは動かさず、この中をスクロールする。A〜D のカードは上に固定する(案件 65)', () => {
+    expect(css).toMatch(/#view-import\{height:calc\(100vh - var\(--top-h\)\)[^}]*overflow:auto/);
+    expect(css).toMatch(/\.slots\{[^}]*position:sticky;top:0/);
+    expect(css).toMatch(/\.guide-mini\{position:sticky;top:var\(--imp-slots-h,0px\);height:0/);
   });
   it('比較画面のカードの文字の大きさ', () => {
     expect(css).toContain('.card .c1{font-weight:700;font-size:10px}');
@@ -361,18 +357,49 @@ describe('文字の大きさ(CSS)', () => {
 });
 
 describe('サーキット編集中は画面を移れない', () => {
-  it('編集中は上部のタブと「比較画面へ」が押せず、キャンセルで戻ると押せる', () => {
+  it('編集中は上部のタブが押せず、キャンセルで戻ると押せる', () => {
     session.registerCircuit('オートポリス', cln, sci);
     session.addLog(parseOne(), 'u', 0);
     session.autoAssignFastest(0);
     $<HTMLButtonElement>('[data-act="open-circuit-editor"]').click();
     const tabs = Array.from(root.querySelectorAll<HTMLButtonElement>('.navtab'));
     expect(tabs.filter((t) => t.disabled)).toHaveLength(3);     // 使い方・比較・設定
-    expect($<HTMLButtonElement>('[data-act="goto-compare"]').disabled).toBe(true);
     nav('compare');
     expect($<HTMLElement>('#view-compare').hidden).toBe(true);
     $<HTMLButtonElement>('#ce-cancel').click();
     expect(tabs.every((t) => !t.disabled)).toBe(true);
-    expect($<HTMLButtonElement>('[data-act="goto-compare"]').disabled).toBe(false);
+  });
+});
+
+describe('簡易のはじめかた(案件 65)', () => {
+  const cells = () => Array.from(root.querySelectorAll<HTMLElement>('#guide-mini .gm'));
+  it('4 つの手順が並び、「いまここ」だけが番号と短い題名、ほかは番号(済みは ✓)だけを出す', () => {
+    expect(cells()).toHaveLength(4);
+    expect(cells()[0].classList.contains('cur')).toBe(true);
+    expect(cells()[0].textContent).toContain('1ログ追加');
+    expect(cells()[1].querySelector('.gmt')).toBeNull();
+    expect(cells()[1].querySelector('.gn')!.textContent).toBe('2');
+    session.addLog(parseOne(), 'u', 0);
+    expect(cells()[0].querySelector('.gn')!.textContent).toBe('✓');
+    expect(cells().findIndex((c) => c.classList.contains('cur'))).toBeGreaterThan(0);
+  });
+  it('「閉じる ×」でカードの下の簡易表示も消える。カードは 1 行。「表示中 比較セット」の見出し行はあり、「比較画面へ」は無い', () => {
+    expect(root.querySelector('#slots .slots-title')).not.toBeNull();
+    expect(root.querySelector('#slots [data-act="goto-compare"]')).toBeNull();
+    $<HTMLButtonElement>('[data-act="guide-close"]').click();
+    expect(cells()).toHaveLength(0);
+  });
+});
+
+describe('簡易のはじめかたの手順 4(案件 65)', () => {
+  it('「いまここ」になると青いボタン「比較画面へ ▶」になり、押すと比較画面へ行く。それまでは番号だけ', () => {
+    expect(root.querySelector('#guide-mini .gm-go')).toBeNull();
+    session.registerCircuit('オートポリス', cln, sci);
+    session.addLog(parseOne(), 'u', 0);
+    session.autoAssignFastest(0);
+    const b = $<HTMLButtonElement>('#guide-mini .gm-go');
+    expect(b.textContent).toBe('比較画面へ ▶');
+    b.click();
+    expect($<HTMLElement>('#view-compare').hidden).toBe(false);
   });
 });

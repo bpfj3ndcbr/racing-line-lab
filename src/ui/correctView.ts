@@ -89,9 +89,11 @@ export function mountCorrectView(root: HTMLElement, session: Session, deps: Corr
         <div class="corr-laps" id="cor-laps" role="status"></div>
         <div class="sub" id="cor-note"></div>
         <div class="corr-actions">
-          <button class="btn pri" id="cor-apply" data-act="cor-apply">適用して保存</button>
           <button class="btn" id="cor-revert" data-act="cor-revert" title="開いたときの補正量に戻します">元に戻す</button>
           <button class="btn" id="cor-zero" data-act="cor-zero" title="補正なし(0, 0)にします">補正なしにする</button>
+        </div>
+        <div class="fix-foot">
+          <button class="btn pri" id="cor-apply" data-act="cor-apply">適用して保存</button>
           <button class="btn" id="cor-cancel" data-act="cor-cancel">キャンセル</button>
         </div>
       </aside>

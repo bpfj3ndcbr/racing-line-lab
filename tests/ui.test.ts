@@ -63,7 +63,7 @@ describe('読み込み画面', () => {
     btn(1, 'A').click();
     expect(slotsText()).toContain('Run 1');
     expect(slotsText()).toContain('2:22.9');
-    expect(slotsText()).toContain('2026/09/13');
+    expect(root.querySelector('#slots .slot-a')!.getAttribute('title')).toContain('2026/09/13');   // 日付はマウスを乗せたとき(案件 65)
     btn(1, 'A').click();
     expect(slotsText()).not.toContain('Run 1');
     expect(slotsText()).toContain('未割り当て');
@@ -94,7 +94,6 @@ describe('読み込み画面', () => {
     btn(1, 'B').click();
     root.querySelector<HTMLButtonElement>('[data-act="remove"]')!.click();
     expect(session.assignment.B).toBeNull();
-    expect(root.textContent).toContain('ここに .vbo ファイルをドラッグ&ドロップ');
   });
 
   it.skipIf(!existsSync(bigPath))('ソート: ラップ順 / タイム順(昇順・降順)', () => {

@@ -51,11 +51,12 @@ describe('画面の切り替え', () => {
     expect($<HTMLElement>('#view-import').hidden).toBe(false);
   });
 
-  it('「比較画面へ」は割り当てがあるときだけ押せる', () => {
+  it('「比較画面へ」(はじめかたの手順 4)は割り当てがあるときだけ出る。A〜D のカードの横のボタンは無い(案件 65)', () => {
     session.addLog(utc(), 'u');
-    expect($<HTMLButtonElement>('[data-act="goto-compare"]').disabled).toBe(true);
+    expect(root.querySelector('[data-act="goto-compare"]')).toBeNull();
+    expect(root.querySelector('[data-act="guide-compare"]')).toBeNull();
     session.toggleAssignment('A', { logId: 'u', lap: 1 });
-    const b = $<HTMLButtonElement>('[data-act="goto-compare"]');
+    const b = $<HTMLButtonElement>('[data-act="guide-compare"]');
     expect(b.disabled).toBe(false);
     b.click();
     expect($<HTMLElement>('#view-compare').hidden).toBe(false);

@@ -120,8 +120,8 @@ h2{margin:0}
 .cur b{font-weight:700}
 
 /* A〜D の割り当て欄 */
-.slots{display:flex;gap:12px;align-items:center;padding:16px 24px;background:var(--bar);border-bottom:1px solid var(--border)}
-.slot{flex:1;display:flex;gap:10px;align-items:center;min-height:56px;padding:8px 12px;border-radius:var(--r-m);
+.slots{display:flex;gap:12px;align-items:center;padding:8px 24px;background:var(--bar);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:8}   /* 上に固定(案件 65) */
+.slot{flex:1;display:flex;gap:8px;align-items:center;min-height:42px;padding:4px 10px;border-radius:var(--r-m);
   background:var(--surface);border:1px solid var(--border)}
 .chip{display:inline-flex;align-items:center;justify-content:center;flex:none;width:28px;height:28px;border-radius:50%;font-weight:800}
 .st{font-weight:700}
@@ -260,6 +260,7 @@ select{min-height:44px;padding:0 10px;background:var(--surface);border:1px solid
 .cmp-seek{flex:1;min-width:120px;accent-color:var(--accent)}
 .cmp-side{width:var(--side-w);flex:none;display:flex;flex-direction:column;min-height:0;overflow:hidden;
   background:var(--sec-bg);border-left:1px solid var(--border-strong)}
+.side-tabs{display:none}   /* 横向きのスマホのときだけ(下の @media) */
 .side-upper{flex:1 1 0;min-height:0;overflow:hidden}
 .side-upper-in{padding:10px 12px 8px;display:flex;flex-direction:column;gap:8px}
 .cmp-cards{display:flex;flex-direction:column;gap:6px;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}  /* 長押ししても、カードの文字を選択しない(案件 46) */
@@ -459,6 +460,11 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .corr-lost{margin-top:4px;color:var(--warn)}
 .corr-laps{min-height:36px;padding:6px 8px;font-size:11px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-m)}
 .corr-actions{display:flex;flex-direction:column;gap:6px;margin-top:4px}
+/* 保存・キャンセルのボタンは、右の列の下に固定する(案件 63)。スクロールする列の中で、内側の余白(padding)の分まで広げて下端に付ける */
+.corr-side{--foot-pad:12px}
+.fix-foot{position:sticky;bottom:calc(0px - var(--foot-pad));z-index:3;margin:auto calc(0px - var(--foot-pad)) calc(0px - var(--foot-pad));padding:10px var(--foot-pad);
+  display:flex;gap:8px;background:var(--sec-bg);border-top:1px solid var(--border-strong)}
+.fix-foot .btn{flex:1;min-height:34px;justify-content:center}
 .corr-actions .btn{min-height:34px;justify-content:center}
 
 .frow2.col{flex-direction:column;align-items:stretch;gap:2px}
@@ -634,8 +640,6 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 
 /* 比較セット 1〜5 */
 .slots{flex-direction:column;align-items:stretch;gap:8px}
-.slots-title{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
-.slots-title b{color:var(--text);font-size:13px}
 .slots-row{display:flex;gap:12px;align-items:center}
 .set-sec .badge{margin-left:4px}
 .set-shown{display:inline-flex;align-items:center;min-width:88px;margin-left:16px}
@@ -643,8 +647,9 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .set-sec.set-active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
 .set-sec .toolbar.set-circuit{padding-bottom:0}
 /* 比較セット1〜5を 1 つの枠にまとめる(案件 27): 行は交互に色分け、表示セットは左端に帯、開いたら見出しを目立たせて中身を一段下げる */
-.sets-group{flex:none;border:1px solid var(--border-strong);border-radius:var(--r-l);background:var(--sec-bg);box-shadow:var(--sec-shadow);overflow:hidden}
-.sets-group-h{display:flex;align-items:center;gap:12px;min-height:40px;padding:0 16px;background:var(--sec-head);border-bottom:1px solid var(--border-strong)}
+.sets-group{flex:none;border:1px solid var(--border-strong);border-radius:var(--r-l);background:var(--sec-bg);box-shadow:var(--sec-shadow)}   /* 中を固定(sticky)するため overflow:hidden は付けない。角は中身の側で丸める(案件 63) */
+.sets-group-h{display:flex;align-items:center;gap:12px;min-height:40px;padding:0 16px;background:var(--sec-head);border-bottom:1px solid var(--border-strong);border-radius:calc(var(--r-l) - 1px) calc(var(--r-l) - 1px) 0 0}
+.sets-group .set-sec:last-of-type{border-radius:0 0 calc(var(--r-l) - 1px) calc(var(--r-l) - 1px)}
 .sets-group-h h2{font-size:14px}
 .sets-group-sub{font-size:11px;color:var(--muted)}
 .sets-group .set-sec{border:0;border-radius:0;box-shadow:none;border-top:1px solid var(--border)}
@@ -671,6 +676,10 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 /* 「表示中」の印(比較セットのタブ・比較画面) */
 .shown-mark{display:inline-flex;align-items:center;gap:3px;flex:none;padding:0 6px;height:18px;border:1px solid var(--accent);border-radius:9px;background:var(--surface);color:var(--accent);font-size:10px;font-weight:700;line-height:1}
 .sets-group.as-tabs .set-sec:not(.tab-on){display:none}
+/* タブが画面の最上部に来たら、タブと「表示中にする」「別名」の行を固定し、その下をスクロールさせる(案件 63)。タブの高さは --sets-tabs-h(importSets.ts が測る) */
+.sets-group.as-tabs .sets-tabs{position:sticky;top:var(--imp-stack,0px);z-index:6}   /* --imp-stack: 上に固定しているもの(カード・簡易のはじめかた)の高さの合計 */
+.sets-group.as-tabs .set-sec.tab-on>.sec-h{position:sticky;top:calc(var(--imp-stack,0px) + var(--sets-tabs-h,0px));z-index:5}
+.sets-group .set-sec{scroll-margin-top:calc(var(--imp-stack,0px) + var(--sets-tabs-h,0px))}   /* 一覧から移動したとき、固定している部分の下に隠れない */
 .sets-group.as-tabs .set-sec.tab-on{box-shadow:inset 4px 0 0 var(--accent)}
 .sets-group.as-tabs .set-sec.tab-on>.sec-h{border-bottom-width:1px;box-shadow:inset 4px 0 0 var(--accent)}
 .sets-group.as-tabs .set-sec.tab-on>.sec-h{cursor:default}
@@ -715,24 +724,28 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .linkbtn{background:none;border:0;padding:2px 4px;font:inherit;font-size:12px;color:var(--accent);cursor:pointer;text-decoration:underline}
 .guide-wrap > .linkbtn{margin-bottom:2px}
 
-/* .vbo のドロップ枠(比較セットの枠ごと) */
-.dropbox{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;margin:8px 0;padding:22px 12px;text-align:center;
-  border:2px dashed var(--border-strong);border-radius:var(--r-m);color:var(--muted);cursor:pointer}
-.dropbox small{font-size:11px}
-.dropbox.compact{flex-direction:row;padding:8px 12px;font-size:12px}
-.dropbox:hover,.dropbox:focus-visible,.dropbox.over{border-color:var(--accent);background:var(--surface-2);color:var(--text)}
-.dropbox.over{border-style:solid;background:color-mix(in srgb,var(--accent) 12%,var(--surface))}
 .set-hint{display:flex;align-items:center;gap:10px;margin:6px 0;font-size:12px;color:var(--muted)}
 .empty .btn-row{margin-top:6px}
 .sec-h-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .guide .btn.sm,.set-hint .btn.sm,.empty .btn.sm{min-height:28px;padding:0 12px}
 
 /* データ管理: 上部(ヘッダー・A〜D のカード・はじめかた)は動かさず、その下だけをスクロールする */
-#view-import{display:flex;flex-direction:column;height:calc(100vh - var(--top-h));height:calc(100dvh - var(--top-h));overflow:hidden}
-#view-import>.slots,#view-import>.guide-wrap,#view-import>.work{flex:none}
-#view-import>.body{flex:1 1 0;min-height:0;overflow:auto;max-width:none}
+#view-import{height:calc(100vh - var(--top-h));height:calc(100dvh - var(--top-h));overflow:auto;position:relative}   /* PC: 上部のタブは動かさず、この中をスクロールする。カード・簡易のはじめかた・比較セットのタブは、上に固定する(案件 65) */
+#view-import>.body{max-width:none}
 #view-import>.body>*{max-width:1392px;width:100%;box-sizing:border-box}
-.guide-wrap{margin:0;padding:10px 24px;background:var(--bg);border-bottom:1px solid var(--border);max-height:42vh;overflow:auto}
+.guide-wrap{margin:0;padding:10px 24px;background:var(--bg);border-bottom:1px solid var(--border)}
+/* 簡易のはじめかた: はじめかた(大)がカードの下に隠れたら、カードの下に重ねて固定する。高さは持たない(出し入れで下がずれない) */
+.guide-mini{position:sticky;top:var(--imp-slots-h,0px);height:0;z-index:7}
+.gmini{display:none;position:absolute;left:0;right:0;top:0;gap:6px;align-items:center;padding:4px 24px;background:var(--bg);border-bottom:1px solid var(--border-strong);box-shadow:0 2px 4px rgba(0,0,0,.08)}
+.mini-on .gmini{display:flex}
+.gm{flex:none;display:flex;align-items:center;gap:6px;min-width:0;padding:2px 8px 2px 4px;border:1px solid var(--border);border-radius:999px;background:var(--surface-2);color:var(--muted);font-size:11px;font-weight:700}
+.gm .gn{width:20px;height:20px;border-radius:50%;background:var(--border-strong);color:var(--surface);display:flex;align-items:center;justify-content:center;font-size:11px}
+.gm.done .gn{background:var(--c)}
+.gm.cur{background:var(--surface);border:2px solid var(--accent);color:var(--text)}
+.gm.cur .gn{background:var(--accent);color:var(--accent-on)}
+.gm:not(.cur){padding-right:4px}
+.gm.gm-go{flex:1;justify-content:center;min-height:32px;padding:0 12px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;background:var(--accent);border:1px solid var(--accent);color:var(--accent-on)}   /* 手順 4 が「いまここ」のとき: 青いボタン */
+.in-work .slots{position:static}   /* 位置補正・登録/編集の画面では、固定しない */
 
 /* 上部のタブは、すべて「データ管理」の幅にそろえる */
 .navtabs{display:grid;grid-auto-flow:column;grid-auto-columns:1fr}
@@ -832,7 +845,9 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 
 /* 走行ログの取り込み範囲(案件 59)。PC: 地図と候補の一覧を上に並べ、その下に全体のグラフと、切り取り開始・終了の拡大のグラフ。
    スマホ(縦向き): 上から地図・候補(横に並べてスクロール)・グラフ。データ管理は横向きでは使わないので、横向きの配置は持たない */
-.modal.tr{width:min(980px,calc(100vw - 32px));max-height:calc(100vh - 32px);overflow-y:auto}
+.modal.tr{width:min(980px,calc(100vw - 32px));max-height:calc(100vh - 32px);overflow:hidden}
+.tr-body{display:flex;flex-direction:column;gap:inherit;flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain}   /* 中身だけスクロールし、ボタン(.tr-actions)は下に固定(案件 63) */
+.tr-body>*{flex:none}
 .tr-h{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
 .tr-h h3{margin:0}
 .tr-step{color:var(--muted);font-variant-numeric:tabular-nums}
@@ -895,6 +910,7 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .tr-all .tr-knob{pointer-events:auto;cursor:ew-resize;width:16px;margin-left:-8px;background:transparent}
 .tr-all .tr-knob::before{content:"";position:absolute;top:0;bottom:0;left:50%;width:3px;margin-left:-1.5px;background:var(--accent)}
 @media (pointer:coarse){.tr-all .tr-knob{width:40px;margin-left:-20px}}   /* 指でつかみやすく(拡大したときは横のスクロールと分ける) */
+.tr-actions{flex:none;padding-top:10px;border-top:1px solid var(--border)}
 .tr-actions .sp{flex:1}
 @media (max-width:767px){
   .modal.tr{width:100vw;max-height:100dvh;height:100dvh;border-radius:0;padding:12px}
@@ -929,7 +945,15 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .cmp-set select option{font-weight:700}
 
 /* カード名(A〜D の別名) */
-.slot-main{flex:1;min-width:0}
+.slot-main{flex:1;min-width:0;display:flex;gap:8px;align-items:baseline;white-space:nowrap}
+.slot-main>*{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.slots .chip{width:28px;height:28px;font-size:14px}
+.slots-title{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-bottom:4px}   /* 表示中の比較セット(タブとの境目の目印) */
+.slots-title b{color:var(--text);font-size:13px}
+.slots-circuit{display:none}   /* PC は上部のバーに出ている。スマホの幅でだけ出す(下の @media) */
+.slot[data-act]{cursor:pointer}
+.slots .slot{box-shadow:var(--btn-shadow),0 2px 5px rgba(20,30,50,.2)}   /* カードに影(案件 65) */
+.sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
 .slot-pen{min-height:24px;height:24px;min-width:24px;padding:0 6px;flex:none}
 .slot-edit{display:flex;align-items:center;gap:6px}
 .slot-edit .alias-input{width:9em;max-width:100%}
@@ -983,9 +1007,9 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
   .map-legend{gap:4px;padding:0 4px;font-size:10px}
   .legend-bar{width:22px}
   /* 上部バー: 1 行目にロゴ・About、2 行目にタブ(折り返さない)。サーキット名は出さない */
-  .top{flex-wrap:wrap;gap:6px 8px;padding:6px 10px;min-height:0}
+  .top{flex-wrap:wrap;gap:6px 8px;padding:6px 10px 0;min-height:0}   /* タブの下に PC と同じ線を引く(タブの下の余白は無くす) */
   .brand-txt{display:none}
-  .navtabs{order:3;width:100%;gap:4px}
+  .navtabs{order:3;width:calc(100% - 24px);gap:4px}   /* 右に余白を空け、PC と同じタブの見た目に */
   .navtab{flex:1;justify-content:center;padding:0 4px;min-height:38px;font-size:12px;white-space:nowrap}
   .top-right{gap:8px}
   .top-right .cur{display:none}
@@ -993,12 +1017,19 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
   /* データ管理: 上の固定をやめ、ページ全体をスクロール */
   #view-import{height:auto;overflow:visible}
   #view-import>.body{overflow:visible;padding:8px;gap:14px}
-  .guide-wrap{max-height:none;padding:8px 12px}
-  .slots{flex-direction:column;align-items:stretch;padding:10px 12px;gap:8px}
-  .slots-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%}
-  .slots-row>.btn{grid-column:1/-1;min-height:44px}
-  .slot{min-height:48px;padding:6px 10px}
-  .slot .sub{display:none}
+  .guide-wrap{padding:8px 12px}
+  .gmini{padding:4px 8px;gap:4px}
+  /* A〜D のカード: 横 4 枚(About 程度の文字)。カードを押すと名前を編集する */
+  .slots{padding:4px 8px 6px}
+  .slots-title{font-size:11px;margin-bottom:3px;white-space:nowrap;overflow:hidden}
+  .slots-circuit{display:inline;margin-left:auto;overflow:hidden;text-overflow:ellipsis}   /* 上部のバーではサーキット名を出さないので、ここに右寄せで出す */
+  .slots-title b{font-size:12px}
+  .slots-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;width:100%}
+  .slot{min-height:36px;padding:2px 5px;gap:4px;font-size:10px}
+  .slots .chip{width:18px;height:18px;font-size:11px}
+  .slot-main{flex-direction:column;gap:0;align-items:stretch}
+  .slot-pen,.slot .lapno{display:none}   /* 幅が足りないので、「LAP n:」は省き、タイムだけ出す */
+  .slot.editing{grid-column:1/-1}
   .sec-h{flex-wrap:wrap;padding:6px 10px;gap:6px 10px}
   .sec-hint{display:none}
   .tablist .tab{padding:6px 8px;font-size:12px;white-space:nowrap}
@@ -1020,8 +1051,11 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 
   /* 位置補正・サーキットの登録/編集: 地図を上、操作の欄を下に。登録の見出しの帯は 2 行に */
   .corr{flex-direction:column;height:auto;min-height:0}
-  .corr-map-wrap{flex:none;height:60vh;height:60dvh}
+  .corr-map-wrap{flex:none;height:calc(60vh - 56px);height:calc(60dvh - 56px)}   /* 下端に固定するボタンの分(56px)を引く */
   .corr-side{width:auto;overflow:visible;border-left:0;border-top:1px solid var(--border-strong)}
+  /* ページ全体がスクロールし、操作の欄は地図の下にあるので、ボタンは画面の下端に固定する(欄の下に隠れないよう、余白を空ける) */
+  .fix-foot{position:fixed;left:0;right:0;bottom:0;margin:0;z-index:1500;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px))}
+  .corr-side{padding-bottom:calc(70px + env(safe-area-inset-bottom,0px))}
   .corr.ce{--ce-head-h:96px}
   .ce-head{flex-wrap:wrap;align-content:center;gap:6px 8px;padding:6px 10px}
   .ce-head-s{display:none}
@@ -1166,10 +1200,16 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
   .cmp-left{flex:1;height:auto;min-width:0}
   .cmp-main>.splitter.v{display:block}
   .cmp-side{width:var(--side-w);overflow:hidden;border-top:0;border-left:1px solid var(--border-strong)}
-  .cmp-side .side-upper{flex:1 1 0;height:auto;min-height:0;overflow-y:auto;overscroll-behavior:contain}   /* セクターの操作は、カードの下をスクロールして出す */
+  /* 右の列: カードは常時表示。その下に「セクター」「グラフ」のタブ。選んだ方だけを出す(案件 63) */
+  .cmp-side .side-upper,.side-upper-in{display:contents}
+  .cmp-cards{order:1;flex:none;padding:6px 8px}
+  .side-tabs{display:flex;order:2;flex:none;gap:4px;padding:4px 8px 0;border-bottom:2px solid var(--accent)}
+  .side-tabs button{flex:1;height:28px;border:1px solid var(--border-strong);border-bottom:0;border-radius:var(--r-m) var(--r-m) 0 0;background:var(--surface-2);color:var(--muted);font:inherit;font-size:12px;font-weight:700;cursor:pointer}
+  .side-tabs button.on{border:2px solid var(--accent);border-bottom:0;margin-bottom:-2px;height:30px;background:var(--set-open-head);color:var(--text)}
+  .cmp-side .sec-block{order:3;flex:1 1 0;min-height:0;overflow-y:auto;overscroll-behavior:contain;border-top:0;padding:6px 8px}   /* セクターの操作は、タブの下をスクロールして出す */
+  .side-graph{order:3;flex:1 1 0;height:auto;border-bottom:0;border-top:0}
+  .cmp-side[data-tab="graph"] .sec-block,.cmp-side[data-tab="sectors"] .side-graph{display:none}
   .cmp-side>.splitter{display:none}
-  .side-graph{order:0;flex:1.25 1 0;height:auto;border-bottom:0;border-top:1px solid var(--border-strong)}
-  .side-upper-in{padding:6px 8px;gap:6px}
   .cmp-cards{display:grid;grid-template-columns:1fr 1fr;gap:4px}
   .cmp-cards .card{min-height:40px;padding:2px 6px;gap:6px}
   .cmp-cards .card .chip{width:20px;height:20px;font-size:11px}

@@ -33,7 +33,6 @@ function setHtml(i: number): string {
         <div class="sec-body">
           <div class="set-tools"><div class="toolbar set-circuit"></div><div class="toolbar set-bar"></div></div>
           <div class="set-hint" hidden></div>
-          <div class="set-drop"></div>
           <div class="files"></div>
           <div class="foot"></div>
         </div>
@@ -267,13 +266,9 @@ export function createSets(root: HTMLElement, session: Session, actions: ImportA
       </div></section>`;
   }
 
-  /** 追加のドロップ枠と、割り当ての案内(セットごと) */
+  /** 割り当ての案内(セットごと) */
   function renderSetExtras(i: number, w: WorkSet) {
     const el = setEls[i];
-    el.querySelector('.set-drop')!.innerHTML = w.logs.length
-      ? `<div class="dropbox compact" data-act="drop-pick" data-set="${i}" tabindex="0" role="button" data-fk="s${i}-drop">ここに .vbo ファイルをドラッグ&ドロップして追加(またはクリックして選択)</div>`
-      : `<div class="dropbox" data-act="drop-pick" data-set="${i}" tabindex="0" role="button" data-fk="s${i}-drop">
-          <b>ここに .vbo ファイルをドラッグ&ドロップ</b><small>またはクリックしてファイルを選択(複数まとめて選べます)</small></div>`;
     const hint = el.querySelector<HTMLElement>('.set-hint')!;
     const ready = needsAssign(w);
     hint.hidden = !ready;
@@ -316,7 +311,11 @@ export function createSets(root: HTMLElement, session: Session, actions: ImportA
         ` title="${session.setLabel(i)}${shown ? '(表示セット)' : ''}">${shown ? SHOWN_MARK : ''}${esc(alias || session.setLabel(i))}` +
         `<span class="badge set-badge${n ? ' has-logs' : ''}">${n} 本</span></button>`;
     }).join('');
+    syncTabsHeight();
   }
+  /** 固定するタブの高さを CSS に渡す(「表示中にする」「別名」の行を、タブの真下に固定するため。案件 63) */
+  function syncTabsHeight() { groupEl.style.setProperty('--sets-tabs-h', `${tabsEl.getBoundingClientRect().height}px`); }
+  if (typeof ResizeObserver !== 'undefined') new ResizeObserver(syncTabsHeight).observe(tabsEl);
   function showTab(set: number) { tabSet = set; renderSetTabs(); }
 
   function scrollToSet(set: number) {

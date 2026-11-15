@@ -122,7 +122,11 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
         <div class="splitter v" id="cmp-sp-v" role="separator" aria-orientation="vertical" tabindex="0"
           aria-label="地図と右パネルの境界(ドラッグで幅を変更)"
           title="ドラッグで幅を変更 / ダブルクリックで元に戻す"></div>
-        <aside class="cmp-side" id="cmp-side" aria-label="走行データ">
+        <aside class="cmp-side" id="cmp-side" aria-label="走行データ" data-tab="graph">
+          <div class="side-tabs" id="cmp-side-tabs" role="tablist" aria-label="右の列の表示(横向きのスマホのとき)">
+            <button type="button" role="tab" data-act="side-tab" data-tab="sectors" aria-selected="false">セクター</button>
+            <button type="button" role="tab" data-act="side-tab" data-tab="graph" aria-selected="true" class="on">グラフ</button>
+          </div>
           <div class="side-upper" id="cmp-upper">
             <div class="side-upper-in" id="cmp-upper-in">
               <label class="sel cmp-set" id="cmp-set-wrap">${SHOWN_MARK}<select id="cmp-set" class="cmp-set-sel" data-fk="cmp-set" aria-label="表示中の比較セット"></select></label>
@@ -940,6 +944,16 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
     }
   });
 
+  // ---------- 横向きのスマホ: 右の列は、カードの下に「セクター」「グラフ」のタブ(案件 63。タブが出るのは横向きのときだけ) ----------
+  function setSideTab(t: 'sectors' | 'graph') {
+    $('cmp-side').dataset.tab = t;
+    root.querySelectorAll<HTMLElement>('#cmp-side-tabs [data-tab]').forEach((b) => {
+      const on = b.dataset.tab === t;
+      b.classList.toggle('on', on); b.setAttribute('aria-selected', String(on));
+    });
+    if (t === 'graph') graph.resize();         // 隠していた間に大きさが変わっていても、描き直す
+  }
+
   // ---------- 操作 ----------
   root.addEventListener('click', (e) => {
     const el = (e.target as HTMLElement).closest<HTMLElement>('[data-act]');
@@ -956,6 +970,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
         setPressed('[data-act="rate"]', (b) => b === el);
         break;
       case 'xkind': setXKind(d.kind as XKind); break;
+      case 'side-tab': setSideTab(d.tab === 'sectors' ? 'sectors' : 'graph'); break;
       case 'zoom-in': graph.zoomIn(); break;
       case 'zoom-out': graph.zoomOut(); break;
       case 'zoom-reset': graph.resetZoom(); break;

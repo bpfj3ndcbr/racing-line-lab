@@ -138,3 +138,28 @@ describe('上部バーの「表示中」と比較セット(スマホの横向き
     expect(b).toContain('#cmp-set-wrap,#cmp-sync{display:none}');     // セクターボタンの動作も上部バーへ
   });
 });
+
+describe('右の列の「セクター」「グラフ」のタブ(スマホの横向き。案件 63)', () => {
+  const tab = (t: string) => $<HTMLButtonElement>(`#cmp-side-tabs [data-tab="${t}"]`);
+  const sel = () => ['sectors', 'graph'].filter((t) => tab(t).getAttribute('aria-selected') === 'true');
+
+  it('はじめは「グラフ」。押したタブだけが選ばれ、右の列の data-tab が変わる', () => {
+    expect($('#cmp-side').dataset.tab).toBe('graph');
+    expect(sel()).toEqual(['graph']);
+    tab('sectors').click();
+    expect($('#cmp-side').dataset.tab).toBe('sectors');
+    expect(sel()).toEqual(['sectors']);
+    expect(tab('sectors').classList.contains('on') && !tab('graph').classList.contains('on')).toBe(true);
+    tab('graph').click();
+    expect($('#cmp-side').dataset.tab).toBe('graph');
+    expect(sel()).toEqual(['graph']);
+  });
+
+  it('タブが出るのは横向きのときだけ。横向きでは、選んでいない方を隠し、カードは常に出す', () => {
+    expect(css).toMatch(/\.side-tabs\{display:none\}/);
+    const b = css.slice(css.indexOf('@media (orientation:landscape) and (max-height:500px){'));
+    expect(b).toMatch(/\.side-tabs\{display:flex;/);
+    expect(b).toContain('.cmp-side[data-tab="graph"] .sec-block,.cmp-side[data-tab="sectors"] .side-graph{display:none}');
+    expect(b).not.toMatch(/\.cmp-cards\{[^}]*display:none/);
+  });
+});

@@ -53,7 +53,7 @@ describe('大きな画面: 登録', () => {
     expect(work().hidden).toBe(false);
     expect($('#import-body').hidden).toBe(true);
     const kids = Array.from($('#view-import').children).map((c) => c.id);
-    expect(kids.slice(0, 3)).toEqual(['slots', 'guide', 'work']);                  // カードの下(はじめかたは、大きな画面の間は隠れる)
+    expect(kids.slice(0, 4)).toEqual(['slots', 'guide', 'guide-mini', 'work']);                  // カードの下(はじめかたは、大きな画面の間は隠れる)
     expect($('#guide').hidden).toBe(true);
     expect($('.navtab[data-view="import"]').getAttribute('aria-current')).toBe('page');
     expect($('#ce-title').textContent).toBe('サーキットの登録');

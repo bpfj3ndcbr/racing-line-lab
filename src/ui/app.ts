@@ -240,7 +240,7 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
       await importApi?.addShared(files);
     }).catch(() => session.say('共有されたファイルを受け取れませんでした。', true));
   }
-  // ファイルを枠の外に落としても、ブラウザがそのファイルを開いてしまわないようにする(追加は、ドロップ枠に落としたときだけ)
+  // ファイルを枠の外に落としても、ブラウザがそのファイルを開いてしまわないようにする(ドラッグ&ドロップでの追加は行わない)
   const stopDrop = (e: DragEvent) => { if (Array.from(e.dataTransfer?.types ?? []).includes('Files')) e.preventDefault(); };
   window.addEventListener('dragover', stopDrop);
   window.addEventListener('drop', stopDrop);
