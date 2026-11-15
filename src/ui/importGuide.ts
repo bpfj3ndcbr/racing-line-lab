@@ -44,6 +44,8 @@ export function createGuide(el: HTMLElement, session: Session, actions: ImportAc
     if (mini) {
       mini.innerHTML = `<div class="gmini" role="group" aria-label="はじめかた(簡易表示)">${steps.map((s, k) => {
         const mark = k < cur ? '✓' : String(k + 1);
+        // 手順 4 が「いまここ」のときは、横幅いっぱいの青いボタン(押すと比較画面へ)
+        if (k === 3 && k === cur) return `<button type="button" class="gm gm-go cur" data-act="guide-compare" aria-current="step">比較画面へ ▶</button>`;
         return `<div class="gm${k < cur ? ' done' : k === cur ? ' cur' : ''}" title="${s.t}"${k === cur ? ' aria-current="step"' : ''}><span class="gn" aria-hidden="true">${mark}</span>${k === cur ? `<span class="gmt">${SHORT[k]}</span>` : `<span class="sr-only">${s.t}</span>`}</div>`;
       }).join('')}</div>`;
     }

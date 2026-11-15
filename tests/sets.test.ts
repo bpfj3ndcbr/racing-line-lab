@@ -46,8 +46,9 @@ describe('比較セット 1〜5', () => {
     expect(Array.from(root.querySelectorAll<HTMLElement>('.set-sec .set-shown')).map((e) => e.textContent)).toEqual(Array(5).fill('表示中にする'));
     expect(Array.from(root.querySelectorAll<HTMLButtonElement>('[data-act="set-active"]')).every((b) => b.disabled)).toBe(true);
     expect(session.shownIndex).toBeNull();
-    expect($('#slots .slots-title').textContent).toBe('表示予定比較セット1');                    // 「表示中の比較セットはありません…」の案内は無い(案件 65)
+    expect($('#slots .slots-title').textContent).toContain('表示予定比較セット1');                    // 「表示中の比較セットはありません…」の案内は無い(案件 65)
     expect($('#slots .slots-title .shown-mark')).toBeNull();
+    expect($('#slots .slots-title .slots-circuit').textContent).toContain('サーキット: ');            // スマホの幅でだけ見える(CSS)
     expect($('#guide').textContent).toContain('表示予定のセット(比較セット1)');
   });
 
@@ -59,7 +60,7 @@ describe('比較セット 1〜5', () => {
     session.toggleAssignment('A', { logId: 'u', lap: 1 }, 0);
     expect(session.shownIndex).toBe(0);
     expect($('#sec-set-0 .set-shown .shown-mark')).not.toBeNull();
-    expect($('#slots .slots-title').textContent).toBe('表示中比較セット1');
+    expect($('#slots .slots-title').textContent).toContain('表示中比較セット1');
     expect($('#slots .slots-title .shown-mark')).not.toBeNull();
     expect($('#guide').textContent).toContain('表示中のセット(比較セット1)');
     expect($<HTMLButtonElement>('#sec-set-2 [data-act="set-active"]').disabled).toBe(true);   // 割り当てが無いので押せない
@@ -67,7 +68,7 @@ describe('比較セット 1〜5', () => {
     expect(session.shownIndex).toBe(2);
     $<HTMLButtonElement>('#sec-set-0 [data-act="set-active"]').click();
     expect(session.shownIndex).toBe(0);
-    expect($('#slots .slots-title').textContent).toBe('表示中比較セット1');
+    expect($('#slots .slots-title').textContent).toContain('表示中比較セット1');
     session.toggleAssignment('A', { logId: 'u', lap: 1 }, 0);                                 // 割り当てを外すと、表示中が無い状態に戻る
     expect(session.shownIndex).toBeNull();
   });

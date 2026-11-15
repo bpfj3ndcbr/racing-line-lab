@@ -390,3 +390,16 @@ describe('簡易のはじめかた(案件 65)', () => {
     expect(cells()).toHaveLength(0);
   });
 });
+
+describe('簡易のはじめかたの手順 4(案件 65)', () => {
+  it('「いまここ」になると青いボタン「比較画面へ ▶」になり、押すと比較画面へ行く。それまでは番号だけ', () => {
+    expect(root.querySelector('#guide-mini .gm-go')).toBeNull();
+    session.registerCircuit('オートポリス', cln, sci);
+    session.addLog(parseOne(), 'u', 0);
+    session.autoAssignFastest(0);
+    const b = $<HTMLButtonElement>('#guide-mini .gm-go');
+    expect(b.textContent).toBe('比較画面へ ▶');
+    b.click();
+    expect($<HTMLElement>('#view-compare').hidden).toBe(false);
+  });
+});

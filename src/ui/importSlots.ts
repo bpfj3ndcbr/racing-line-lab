@@ -45,7 +45,9 @@ export function createSlots(el: HTMLElement, session: Session): SlotsPart {
     const title = shownI === null
       ? `<span>表示予定</span><b>${esc(session.setName(session.activeIndex))}</b>`
       : `${SHOWN_MARK}<b>${esc(session.setName(shownI))}</b>${session.aliasOf(shownI) ? ` <span class="sub">(${session.setLabel(shownI)})</span>` : ''}`;
-    el.innerHTML = `<div class="slots-title">${title}</div><div class="slots-row">${cards}</div>`;
+    // サーキット名: 上部のバーに出ない幅(スマホ)でだけ、この行に出す(CSS)
+    const circuit = `<span class="slots-circuit">サーキット: <b>${esc(session.setCircuitOf()?.name ?? '未選択')}</b></span>`;
+    el.innerHTML = `<div class="slots-title">${title}${circuit}</div><div class="slots-row">${cards}</div>`;
     const inp = el.querySelector<HTMLInputElement>('.slot-alias-input');
     if (inp && draftText !== undefined && draft) { inp.value = draftText; inp.focus(); inp.setSelectionRange(draftText.length, draftText.length); }
   }
