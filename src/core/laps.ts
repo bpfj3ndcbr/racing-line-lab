@@ -139,7 +139,8 @@ export function detectLapRun(
 
   // 取り込み範囲で切った所(時刻が飛ぶ所)をまたぐラップは出さない。ほかのラップの番号は変えない
   // (割り当て・終端の調整はラップの番号で覚えているため。番号は飛ぶ)。通過が無いときの全体の参考値は除かない
-  const kept = cross.length ? laps.filter((l) => !spansGap(log, l)) : laps;
+  // (通過が無いときは laps をそのまま使う。同じ配列を参照したまま空にしないよう、コピーを渡す)
+  const kept = cross.length ? laps.filter((l) => !spansGap(log, l)) : [...laps];
   const cutLaps = laps.filter((l) => !kept.includes(l)).map((l) => l.number);
   laps.length = 0;
   laps.push(...kept);
