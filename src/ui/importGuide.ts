@@ -12,10 +12,15 @@ function guideStep(w: WorkSet): number {
   return 2;
 }
 
-export function createGuide(el: HTMLElement, session: Session, actions: ImportActions): ImportPart {
+/** 簡易表示で「いまここ」に添える短い題名(案件 65) */
+const SHORT = ['ログ追加', 'サーキット', '割り当て', '比較'];
+
+/** mini: 簡易表示の置き場。スクロールして上へ送ったときに、画面の上に固定して出す(出し入れは importView が行う) */
+export function createGuide(el: HTMLElement, session: Session, actions: ImportActions, mini?: HTMLElement): ImportPart {
   function render() {
     if (session.guideClosed) {
       el.innerHTML = '<button class="linkbtn" data-act="guide-open" data-fk="guide-open">はじめかた ▸</button>';
+      if (mini) mini.innerHTML = '';
       return;
     }
     const w = session.active;
@@ -36,6 +41,12 @@ export function createGuide(el: HTMLElement, session: Session, actions: ImportAc
       { t: '比較する', d: '「比較画面へ」を押して、走行ラインを見比べます。',
         b: btn('guide-compare', '比較画面へ ▶') },
     ];
+    if (mini) {
+      mini.innerHTML = `<div class="gmini" role="group" aria-label="はじめかた(簡易表示)">${steps.map((s, k) => {
+        const mark = k < cur ? '✓' : String(k + 1);
+        return `<div class="gm${k < cur ? ' done' : k === cur ? ' cur' : ''}" title="${s.t}"${k === cur ? ' aria-current="step"' : ''}><span class="gn" aria-hidden="true">${mark}</span>${k === cur ? `<span class="gmt">${SHORT[k]}</span>` : `<span class="sr-only">${s.t}</span>`}</div>`;
+      }).join('')}</div>`;
+    }
     el.innerHTML = `<section class="guide" aria-label="はじめかた">
       <div class="gh"><b>はじめかた</b><span class="sub">${session.shownIndex === null ? '表示予定' : '表示中'}のセット(${esc(session.setName(session.activeIndex))})の状態に合わせて、次の操作を案内します</span>
         <button class="linkbtn" data-act="guide-close" data-fk="guide-close">閉じる ×</button></div>

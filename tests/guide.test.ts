@@ -344,9 +344,10 @@ describe('文字の大きさ(CSS)', () => {
   it('全体の文字は 13px', () => {
     expect(css).toMatch(/^body\{[^}]*font:13px\/1\.5/m);
   });
-  it('データ管理は、ヘッダー・A〜D のカード・はじめかたを固定して、その下だけスクロールする', () => {
-    expect(css).toContain('#view-import{display:flex;flex-direction:column;height:calc(100vh - var(--top-h))');
-    expect(css).toMatch(/#view-import>\.body\{[^}]*overflow:auto/);
+  it('データ管理は、ヘッダーは動かさず、この中をスクロールする。A〜D のカードは上に固定する(案件 65)', () => {
+    expect(css).toMatch(/#view-import\{height:calc\(100vh - var\(--top-h\)\)[^}]*overflow:auto/);
+    expect(css).toMatch(/\.slots\{[^}]*position:sticky;top:0/);
+    expect(css).toMatch(/\.guide-mini\{position:sticky;top:var\(--imp-slots-h,0px\);height:0/);
   });
   it('比較画面のカードの文字の大きさ', () => {
     expect(css).toContain('.card .c1{font-weight:700;font-size:10px}');
@@ -356,18 +357,36 @@ describe('文字の大きさ(CSS)', () => {
 });
 
 describe('サーキット編集中は画面を移れない', () => {
-  it('編集中は上部のタブと「比較画面へ」が押せず、キャンセルで戻ると押せる', () => {
+  it('編集中は上部のタブが押せず、キャンセルで戻ると押せる', () => {
     session.registerCircuit('オートポリス', cln, sci);
     session.addLog(parseOne(), 'u', 0);
     session.autoAssignFastest(0);
     $<HTMLButtonElement>('[data-act="open-circuit-editor"]').click();
     const tabs = Array.from(root.querySelectorAll<HTMLButtonElement>('.navtab'));
     expect(tabs.filter((t) => t.disabled)).toHaveLength(3);     // 使い方・比較・設定
-    expect($<HTMLButtonElement>('[data-act="goto-compare"]').disabled).toBe(true);
     nav('compare');
     expect($<HTMLElement>('#view-compare').hidden).toBe(true);
     $<HTMLButtonElement>('#ce-cancel').click();
     expect(tabs.every((t) => !t.disabled)).toBe(true);
-    expect($<HTMLButtonElement>('[data-act="goto-compare"]').disabled).toBe(false);
+  });
+});
+
+describe('簡易のはじめかた(案件 65)', () => {
+  const cells = () => Array.from(root.querySelectorAll<HTMLElement>('#guide-mini .gm'));
+  it('4 つの手順が並び、「いまここ」だけが番号と短い題名、ほかは番号(済みは ✓)だけを出す', () => {
+    expect(cells()).toHaveLength(4);
+    expect(cells()[0].classList.contains('cur')).toBe(true);
+    expect(cells()[0].textContent).toContain('1ログ追加');
+    expect(cells()[1].querySelector('.gmt')).toBeNull();
+    expect(cells()[1].querySelector('.gn')!.textContent).toBe('2');
+    session.addLog(parseOne(), 'u', 0);
+    expect(cells()[0].querySelector('.gn')!.textContent).toBe('✓');
+    expect(cells().findIndex((c) => c.classList.contains('cur'))).toBeGreaterThan(0);
+  });
+  it('「閉じる ×」でカードの下の簡易表示も消える。カードは 1 行で、見出し行・「比較画面へ」は無い', () => {
+    expect(root.querySelector('#slots .slots-title')).toBeNull();
+    expect(root.querySelector('#slots [data-act="goto-compare"]')).toBeNull();
+    $<HTMLButtonElement>('[data-act="guide-close"]').click();
+    expect(cells()).toHaveLength(0);
   });
 });

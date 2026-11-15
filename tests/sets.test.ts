@@ -46,7 +46,7 @@ describe('比較セット 1〜5', () => {
     expect(Array.from(root.querySelectorAll<HTMLElement>('.set-sec .set-shown')).map((e) => e.textContent)).toEqual(Array(5).fill('表示中にする'));
     expect(Array.from(root.querySelectorAll<HTMLButtonElement>('[data-act="set-active"]')).every((b) => b.disabled)).toBe(true);
     expect(session.shownIndex).toBeNull();
-    expect($('#slots .slots-title').textContent).toBe('表示中の比較セットはありません(ラップを A〜D に割り当てると表示されます)');
+    expect($('#slots .slots-title')).toBeNull();                                           // 見出し行・案内は無い(案件 65)
     expect($('#guide').textContent).toContain('表示予定のセット(比較セット1)');
   });
 
@@ -58,18 +58,14 @@ describe('比較セット 1〜5', () => {
     session.toggleAssignment('A', { logId: 'u', lap: 1 }, 0);
     expect(session.shownIndex).toBe(0);
     expect($('#sec-set-0 .set-shown .shown-mark')).not.toBeNull();
-    expect($('#slots .slots-title').textContent).toBe('表示中比較セット1');
-    expect($('#slots .slots-title .shown-mark')).not.toBeNull();
     expect($('#guide').textContent).toContain('表示中のセット(比較セット1)');
     expect($<HTMLButtonElement>('#sec-set-2 [data-act="set-active"]').disabled).toBe(true);   // 割り当てが無いので押せない
     session.toggleAssignment('B', { logId: 'u', lap: 1 }, 2);                                 // 割り当てると、その比較セットが表示中
     expect(session.shownIndex).toBe(2);
     $<HTMLButtonElement>('#sec-set-0 [data-act="set-active"]').click();
     expect(session.shownIndex).toBe(0);
-    expect($('#slots .slots-title').textContent).toBe('表示中比較セット1');
     session.toggleAssignment('A', { logId: 'u', lap: 1 }, 0);                                 // 割り当てを外すと、表示中が無い状態に戻る
     expect(session.shownIndex).toBeNull();
-    expect($('#slots .slots-title').textContent).toContain('表示中の比較セットはありません');
   });
 });
 
@@ -173,7 +169,7 @@ describe('セットは独立している(位置補正だけが共通)', () => {
     $<HTMLButtonElement>('#sec-set-1 [data-act="assign"][data-slot="C"]').click();
     expect(session.activeIndex).toBe(1);
     expect(session.assignment.C).toEqual({ logId: 'u', lap: 1 });
-    expect($('#slots .slots-title').textContent).toContain('比較セット2');
+    expect($('#guide').textContent).toContain('比較セット2');
     expect(session.sets[0].assignment.C).toBeNull();
   });
 
@@ -368,16 +364,13 @@ describe('セットの別名', () => {
     session.setAlias(2, 'あ');
     expect(new Session(store).aliasOf(2)).toBe('あ');
   });
-  it('比較画面のプルダウンと上部のカードに別名が出る(元の名前と件数も)', () => {
+  it('比較画面のプルダウンに別名が出る(元の名前と件数も)', () => {
     session.addLog(log(), 'u', 1);
     session.toggleAssignment('A', { logId: 'u', lap: 1 }, 1);
     $<HTMLButtonElement>('[data-act="nav"][data-view="compare"]').click();
     session.setAlias(1, '先週');
     const opt = Array.from(root.querySelectorAll<HTMLOptionElement>('#cmp-set option'))[1];
     expect(opt.textContent).toBe('先週(1本)');
-    session.setActive(1);
-    expect($('.slots-title').textContent).toContain('先週');
-    expect($('.slots-title').textContent).toContain('比較セット2');
   });
 });
 

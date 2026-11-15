@@ -156,7 +156,7 @@ describe('データ管理画面から位置補正の画面へ', () => {
     expect($('#import-body').hidden).toBe(true);
     expect($('#view-import').hidden).toBe(false);
     const kids = Array.from($('#view-import').children).map((c) => c.id);
-    expect(kids.slice(0, 3)).toEqual(['slots', 'guide', 'work']);                  // カードの下(はじめかたは、大きな画面の間は隠れる)
+    expect(kids.slice(0, 4)).toEqual(['slots', 'guide', 'guide-mini', 'work']);                  // カードの下(はじめかたは、大きな画面の間は隠れる)
     expect($('#guide').hidden).toBe(true);
     expect($('#slots').hidden).toBe(false);
     expect($('#cor-title').textContent).toBe('Run 1 の位置補正');
@@ -262,17 +262,17 @@ describe('補正量を動かしたまま、ほかの画面へ移るとき(1.2.1)
     expect(store.get('offsets')).toBeFalsy();
   });
 
-  it('カードの横の「比較画面へ」も確かめる', async () => {
+  it('はじめかたの「比較画面へ」も確かめる', async () => {
     session.toggleAssignment('A', { logId: 'u', lap: 1 });
     openCorrect();
     key('ArrowRight');
-    $<HTMLButtonElement>('[data-act="goto-compare"]').click();
+    $<HTMLButtonElement>('[data-act="guide-compare"]').click();
     expect(dialog()).not.toBeNull();
     dialogBtn('cancel').click();
     await flush();
     expect($('#view-compare').hidden).toBe(true);
     expect(work().hidden).toBe(false);
-    $<HTMLButtonElement>('[data-act="goto-compare"]').click();
+    $<HTMLButtonElement>('[data-act="guide-compare"]').click();
     dialogBtn('ok').click();
     await flush();
     expect($('#view-compare').hidden).toBe(false);

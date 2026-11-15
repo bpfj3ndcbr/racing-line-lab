@@ -1,15 +1,14 @@
 import { SLOTS, type Slot, formatLapTime, escapeHtml as esc } from '../core';
 import { SLOT_ALIAS_MAX, type Session } from '../store/session';
-import { type ImportActions, type ImportPart, dateOf } from './importParts';
-import { SHOWN_MARK } from './marks';
+import { type ImportPart, dateOf } from './importParts';
 
-/** 「データ管理」の上部: 表示中の比較セットの A〜D のカードと、カード名(A〜D の別名)の編集、「比較画面へ」 */
+/** 「データ管理」の上部: 表示中の比較セットの A〜D のカード(1 行の小さなカード)と、カード名(A〜D の別名)の編集 */
 export interface SlotsPart extends ImportPart {
   /** カード名の入力欄でのキー操作(Enter で確定、Esc でやめる) */
   onAliasKey(e: KeyboardEvent): void;
 }
 
-export function createSlots(el: HTMLElement, session: Session, deps: { actions: ImportActions; editingCircuit: () => boolean }): SlotsPart {
+export function createSlots(el: HTMLElement, session: Session): SlotsPart {
   let editing: Slot | null = null;
 
   function commit() {
@@ -33,16 +32,14 @@ export function createSlots(el: HTMLElement, session: Session, deps: { actions: 
           <button class="btn xs pri" data-act="slot-alias-ok" data-slot="${s}">確定</button></div>`;
       } else if (r) {
         body = `<div class="st">${alias ? `${esc(alias)} <span class="sub">Run ${r.log.no}</span>` : `Run ${r.log.no}`}</div>
-           <div class="sub num">LAP ${r.lap.number}: ${formatLapTime(r.lap.duration)} ・ ${dateOf(r.log).split(' ')[0]}</div>`;
+           <div class="sub num"><span class="lapno">LAP ${r.lap.number}: </span>${formatLapTime(r.lap.duration)}</div>`;
       } else body = '<div class="mut">未割り当て</div>';
       const pen = r && !edit ? `<button class="btn xs slot-pen" data-act="slot-alias-edit" data-slot="${s}" aria-label="${s} のカード名を編集" title="カード名を編集">✎</button>` : '';
-      return `<div class="slot slot-${s.toLowerCase()}"><span class="chip s${s.toLowerCase()}">${s}</span><div class="slot-main">${body}</div>${pen}</div>`;
-    }).join('') + `<button class="btn pri" data-act="goto-compare" data-fk="goto-compare"${deps.editingCircuit() ? ' disabled title="サーキットの登録・編集中です。登録かキャンセルをしてください"' : SLOTS.some((s) => session.assignment[s]) ? '' : ' disabled title="A〜D にラップを割り当ててください"'}>比較画面へ ▶</button>`;
-    const shownI = session.shownIndex;
-    const title = shownI === null
-      ? '表示中の比較セットはありません(ラップを A〜D に割り当てると表示されます)'          // 案件 28
-      : `${SHOWN_MARK}<b>${esc(session.setName(shownI))}</b>${session.aliasOf(shownI) ? ` <span class="sub">(${session.setLabel(shownI)})</span>` : ''}`;
-    el.innerHTML = `<div class="slots-title">${title}</div><div class="slots-row">${cards}</div>`;
+      const tip = r ? ` title="${esc(dateOf(r.log))}"` : '';
+      const tap = r && !edit ? ` data-act="slot-alias-edit" data-slot="${s}"` : '';          // スマホでは鉛筆を出さず、カードを押して名前を編集する
+      return `<div class="slot slot-${s.toLowerCase()}${edit ? ' editing' : ''}"${tip}${tap}><span class="chip s${s.toLowerCase()}">${s}</span><div class="slot-main">${body}</div>${pen}</div>`;
+    }).join('');
+    el.innerHTML = `<div class="slots-row">${cards}</div>`;
     const inp = el.querySelector<HTMLInputElement>('.slot-alias-input');
     if (inp && draftText !== undefined && draft) { inp.value = draftText; inp.focus(); inp.setSelectionRange(draftText.length, draftText.length); }
   }
@@ -53,7 +50,6 @@ export function createSlots(el: HTMLElement, session: Session, deps: { actions: 
       switch (act) {
         case 'slot-alias-edit': editing = d.slot as Slot; render(); el.querySelector<HTMLInputElement>('.slot-alias-input')?.select(); return true;
         case 'slot-alias-ok': commit(); return true;
-        case 'goto-compare': deps.actions.toCompare(); return true;
         default: return false;
       }
     },

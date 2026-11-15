@@ -120,8 +120,8 @@ h2{margin:0}
 .cur b{font-weight:700}
 
 /* A〜D の割り当て欄 */
-.slots{display:flex;gap:12px;align-items:center;padding:16px 24px;background:var(--bar);border-bottom:1px solid var(--border)}
-.slot{flex:1;display:flex;gap:10px;align-items:center;min-height:56px;padding:8px 12px;border-radius:var(--r-m);
+.slots{display:flex;gap:12px;align-items:center;padding:6px 24px;background:var(--bar);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:8}   /* 上に固定(案件 65) */
+.slot{flex:1;display:flex;gap:8px;align-items:center;min-height:30px;padding:2px 10px;border-radius:var(--r-m);
   background:var(--surface);border:1px solid var(--border)}
 .chip{display:inline-flex;align-items:center;justify-content:center;flex:none;width:28px;height:28px;border-radius:50%;font-weight:800}
 .st{font-weight:700}
@@ -640,8 +640,6 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 
 /* 比較セット 1〜5 */
 .slots{flex-direction:column;align-items:stretch;gap:8px}
-.slots-title{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
-.slots-title b{color:var(--text);font-size:13px}
 .slots-row{display:flex;gap:12px;align-items:center}
 .set-sec .badge{margin-left:4px}
 .set-shown{display:inline-flex;align-items:center;min-width:88px;margin-left:16px}
@@ -679,8 +677,9 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .shown-mark{display:inline-flex;align-items:center;gap:3px;flex:none;padding:0 6px;height:18px;border:1px solid var(--accent);border-radius:9px;background:var(--surface);color:var(--accent);font-size:10px;font-weight:700;line-height:1}
 .sets-group.as-tabs .set-sec:not(.tab-on){display:none}
 /* タブが画面の最上部に来たら、タブと「表示中にする」「別名」の行を固定し、その下をスクロールさせる(案件 63)。タブの高さは --sets-tabs-h(importSets.ts が測る) */
-.sets-group.as-tabs .sets-tabs{position:sticky;top:var(--stick-top,0px);z-index:6}   /* --stick-top: 内側のスクロール領域の上の余白(padding)の分だけ上へ(下の #view-import>.body) */
-.sets-group.as-tabs .set-sec.tab-on>.sec-h{position:sticky;top:calc(var(--stick-top,0px) + var(--sets-tabs-h,0px));z-index:5}
+.sets-group.as-tabs .sets-tabs{position:sticky;top:var(--imp-stack,0px);z-index:6}   /* --imp-stack: 上に固定しているもの(カード・簡易のはじめかた)の高さの合計 */
+.sets-group.as-tabs .set-sec.tab-on>.sec-h{position:sticky;top:calc(var(--imp-stack,0px) + var(--sets-tabs-h,0px));z-index:5}
+.sets-group .set-sec{scroll-margin-top:calc(var(--imp-stack,0px) + var(--sets-tabs-h,0px))}   /* 一覧から移動したとき、固定している部分の下に隠れない */
 .sets-group.as-tabs .set-sec.tab-on{box-shadow:inset 4px 0 0 var(--accent)}
 .sets-group.as-tabs .set-sec.tab-on>.sec-h{border-bottom-width:1px;box-shadow:inset 4px 0 0 var(--accent)}
 .sets-group.as-tabs .set-sec.tab-on>.sec-h{cursor:default}
@@ -731,11 +730,21 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .guide .btn.sm,.set-hint .btn.sm,.empty .btn.sm{min-height:28px;padding:0 12px}
 
 /* データ管理: 上部(ヘッダー・A〜D のカード・はじめかた)は動かさず、その下だけをスクロールする */
-#view-import{display:flex;flex-direction:column;height:calc(100vh - var(--top-h));height:calc(100dvh - var(--top-h));overflow:hidden}
-#view-import>.slots,#view-import>.guide-wrap,#view-import>.work{flex:none}
-#view-import>.body{flex:1 1 0;min-height:0;overflow:auto;max-width:none;--stick-top:-24px}   /* 固定(sticky)の位置は、padding(24px)の内側から測られるので、その分を引く */
+#view-import{height:calc(100vh - var(--top-h));height:calc(100dvh - var(--top-h));overflow:auto;position:relative}   /* PC: 上部のタブは動かさず、この中をスクロールする。カード・簡易のはじめかた・比較セットのタブは、上に固定する(案件 65) */
+#view-import>.body{max-width:none}
 #view-import>.body>*{max-width:1392px;width:100%;box-sizing:border-box}
-.guide-wrap{margin:0;padding:10px 24px;background:var(--bg);border-bottom:1px solid var(--border);max-height:42vh;overflow:auto}
+.guide-wrap{margin:0;padding:10px 24px;background:var(--bg);border-bottom:1px solid var(--border)}
+/* 簡易のはじめかた: はじめかた(大)がカードの下に隠れたら、カードの下に重ねて固定する。高さは持たない(出し入れで下がずれない) */
+.guide-mini{position:sticky;top:var(--imp-slots-h,0px);height:0;z-index:7}
+.gmini{display:none;position:absolute;left:0;right:0;top:0;gap:6px;align-items:center;padding:4px 24px;background:var(--bg);border-bottom:1px solid var(--border-strong);box-shadow:0 2px 4px rgba(0,0,0,.08)}
+.mini-on .gmini{display:flex}
+.gm{flex:none;display:flex;align-items:center;gap:6px;min-width:0;padding:2px 8px 2px 4px;border:1px solid var(--border);border-radius:999px;background:var(--surface-2);color:var(--muted);font-size:11px;font-weight:700}
+.gm .gn{width:20px;height:20px;border-radius:50%;background:var(--border-strong);color:var(--surface);display:flex;align-items:center;justify-content:center;font-size:11px}
+.gm.done .gn{background:var(--c)}
+.gm.cur{background:var(--surface);border:2px solid var(--accent);color:var(--text)}
+.gm.cur .gn{background:var(--accent);color:var(--accent-on)}
+.gm:not(.cur){padding-right:4px}
+.in-work .slots{position:static}   /* 位置補正・登録/編集の画面では、固定しない */
 
 /* 上部のタブは、すべて「データ管理」の幅にそろえる */
 .navtabs{display:grid;grid-auto-flow:column;grid-auto-columns:1fr}
@@ -935,7 +944,11 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .cmp-set select option{font-weight:700}
 
 /* カード名(A〜D の別名) */
-.slot-main{flex:1;min-width:0}
+.slot-main{flex:1;min-width:0;display:flex;gap:8px;align-items:baseline;white-space:nowrap}
+.slot-main>*{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.slots .chip{width:24px;height:24px;font-size:13px}
+.slot[data-act]{cursor:pointer}
+.sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
 .slot-pen{min-height:24px;height:24px;min-width:24px;padding:0 6px;flex:none}
 .slot-edit{display:flex;align-items:center;gap:6px}
 .slot-edit .alias-input{width:9em;max-width:100%}
@@ -998,13 +1011,17 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 
   /* データ管理: 上の固定をやめ、ページ全体をスクロール */
   #view-import{height:auto;overflow:visible}
-  #view-import>.body{overflow:visible;padding:8px;gap:14px;--stick-top:0px}
-  .guide-wrap{max-height:none;padding:8px 12px}
-  .slots{flex-direction:column;align-items:stretch;padding:10px 12px;gap:8px}
-  .slots-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%}
-  .slots-row>.btn{grid-column:1/-1;min-height:44px}
-  .slot{min-height:48px;padding:6px 10px}
-  .slot .sub{display:none}
+  #view-import>.body{overflow:visible;padding:8px;gap:14px}
+  .guide-wrap{padding:8px 12px}
+  .gmini{padding:4px 8px;gap:4px}
+  /* A〜D のカード: 横 4 枚(About 程度の文字)。カードを押すと名前を編集する */
+  .slots{padding:4px 8px}
+  .slots-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;width:100%}
+  .slot{min-height:36px;padding:2px 5px;gap:4px;font-size:10px}
+  .slots .chip{width:18px;height:18px;font-size:11px}
+  .slot-main{flex-direction:column;gap:0;align-items:stretch}
+  .slot-pen,.slot .lapno{display:none}   /* 幅が足りないので、「LAP n:」は省き、タイムだけ出す */
+  .slot.editing{grid-column:1/-1}
   .sec-h{flex-wrap:wrap;padding:6px 10px;gap:6px 10px}
   .sec-hint{display:none}
   .tablist .tab{padding:6px 8px;font-size:12px;white-space:nowrap}

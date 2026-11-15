@@ -52,6 +52,7 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
   root.innerHTML = `
     <div id="slots" class="slots" aria-label="A〜D の割り当て"></div>
     <div id="guide" class="guide-wrap"></div>
+    <div id="guide-mini" class="guide-mini"></div>
     <div id="work" class="work" hidden></div>
     <div class="body" id="import-body">${CIRCUITS_HTML}
 ${OFFSETS_HTML}
@@ -80,8 +81,8 @@ ${SETS_HTML}
   };
   /** サーキットの登録・編集中(保存していないラインがあるので、画面を移れない) */
   const editingCircuit = () => work === 'circuit';
-  const slots = createSlots(slotsEl, session, { actions, editingCircuit });
-  const guide = createGuide($('guide'), session, actions);
+  const slots = createSlots(slotsEl, session);
+  const guide = createGuide($('guide'), session, actions, $('guide-mini'));
   const circuits = createCircuits(root, session, actions);
   const offsets = createOffsets(root, session);
   const sets = createSets(root, session, actions);
@@ -98,7 +99,30 @@ ${SETS_HTML}
       const el = Array.from(root.querySelectorAll<HTMLElement>('[data-fk]')).find((e) => e.dataset.fk === focusKey);
       el?.focus({ preventScroll: true });
     }
+    updateStack();
   }
+
+  // ---------- 上に固定するもの(案件 65): A〜D のカード →(はじめかたを過ぎたら)簡易のはじめかた → 比較セットのタブ → 「表示中にする」の行 ----------
+  // 固定の位置は、上にあるものの高さの合計。CSS の変数(--imp-slots-h / --imp-stack)で渡す。
+  // 簡易のはじめかたは高さを持たず(上に重ねて出す)、出し入れで下の位置がずれない
+  const guideEl = $('guide'), miniEl = $('guide-mini');
+  function updateStack() {
+    const sh = slotsEl.offsetHeight;
+    let on = false;
+    if (!session.guideClosed && !guideEl.hidden && guideEl.offsetHeight > 0 && sh > 0) {
+      on = guideEl.getBoundingClientRect().bottom <= slotsEl.getBoundingClientRect().bottom + 1;   // はじめかた(大)が、カードの下に隠れた
+    }
+    root.classList.toggle('mini-on', on);
+    const mh = on ? (miniEl.firstElementChild as HTMLElement | null)?.offsetHeight ?? 0 : 0;
+    root.style.setProperty('--imp-slots-h', `${sh}px`);
+    root.style.setProperty('--imp-stack', `${sh + mh}px`);
+  }
+  let stackRaf = 0;
+  const onScroll = () => { if (!stackRaf) stackRaf = requestAnimationFrame(() => { stackRaf = 0; updateStack(); }); };
+  root.addEventListener('scroll', onScroll, { passive: true });                // PC: このビューの中をスクロールする
+  window.addEventListener('scroll', onScroll, { passive: true });              // スマホ: ページ全体をスクロールする
+  window.addEventListener('resize', onScroll);
+  if (typeof ResizeObserver === 'function') new ResizeObserver(onScroll).observe(slotsEl);
 
   // ---------- 操作 ----------
   root.addEventListener('click', (e) => {
@@ -294,7 +318,7 @@ ${SETS_HTML}
     backToCompare = false;
     if (!work) return;
     work = null;
-    root.classList.remove('view-ce');
+    root.classList.remove('view-ce', 'in-work');
     correct?.hide(); editor?.hide();
     slots.render(); opts.onWorkChange?.();
     workEl.hidden = true;
@@ -313,6 +337,7 @@ ${SETS_HTML}
       });
     }
     work = kind;
+    root.classList.add('in-work');                                           // 位置補正・登録/編集の画面ではカードを固定しない(案件 65)
     root.classList.toggle('view-ce', kind === 'circuit');                 // 登録・編集の画面では A〜D のカードを隠す
     root.style.setProperty('--slots-h', kind === 'circuit' ? '0px' : `${slotsEl.offsetHeight || 92}px`);
     bodyEl.hidden = true;
