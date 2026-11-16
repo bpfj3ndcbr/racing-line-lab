@@ -207,14 +207,16 @@ select{min-height:44px;padding:0 10px;background:var(--surface);border:1px solid
 .bsec-dot{width:10px;height:10px;border-radius:2px;background:var(--bsec);display:inline-block}
 
 /* サーキットのタブ(サーキット登録 / 登録済みサーキット) */
-.tablist{display:flex;gap:4px;padding-left:8px}
+.tablist{display:flex;gap:4px;padding-left:8px;border-bottom:1px solid var(--accent)}
 .tab{min-height:44px;padding:0 18px;font-weight:700;cursor:pointer;position:relative;margin-bottom:-1px;
   background:var(--surface-2);color:var(--muted);border:1px solid var(--border-strong);
   border-radius:var(--r-m) var(--r-m) 0 0}
-.tab[aria-selected="true"]{background:var(--surface);color:var(--text);border-bottom-color:var(--surface);z-index:1}
+.tab[aria-selected="true"]{background:var(--surface);color:var(--text);border-color:var(--accent) var(--accent) var(--border);border-top:3px solid var(--accent);z-index:1}
+.tab:not([aria-selected="true"]){border-bottom-color:var(--accent)}
 .tab-body{padding:16px;display:flex;flex-direction:column;gap:12px;background:var(--surface);
   border:1px solid var(--border-strong);border-radius:var(--r-m)}
 .tab-body[hidden]{display:none}
+.ctabs>.tab-body{border-top-color:var(--surface)}   /* 選ばれたタブの下に、中身の上の線を出さない(比較セットのタブと同じ見た目) */
 
 /* 登録済みサーキットの一覧(案件 66): 1 行 1 件。一覧だけをスクロールし、下の操作の欄は動かさない */
 .clist{margin:0;max-height:202px;overflow-y:auto;   /* 5 行ぶん(1 行 40px × 5 + 枠 2px)。6 件目からスクロール */
@@ -414,10 +416,11 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .navtab{align-self:flex-end;background:color-mix(in srgb,var(--bar) 88%,var(--text));border:1px solid var(--border-strong);border-bottom:1px solid var(--border-strong);
   border-radius:var(--r-s) var(--r-s) 0 0;box-shadow:none;min-height:40px;padding:0 20px;color:var(--muted);font-weight:600;position:relative}
 .navtab:hover:not(:disabled){color:var(--text);background:color-mix(in srgb,var(--bar) 80%,var(--accent))}
-.navtab.on,.navtab[aria-current="page"]{color:var(--text);font-weight:700;background:var(--bg);border-bottom-color:var(--bg);box-shadow:inset 0 3px 0 var(--accent);z-index:1}
+.navtab.on,.navtab[aria-current="page"]{color:var(--text);font-weight:700;background:var(--bg);border-color:var(--accent) var(--accent) var(--border);box-shadow:inset 0 3px 0 var(--accent);z-index:1}
+.navtab:not(.on):not([aria-current="page"]){border-bottom-color:var(--accent)}   /* 選ばれていないタブも、下の水平線の上に乗る */
 .navtab.dim,.navtab:disabled{opacity:.45;cursor:not-allowed}
 .navtab:focus-visible{outline-offset:-3px}
-.top{border-bottom:1px solid var(--border-strong)}
+.top{border-bottom:1px solid var(--accent)}
 
 /* セクターのボタン(小さめ) */
 .secs .btn.sec{min-height:24px;height:24px;min-width:30px;padding:0 6px;font-size:10px;justify-content:center}
@@ -681,9 +684,9 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .set-sum .sum-slots i:last-of-type{margin-right:4px}
 /* 比較セットのタブ(案件 27。「タブ / 一覧」で切り替える) */
 .sets-view{margin-left:auto}
-.sets-tabs{display:flex;flex-wrap:wrap;align-items:flex-end;gap:4px;padding:10px 12px 0 16px;background:var(--sec-head);border-bottom:2px solid var(--accent)}
+.sets-tabs{display:flex;flex-wrap:wrap;align-items:flex-end;gap:4px;padding:10px 12px 0 16px;background:var(--sec-head);border-bottom:1px solid var(--accent)}
 .set-tab{display:flex;align-items:center;gap:8px;padding:8px 14px;border:1px solid var(--border-strong);border-bottom:0;border-radius:var(--r-m) var(--r-m) 0 0;background:var(--surface-2);color:var(--muted);font:inherit;font-weight:700;cursor:pointer}
-.set-tab.on{border:2px solid var(--accent);border-bottom:0;margin-bottom:-2px;padding-bottom:10px;background:var(--set-open-head);color:var(--text)}
+.set-tab.on{border:1px solid var(--accent);border-top:3px solid var(--accent);border-bottom:0;margin-bottom:-1px;padding-bottom:10px;background:var(--set-open-head);color:var(--text)}
 /* 「表示中」の印(比較セットのタブ・比較画面) */
 .shown-mark{display:inline-flex;align-items:center;gap:3px;flex:none;padding:0 6px;height:18px;border:1px solid var(--accent);border-radius:9px;background:var(--surface);color:var(--accent);font-size:10px;font-weight:700;line-height:1}
 .sets-group.as-tabs .set-sec:not(.tab-on){display:none}
@@ -691,7 +694,7 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .sets-group.as-tabs .sets-tabs{position:sticky;top:var(--imp-stack,0px);z-index:6}   /* --imp-stack: 上に固定しているもの(カード・簡易のはじめかた)の高さの合計 */
 .sets-group.as-tabs .set-sec.tab-on>.sec-h{position:sticky;top:calc(var(--imp-stack,0px) + var(--sets-tabs-h,0px));z-index:5}
 .sets-group .set-sec{scroll-margin-top:calc(var(--imp-stack,0px) + var(--sets-tabs-h,0px))}   /* 一覧から移動したとき、固定している部分の下に隠れない */
-.sets-group.as-tabs .set-sec.tab-on{box-shadow:inset 4px 0 0 var(--accent)}
+.sets-group.as-tabs .set-sec.tab-on{box-shadow:inset 4px 0 0 var(--accent);border-top:1px solid var(--border)}   /* 1 つ目の比較セットにも、選ばれたタブの下の薄い線を出す(:first-of-type の border-top:0 を上書き) */
 .sets-group.as-tabs .set-sec.tab-on>.sec-h{border-bottom-width:1px;box-shadow:inset 4px 0 0 var(--accent)}
 .sets-group.as-tabs .set-sec.tab-on>.sec-h{cursor:default}
 .sets-group.as-tabs .set-sec.tab-on>.sec-h :is(.chev,h2,.set-badge,.sec-hint,.set-sum){display:none}
@@ -1212,9 +1215,9 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
   /* 右の列: カードは常時表示。その下に「セクター」「グラフ」のタブ。選んだ方だけを出す(案件 63) */
   .cmp-side .side-upper,.side-upper-in{display:contents}
   .cmp-cards{order:1;flex:none;padding:6px 8px}
-  .side-tabs{display:flex;order:2;flex:none;gap:4px;padding:4px 8px 0;border-bottom:2px solid var(--accent)}
+  .side-tabs{display:flex;order:2;flex:none;gap:4px;padding:4px 8px 0;border-bottom:1px solid var(--accent)}
   .side-tabs button{flex:1;height:28px;border:1px solid var(--border-strong);border-bottom:0;border-radius:var(--r-m) var(--r-m) 0 0;background:var(--surface-2);color:var(--muted);font:inherit;font-size:12px;font-weight:700;cursor:pointer}
-  .side-tabs button.on{border:2px solid var(--accent);border-bottom:0;margin-bottom:-2px;height:30px;background:var(--set-open-head);color:var(--text)}
+  .side-tabs button.on{border:1px solid var(--accent);border-top:3px solid var(--accent);border-bottom:1px solid var(--border);margin-bottom:-1px;height:30px;background:var(--sec-bg);color:var(--text)}
   .cmp-side .sec-block{order:3;flex:1 1 0;min-height:0;overflow-y:auto;overscroll-behavior:contain;border-top:0;padding:6px 8px}   /* セクターの操作は、タブの下をスクロールして出す */
   .side-graph{order:3;flex:1 1 0;height:auto;border-bottom:0;border-top:0}
   .cmp-side[data-tab="graph"] .sec-block,.cmp-side[data-tab="sectors"] .side-graph{display:none}
