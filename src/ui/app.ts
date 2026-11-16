@@ -18,6 +18,7 @@ import { isSharedLaunch, takeSharedFiles } from '../io/share';
 import type { UpdateWatcher } from '../io/pwa';
 import { MapAreas } from '../store/mapAreas';
 import { installAppleFilePicker } from './fileKind';
+import { installFilePickGuard } from './filePickGuard';
 
 export type ViewName = 'help' | 'import' | 'compare' | 'settings';
 
@@ -62,6 +63,7 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
   const topRight = root.querySelector<HTMLElement>('#top-right')!;
   let current: ViewName = 'import';
   const unApple = installAppleFilePicker(document, navigator);     // iPhone・iPad でファイルが選べるように(案件 29)
+  const unPick = installFilePickGuard(document);                   // ファイルを選ぶ欄の二重タップを防ぐ(案件 70)
   let compare: CompareView | null = null;
   let importApi: ImportApi | null = null;
   let settingsApi: { refresh(): void } | null = null;
@@ -245,5 +247,5 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
   window.addEventListener('dragover', stopDrop);
   window.addEventListener('drop', stopDrop);
   /** 画面を作り直す前に呼ぶ。キー操作の受付(document への登録)を外す。 */
-  return { dispose: () => { unhook(); unApple(); compare?.hide(); importApi?.closeWork(); window.removeEventListener('dragover', stopDrop); window.removeEventListener('drop', stopDrop); } };
+  return { dispose: () => { unhook(); unApple(); unPick(); compare?.hide(); importApi?.closeWork(); window.removeEventListener('dragover', stopDrop); window.removeEventListener('drop', stopDrop); } };
 }
