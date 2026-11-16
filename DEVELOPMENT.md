@@ -104,7 +104,7 @@ npm run build        # 型チェック + ビルド(dist/)
 | `ui.compare.mapMode` / `labels` / `zoom` / `follow` / `xKind` / `sync` / `rate` | 比較画面の「前回の状態」 |
 | `ui.compare.layout` | 比較画面の右パネルの幅・グラフの高さ(`v` が保存形式の版。形式を変えるときは版を上げる) |
 | `ui.setAliases` / `ui.slotAliases` | 比較セットの別名 / カード(セットごとの A〜D)の別名 |
-| `ui.guideClosed` / `ui.guideSeen` | はじめかたの表示状態 |
+| `ui.guideClosed` | はじめかたを閉じているか(「閉じる」を押したときだけ true。古い版の `ui.guideSeen` は、今は読まない) |
 | `ui.seenVersion` | 前回開いたアプリの版(更新された直後の知らせに使う) |
 | `ui.setsView` | 「データ管理」の比較セットの並べ方(`tabs` / `list`) |
 | `ui.mapAreas` | 地図の保存範囲(Z18 のタイルの区切りにそろえた四角 `x0`〜`x1`・`y0`〜`y1` と名前) |
