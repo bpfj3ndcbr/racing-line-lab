@@ -5,6 +5,7 @@ import { ALIAS_MAX, SET_COUNT, type LoadedLog, type Session, type WorkSet, bestD
 import { type ImportActions, type ImportPart, SEC_HINT, dateOf } from './importParts';
 import { candidateLabel } from './loadDialog';
 import { SHOWN_MARK } from './marks';
+import { createScrollCatch } from './scrollCatch';
 
 /**
  * 比較セット 1〜5 の枠: 見出し(表示中の印・別名・要約)、使用するサーキット、走行ログの追加、ラップの一覧(割り当て・終端の調整)。
@@ -285,6 +286,7 @@ export function createSets(root: HTMLElement, session: Session, actions: ImportA
   function setView(v: SetsView) {
     if (v === setsView) return;
     setsView = v;
+    releaseHeight();
     session.setSetting('setsView', v);
     if (v === 'list') setEls.forEach((el, i) => { el.open = listOpen[i]; });
     renderSetTabs();
@@ -317,6 +319,87 @@ export function createSets(root: HTMLElement, session: Session, actions: ImportA
   function syncTabsHeight() { groupEl.style.setProperty('--sets-tabs-h', `${tabsEl.getBoundingClientRect().height}px`); }
   if (typeof ResizeObserver !== 'undefined') new ResizeObserver(syncTabsHeight).observe(tabsEl);
   function showTab(set: number) { tabSet = set; renderSetTabs(); }
+  /** 画面をスクロールしている要素(PC は「データ管理」の画面そのもの、スマホはページ全体) */
+  function scroller() {
+    const ov = typeof getComputedStyle === 'function' ? getComputedStyle(root).overflowY : '';
+    return ov === 'auto' || ov === 'scroll'
+      ? { get: () => root.scrollTop, top: () => root.getBoundingClientRect().top, set: (y: number) => { root.scrollTop = y; } }
+      : { get: () => window.scrollY, top: () => 0, set: (y: number) => { window.scrollTo(0, y); } };
+  }
+  /**
+   * 比較セットのタブを切り替えるときの、スクロール位置の扱い(案件 74 のあと)。
+   * スクロールは 1 つだが、次の 2 つに分けて考える。
+   *  - 全体: 比較セットのタブが上に固定されるところまで(これより上のスクロール)。タブを切り替えても変えない。
+   *  - タブの中: 固定されたタブの下の、中身のスクロール。比較セットごとに覚えて、戻ったときに元の位置へ戻す。
+   * 空の比較セットは、タブの中を上から出す(全体は変えない)。
+   */
+  const innerOf: (number | undefined)[] = Array.from({ length: SET_COUNT }, () => undefined);
+  /** 切り替える前の高さを保つ。中身の短い(空の)比較セットに切り替えても、ページが縮んでスクロール位置が引き戻されない(下に余白が出る) */
+  function pinHeight() { const h = groupEl.offsetHeight; if (h > 0) groupEl.style.minHeight = `${h}px`; }
+  function releaseHeight() { groupEl.style.minHeight = ''; }
+  /**
+   * 比較セットのタブが上に固定されるスクロール量。これより上が「全体」、これより下が「タブの中」。
+   * タブは、比較セットの見出し(「タブで比較セットを切り替えます…」の行)の下にあるので、その高さも足す
+   */
+  function pinScroll(sc: ReturnType<typeof scroller>, y: number) {
+    const stack = parseFloat(root.style.getPropertyValue('--imp-stack')) || 0;          // 上に固定しているもの(カード・簡易のはじめかた)の高さ
+    const head = groupEl.querySelector<HTMLElement>('.sets-group-h')?.offsetHeight ?? 0;
+    return groupEl.getBoundingClientRect().top - sc.top() + y - stack + groupEl.clientTop + head;
+  }
+  function switchTab(next: number) {
+    const sc = scroller();
+    const y = sc.get();
+    const pin = pinScroll(sc, y);
+    const outer = Math.min(y, pin), inner = Math.max(0, y - pin);
+    if (session.sets[tabSet]?.logs.length) innerOf[tabSet] = inner;
+    pinHeight();
+    showTab(next);
+    const nextInner = session.sets[next]?.logs.length ? (innerOf[next] ?? inner) : 0;     // 初めて開くタブは、今の位置のまま
+    sc.set(outer + nextInner);
+    catcher.sync();
+  }
+
+  // ---------- 比較セットの中の、スクロールの引っかかり(1 か所) ----------
+  /**
+   * 引っかける位置のスクロール量: 比較セットの中身の枠(「使用するサーキット」「走行ログを追加」のボタンなどが入った枠)の上端の線が、
+   * 固定している行(タブ・「表示中にする」の行)のすぐ下に来るところ。比較セットをタブにして、その節を出しているときだけ(それ以外は null)。
+   * 上に固定しているもの(A〜D のカードと、簡易のはじめかた)の高さは、「そのスクロール量のときの」高さで数える。
+   * 勢いよく越えたとき、簡易のはじめかたが出る前の高さで数えると、あとで出たときに位置がずれて、止めた位置から動いてしまう。
+   */
+  function catchPin(): number | null {
+    if (!asTabs() || groupEl.offsetHeight === 0 || groupEl.classList.contains('top-off')) return null;
+    const sec = setEls[tabSet];
+    const frame = sec?.querySelector<HTMLElement>(':scope>.sec-body');            // 中身の枠
+    const head = sec?.querySelector<HTMLElement>(':scope>.sec-h');
+    if (!frame || !head) return null;
+    const sc = scroller(), y = sc.get();
+    const base = frame.getBoundingClientRect().top - sc.top() + y - (tabsEl.getBoundingClientRect().height + head.offsetHeight);   // 固定しているカードの高さを除いた位置
+    const slotsH = root.querySelector<HTMLElement>('#slots')?.offsetHeight ?? 0;
+    const guide = root.querySelector<HTMLElement>('#guide');
+    const miniH = (root.querySelector<HTMLElement>('#guide-mini')?.firstElementChild as HTMLElement | null)?.offsetHeight ?? 0;
+    const guideShown = !session.guideClosed && !!guide && !guide.hidden && guide.offsetHeight > 0 && slotsH > 0;
+    const withMini = base - (slotsH + miniH);
+    // その位置では、はじめかたがカードの下に隠れて、簡易のはじめかたが出ているか
+    const guideBottom = guideShown ? guide!.getBoundingClientRect().bottom - sc.top() + y : 0;
+    return guideShown && miniH > 0 && guideBottom - withMini <= slotsH + 1 ? withMini : base - slotsH;
+  }
+  const catcher = createScrollCatch({
+    getY: () => scroller().get(), setY: (y) => scroller().set(y), pin: catchPin,
+    onHold: (held) => root.classList.toggle('scroll-held', held),      // 止めている間は、画面の操作を受け付けない(CSS)
+  });
+  root.addEventListener('scroll', () => catcher.onScroll(), { passive: true });   // PC: この画面の中をスクロールする
+  window.addEventListener('scroll', () => { if (root.isConnected) catcher.onScroll(); }, { passive: true });   // スマホ: ページ全体をスクロールする(画面を作り直したあとの古い部品は、動かさない)
+  // 人の操作によるスクロールだけを止める(スクロールして見せる・タブの切り替えなど、プログラムの動きは止めない)
+  const input = (ms: number) => () => catcher.noteInput(ms);
+  root.addEventListener('wheel', (e) => {
+    const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * (root.clientHeight || 800) : e.deltaY;
+    catcher.noteWheel(dy);
+  }, { passive: true });
+  root.addEventListener('touchstart', input(Infinity), { passive: true });         // 指で触れている間
+  root.addEventListener('touchmove', input(Infinity), { passive: true });
+  root.addEventListener('touchend', input(1500), { passive: true });              // 指を離したあとの慣性
+  root.addEventListener('touchcancel', input(1500), { passive: true });
+  root.addEventListener('keydown', (e) => { if (['PageDown', 'PageUp', 'ArrowDown', 'ArrowUp', 'Home', 'End', ' '].includes(e.key)) catcher.noteInput(400); });
 
   function scrollToSet(set: number) {
     const sec = setEls[set];
@@ -374,6 +457,7 @@ export function createSets(root: HTMLElement, session: Session, actions: ImportA
     scrollToSet,
     focusCircuitSelect,
     closeSets() {
+      releaseHeight();
       listOpen.fill(false);
       if (asTabs()) showTab(session.activeIndex); else setEls.forEach((el) => { el.open = false; });
     },
@@ -390,7 +474,7 @@ export function createSets(root: HTMLElement, session: Session, actions: ImportA
         case 'remove': session.removeLog(d.log!, set); return true;
         case 'correct': actions.openWork('correct', d.log!, set); return true;
         case 'sets-view': setView(d.view as SetsView); return true;
-        case 'set-tab': showTab(Number(d.set)); return true;
+        case 'set-tab': switchTab(Number(d.set)); return true;
         case 'set-active': if (session.canShow(Number(d.set))) session.setActive(Number(d.set)); return true;
         case 'auto-assign': actions.autoAssign(set); return true;
         case 'circ-map': actions.openMapRegister(set, d.log); return true;
