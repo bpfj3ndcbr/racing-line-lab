@@ -6,6 +6,7 @@ import {
   heatColor, heatLevel, heatRuns, parseCln, parseSci, parseVbo,
 } from '../src/core';
 import { MemoryStore } from '../src/io/storage';
+import { Prefs } from '../src/store/prefs';
 import { Session } from '../src/store/session';
 import { mountApp } from '../src/ui/app';
 import { ThemeController } from '../src/ui/theme';
@@ -223,6 +224,13 @@ describe('走行ライン / ヒートマップ(速度) / 加減速 の切り替�
   });
 });
 
+/** 追従の中心は、なめらかにした位置(案件 69)。車の元の位置とは、GPS の細かな揺れの分だけ違う(数 m 以内。1e-4 度は約 10 m) */
+const expectCenterNear = (car: { lat: number; lon: number }) => {
+  const c = fake.centers[fake.centers.length - 1];
+  expect(Math.abs(c[0] - car.lat)).toBeLessThan(1e-4);
+  expect(Math.abs(c[1] - car.lon)).toBeLessThan(1e-4);
+};
+
 describe('地図の追従', () => {
   it('初期は先頭追従(案件 54): 再生位置を動かすと、地図の中心が車に付いてくる', () => {
     setupOne();
@@ -255,10 +263,28 @@ describe('地図の追従', () => {
     followBtn('A').click();
     expect(fake.centers).toHaveLength(n0 + 1);
     seekTo(50);
-    const last = fake.centers[fake.centers.length - 1];
-    expect(last).toEqual([fake.cars[0].lat, fake.cars[0].lon]);
+    expectCenterNear(fake.cars[0]);
     seekTo(100);
-    expect(fake.centers[fake.centers.length - 1]).toEqual([fake.cars[0].lat, fake.cars[0].lon]);
+    expectCenterNear(fake.cars[0]);
+  });
+
+  it('追従の中心は、「なめらかにする」がオフでもなめらかにした位置(案件 69)。オンのときは車の表示と同じ位置', () => {
+    setupOne();
+    followBtn('A').click();
+    const times = [30, 50, 70, 100];
+    // オフ: 車は元の位置のまま。中心は、なめらかにした位置なので、車とはずれる(車の揺れが、ほかの車に伝わらない)
+    const apart = times.filter((t) => {
+      seekTo(t);
+      const c = fake.centers[fake.centers.length - 1];
+      return c[0] !== fake.cars[0].lat || c[1] !== fake.cars[0].lon;
+    });
+    expect(apart.length).toBeGreaterThan(0);
+    // オン: 車もなめらかにした位置なので、中心と一致する
+    new Prefs(session).setSmooth(true);
+    for (const t of times) {
+      seekTo(t + 1);
+      expect(fake.centers[fake.centers.length - 1]).toEqual([fake.cars[0].lat, fake.cars[0].lon]);
+    }
   });
 
   it('地図を手でドラッグすると追従をやめて固定になる', () => {
@@ -280,11 +306,11 @@ describe('地図の追従', () => {
     seekTo(100);
     const dA = [carAt('A').lat, carAt('A').lon], dB = [carAt('B').lat, carAt('B').lon];
     const c = fake.centers[fake.centers.length - 1];
-    expect(c).toEqual(dB);              // B の方が速く、100秒時点では先に進んでいる
+    expectCenterNear(carAt('B'));       // B の方が速く、100秒時点では先に進んでいる
     expect(c).not.toEqual(dA);
     followBtn('A').click();
     seekTo(101);
-    expect(fake.centers[fake.centers.length - 1]).toEqual([carAt('A').lat, carAt('A').lon]);
+    expectCenterNear(carAt('A'));
   });
 
   it.skipIf(!existsSync(bigPath))('先頭追従(横軸「距離」): 全車が同じ距離にいるので、表示中のいちばん若い枠(基準車)を追う', () => {
@@ -293,7 +319,7 @@ describe('地図の追従', () => {
     const carAt = (slot: string) => fake.cars.find((c) => c.slot === slot)!;
     for (const t of [0, 40, 100]) {
       seekTo(t);
-      expect(fake.centers[fake.centers.length - 1]).toEqual([carAt('A').lat, carAt('A').lon]);
+      expectCenterNear(carAt('A'));
     }
   });
 
