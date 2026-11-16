@@ -684,9 +684,9 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .set-sum .sum-slots i:last-of-type{margin-right:4px}
 /* 比較セットのタブ(案件 27。「タブ / 一覧」で切り替える) */
 .sets-view{margin-left:auto}
-.sets-tabs{display:flex;flex-wrap:wrap;align-items:flex-end;gap:4px;padding:10px 12px 0 16px;background:var(--sec-head);border-bottom:1px solid var(--accent)}
-.set-tab{display:flex;align-items:center;gap:8px;padding:8px 14px;border:1px solid var(--border-strong);border-bottom:0;border-radius:var(--r-m) var(--r-m) 0 0;background:var(--surface-2);color:var(--muted);font:inherit;font-weight:700;cursor:pointer}
-.set-tab.on{border:1px solid var(--accent);border-top:3px solid var(--accent);border-bottom:0;margin-bottom:-1px;padding-bottom:10px;background:var(--set-open-head);color:var(--text)}
+.sets-tabs,.top-tabs{display:flex;flex-wrap:wrap;align-items:flex-end;gap:4px;padding:10px 12px 0 16px;background:var(--sec-head);border-bottom:1px solid var(--accent)}
+.set-tab,.top-tab{display:flex;align-items:center;gap:8px;padding:8px 14px;border:1px solid var(--border-strong);border-bottom:0;border-radius:var(--r-m) var(--r-m) 0 0;background:var(--surface-2);color:var(--muted);font:inherit;font-weight:700;cursor:pointer}
+.set-tab.on,.top-tab.on{border:1px solid var(--accent);border-top:3px solid var(--accent);border-bottom:0;margin-bottom:-1px;padding-bottom:10px;background:var(--set-open-head);color:var(--text)}
 /* 「表示中」の印(比較セットのタブ・比較画面) */
 .shown-mark{display:inline-flex;align-items:center;gap:3px;flex:none;padding:0 6px;height:18px;border:1px solid var(--accent);border-radius:9px;background:var(--surface);color:var(--accent);font-size:10px;font-weight:700;line-height:1}
 .sets-group.as-tabs .set-sec:not(.tab-on){display:none}
@@ -699,6 +699,14 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .sets-group.as-tabs .set-sec.tab-on>.sec-h{cursor:default}
 .sets-group.as-tabs .set-sec.tab-on>.sec-h :is(.chev,h2,.set-badge,.sec-hint,.set-sum){display:none}
 .sets-group.as-tabs .set-shown[data-k="on"]{display:none}   /* タブに「表示中」があるので、中の見出しには出さない */
+/* データ管理の上のタブ(案件 74): 幅 768px 以上で「サーキット」「走行ライン補正データ」「比較セット」を 1 本のタブで切り替える。タブの下に、選んだ節だけを続けて出す(スマホの縦画面は、今までの開閉の見出し) */
+.body.tabbed{gap:0}
+.tabbed .top-off{display:none}
+.tabbed>.top-tabs{border:1px solid var(--border-strong);border-bottom:1px solid var(--accent);border-radius:var(--r-l) var(--r-l) 0 0}
+.tabbed #sec-circuit,.tabbed #sec-offsets,.tabbed #sets-group{border-top:0;border-radius:0 0 var(--r-l) var(--r-l)}
+.tabbed #sec-circuit>.sec-h,.tabbed #sec-offsets>.sec-h{display:none}   /* 見出しはタブに置き換わる */
+.tabbed #sets-group>.sets-group-h{border-radius:0}
+.tabbed #sets-group>.sets-group-h h2{display:none}
 /* 比較セットの「使用するサーキット」とボタン: 小さめにして、幅があれば 1 列に並べる */
 .set-tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
 .set-tools .toolbar{gap:8px}
