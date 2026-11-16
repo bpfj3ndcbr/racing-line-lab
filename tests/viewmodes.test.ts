@@ -204,11 +204,11 @@ describe('A〜D のカードで地図上の表示 / 非表示を切り替える'
     $<HTMLButtonElement>('[data-act="follow"][data-follow="leader"]').click();
     seekTo(100);                                   // 実際の先頭は B だが、B は非表示なので A に追従する
     const a = fake.cars.find((c) => c.slot === 'A')!;
-    expect(fake.centers[fake.centers.length - 1]).toEqual([a.lat, a.lon]);
+    expect(Math.abs(fake.centers[fake.centers.length - 1][0] - a.lat)).toBeLessThan(1e-4);   // 中心はなめらかにした位置(案件 69)
     card('B').click();
     seekTo(101);
     const b = fake.cars.find((c) => c.slot === 'B')!;
-    expect(fake.centers[fake.centers.length - 1]).toEqual([b.lat, b.lon]);
+    expect(Math.abs(fake.centers[fake.centers.length - 1][0] - b.lat)).toBeLessThan(1e-4);
   });
 
   it('割り当てを変えて戻ると、表示状態は初期化される', () => {

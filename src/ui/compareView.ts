@@ -890,7 +890,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
     })));
   }
 
-  type Sample = { c: Car; s: { lat: number; lon: number; dist: number } };
+  type Sample = { c: Car; s: { lat: number; lon: number; dist: number }; a?: { ser: Parameters<typeof sampleSeriesSmooth>[0]; t: number } };
 
   /**
    * 追従の対象: 先頭 = 表示中の車のうち、今いちばん長く走っている車(同じなら若い枠)。
@@ -905,7 +905,10 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   function followCamera(samples: Sample[]) {
     const tgt = followTarget(samples);
     if (!tgt || !map) { followSlot = null; ease = null; return; }
-    let c = { lat: tgt.s.lat, lon: tgt.s.lon };
+    // 追従の中心は、「走行アニメをなめらかにする」がオフでも、なめらかにした位置にする(車の表示は元の位置のまま。
+    // 中心が追従車の細かな揺れを拾うと、追従車以外の車が、その揺れの分だけ揺れて見えるため。案件 69)
+    const at = !prefs.smooth && tgt.a ? sampleSeriesSmooth(tgt.a.ser, tgt.a.t) : tgt.s;
+    let c = { lat: at.lat, lon: at.lon };
     // 再生中に先頭が入れ替わったら、中心が飛ばないよう 0.4 秒かけて移る
     if (followSlot && followSlot !== tgt.c.slot && engine.playing && camera) {
       ease = { from: camera, start: performance.now() };
