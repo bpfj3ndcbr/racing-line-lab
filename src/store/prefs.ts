@@ -10,7 +10,7 @@ export interface PrefStore {
 
 export type ThemeV = 'light' | 'dark';
 /** 地図の表示: line = 車ごとの色の線 / speed = 速度のヒートマップ / accel = 加速・減速のマップ */
-export type MapModeV = 'line' | 'speed' | 'accel';
+export type MapModeV = 'line' | 'speed' | 'accel' | 'none';   // none: 走行ラインを描かない(案件 73)
 export type FollowV = 'fixed' | 'leader' | 'A' | 'B' | 'C' | 'D';
 export type XKindV = 'dist' | 'time';
 export type SyncV = 'all' | 'leader';
@@ -57,7 +57,7 @@ export const LAST_KEY: Record<PrefKey, string | null> = {
 
 const clean: { [K in PrefKey]: (v: unknown) => PrefValues[K] | null } = {
   theme: (v) => (v === 'light' || v === 'dark' ? v : null),
-  mapMode: (v) => (v === 'line' || v === 'speed' || v === 'accel' ? v : null),
+  mapMode: (v) => (v === 'line' || v === 'speed' || v === 'accel' || v === 'none' ? v : null),
   labels: (v) => (v === 'off' || v === 'speed' || v === 'name' ? v : null),
   zoom: (v) => (v === 0 || (typeof v === 'number' && ZOOM_CHOICES.includes(v)) ? (v as number) : null),
   follow: (v) => (v === 'fixed' || v === 'leader' || v === 'A' || v === 'B' || v === 'C' || v === 'D' ? v : null),

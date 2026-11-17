@@ -43,6 +43,10 @@
   --b: #1f6fd1; --b-on: #ffffff; --b-fg: #1757a6;
   --c: #1f8f55; --c-on: #ffffff; --c-fg: #17703f;
   --d: #f2b705; --d-on: #231a00; --d-fg: #7a5600;
+  /* 「表示」メニューの 3 つの項目(追従設定・ライン表示・ラベル)の色(案件 73)。地色 / その上の文字 */
+  --menu-follow: #1f6fd1; --menu-follow-on: #ffffff;
+  --menu-line: #0f7c8c; --menu-line-on: #ffffff;
+  --menu-label: #c46a00; --menu-label-on: #ffffff;
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
@@ -79,6 +83,9 @@
   --b: #4aa3ff; --b-on: #08121f; --b-fg: #7dbcff;
   --c: #3ecf8e; --c-on: #06180f; --c-fg: #6be0a8;
   --d: #ffc83d; --d-on: #231a00; --d-fg: #ffd970;
+  --menu-follow: #2b78c9; --menu-follow-on: #ffffff;
+  --menu-line: #11808f; --menu-line-on: #ffffff;
+  --menu-label: #b8620a; --menu-label-on: #ffffff;
 }
 
 /* ==========================================================================
@@ -387,11 +394,28 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .ov-list .chip,.ov-ico{width:18px;height:18px;font-size:10px}
 .ov-ico{display:inline-flex;align-items:center;justify-content:center;flex:none}
 .ov-sep{height:1px;margin:2px 4px;background:var(--border)}
+/* 地図の上の 3 つの札(案件 73): 左上の、出典の表示と同じ段に丸いボタンを並べる。中には今の設定だけを白抜き文字で出す */
+.cmp-map .map-ov.tl.map-tools{top:4px;left:8px;flex-direction:row;align-items:center;gap:6px}
+.tg-pos{--mc:var(--menu-follow);--mc-on:var(--menu-follow-on)}
+.tg-line{--mc:var(--menu-line);--mc-on:var(--menu-line-on)}
+.tg-label{--mc:var(--menu-label);--mc-on:var(--menu-label-on)}
+.tool{position:relative}
+.tool-btn{height:20px;min-height:20px;padding:0 9px;border-radius:999px;border:0;background:color-mix(in srgb,var(--mc) 72%,transparent);color:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;line-height:1;white-space:nowrap;cursor:pointer}
+.tool-btn[aria-expanded="true"]{box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--mc)}
+.tool-pop{position:absolute;top:calc(100% + 6px);left:0;min-width:168px;z-index:1200;padding:4px;gap:2px;font-size:12px;border-top:3px solid var(--mc)}
+.tool-pop button{height:28px;font-size:12px}
+.tool-pop button.on{background:var(--mc);color:var(--mc-on)}
+.tool-pop button:hover:not(:disabled){background:color-mix(in srgb,var(--mc) 16%,var(--surface))}
 .ov-list .ov-sub{justify-content:space-between;padding-left:30px;font-weight:700}
 .ov-sublist{display:flex;flex-direction:column;gap:2px}
 .ov-sublist[hidden]{display:none}
 .ov-sublist button{padding-left:26px}
-.map-secs{display:none}
+.map-secs{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end;left:56px;right:8px;bottom:8px;pointer-events:none}   /* 地図の下部(右寄せ。出典の表示があったところ)。少し透明(案件 73) */
+.map-secs .btn.sec{pointer-events:auto;min-height:30px;height:30px;min-width:34px;padding:0 6px;font-size:12px;justify-content:center;background:color-mix(in srgb,var(--surface) 72%,transparent)}
+.map-secs .btn.sec[aria-pressed="true"]{background:color-mix(in srgb,var(--accent) 82%,transparent);border-color:var(--accent);color:var(--accent-on);font-weight:700}
+/* 出典の表示は、比較画面では地図の右上へ(案件 73)。右上のメニューはなくなったので、ここに置ける */
+.cmp-map .leaflet-bottom.leaflet-right{top:0;bottom:auto}
+.cmp-map .leaflet-bottom.leaflet-right .leaflet-control-attribution{margin-top:4px}
 .corr-pad-map{display:none}
 /* 速度・加減速の凡例(案件 42): 地図の左下の細い帯。右下の出典(地理院タイル)の帯と同じ高さ・同じ見た目にして、地図をできるだけ隠さない。
    出典は消さない・隠さない(AGENTS.md)。狭い幅では文字を減らして、出典の左に収める。万一重なっても出典(Leaflet の部品は 1000)が手前 */
@@ -400,6 +424,9 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .map-legend[hidden]{display:none}
 .legend-bar{display:block;width:64px;height:6px;border-radius:2px}
 .cmp-map.has-legend .leaflet-bottom.leaflet-left .leaflet-control-zoom{margin-bottom:24px}
+/* 拡大・縮小の +/- も、S1・S2 と同じ透明度(比較画面の地図の上の操作をそろえる) */
+.cmp-map .leaflet-control-zoom a{background:color-mix(in srgb,var(--surface) 72%,transparent)}
+.cmp-map .leaflet-control-zoom a:hover{background:color-mix(in srgb,var(--surface) 90%,transparent)}
 .legend-bar.accel{background:linear-gradient(90deg,rgb(255,59,48),rgb(231,137,132) 25%,rgb(208,214,222) 50%,rgb(127,209,164) 75%,rgb(46,204,113))}
 .legend-bar.speed{background:linear-gradient(90deg,rgb(68,1,84),rgb(59,82,139) 25%,rgb(33,145,140) 50%,rgb(94,201,98) 75%,rgb(253,231,37))}
 
@@ -1155,10 +1182,6 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
   .cmp-map .map-ov.tr{right:8px;top:8px}
   .cmp-map .ov-menu-btn{min-height:30px;height:30px;padding:0 10px;font-size:11px}
   /* 枠はボタンの無い所も地図の上に広がるので、ボタン以外ではマウス・指を地図へ素通りさせる(地図を動かせるように。案件 43) */
-  .map-secs{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end;left:56px;right:8px;bottom:26px;pointer-events:none}
-  .map-secs .btn.sec{pointer-events:auto}
-  .map-secs .btn.sec{min-height:32px;height:32px;min-width:38px;padding:0 6px;font-size:12px;justify-content:center}
-  .map-secs .btn.sec[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-on);font-weight:700}
 
   /* 設定: 地図の保存 */
   .map-areas{grid-column:1}
@@ -1266,9 +1289,6 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
   .cmp-map .map-ov.tl{left:8px;top:8px}
   .cmp-map .map-ov.tr{right:8px;top:8px}
   .cmp-map .ov-menu-btn{min-height:30px;height:30px;padding:0 10px;font-size:11px}
-  .map-secs{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end;left:56px;right:8px;bottom:26px;pointer-events:none}
-  .map-secs .btn.sec{pointer-events:auto;min-height:32px;height:32px;min-width:38px;padding:0 6px;font-size:12px;justify-content:center}
-  .map-secs .btn.sec[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-on);font-weight:700}
 
   /* 比較以外の画面: 縦向きにするよう案内を重ねる(上部バーも覆う) */
   body:has(#view-compare[hidden]) .rotate-note{display:flex}

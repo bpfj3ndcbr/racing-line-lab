@@ -36,7 +36,7 @@ export interface CompareView {
 }
 
 const RATES = RATE_CHOICES;
-const LABEL_TEXT: Record<LabelV, string> = { off: '非表示', speed: '速度・差', name: 'カード名' };
+const LABEL_TEXT: Record<LabelV, string> = { off: 'なし', speed: '速度・差', name: 'カード名' };
 
 // 再生系ボタンのアイコン(16x16)
 const ICONS = {
@@ -78,28 +78,28 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
         <div class="cmp-left">
           <div class="cmp-map">
             <div class="map" id="cmp-map"></div>
-            <div class="map-ov tl ov-menu" id="cmp-follow">
-              <button class="btn sm ov-menu-btn" id="cmp-follow-btn" data-act="menu" data-menu="follow" aria-haspopup="menu" aria-expanded="false" aria-controls="cmp-follow-list"
-                title="地図の表示位置(固定・先頭追従・A〜D の追従)を切り替えます">表示位置: 固定 ▾</button>
-              <div class="ov-list" id="cmp-follow-list" role="menu" aria-label="地図の表示位置" hidden>
-                <button type="button" role="menuitemradio" data-act="follow" data-follow="fixed" aria-checked="true" class="on">${menuIcon(MENU_ICONS.pin)}固定</button>
-                <button type="button" role="menuitemradio" data-act="follow" data-follow="leader" aria-checked="false">${menuIcon(MENU_ICONS.flag)}先頭追従</button>
-                <div class="ov-sep" role="separator"></div>
-                ${SLOTS.map((s) => `<button type="button" role="menuitemradio" data-act="follow" data-follow="${s}" aria-checked="false"><span class="chip s${s.toLowerCase()}" aria-hidden="true">${s}</span>${s} を追従</button>`).join('')}
+            <div class="map-ov tl ov-menu map-tools" id="cmp-menu">
+              <div class="tool tg-pos">
+                <button type="button" class="tool-btn" id="cmp-tool-pos" data-act="menu-sub" data-sub="pos" aria-haspopup="menu" aria-expanded="false" aria-controls="cmp-sub-pos" title="追従設定"><span data-now="pos"></span></button>
+                <div class="ov-list tool-pop" id="cmp-sub-pos" role="menu" aria-label="追従設定" hidden>
+                  <button type="button" role="menuitemradio" data-act="follow" data-follow="fixed" aria-checked="true" class="on">${menuIcon(MENU_ICONS.pin)}固定</button>
+                  <button type="button" role="menuitemradio" data-act="follow" data-follow="leader" aria-checked="false">${menuIcon(MENU_ICONS.flag)}先頭追従</button>
+                  ${SLOTS.map((s) => `<button type="button" role="menuitemradio" data-act="follow" data-follow="${s}" aria-checked="false"><span class="chip s${s.toLowerCase()}" aria-hidden="true">${s}</span>${s} を追従</button>`).join('')}
+                </div>
               </div>
-            </div>
-            <div class="map-ov tr ov-menu" id="cmp-view">
-              <button class="btn sm ov-menu-btn" id="cmp-view-btn" data-act="menu" data-menu="view" aria-haspopup="menu" aria-expanded="false" aria-controls="cmp-view-list"
-                title="走行ラインの表示と、車のラベルを切り替えます">表示: 走行ライン ▾</button>
-              <div class="ov-list" id="cmp-view-list" role="menu" aria-label="走行ラインの表示とラベル" hidden>
-                <button type="button" role="menuitemradio" data-act="mapmode" data-mode="line" aria-checked="true" class="on">走行ライン</button>
-                <button type="button" role="menuitemradio" data-act="mapmode" data-mode="speed" aria-checked="false" title="速度で色分け(全車共通の色)">速度</button>
-                <button type="button" role="menuitemradio" data-act="mapmode" data-mode="accel" aria-checked="false" title="加速・減速で色分け(全車共通の色)">加減速</button>
-                <div class="ov-sep" role="separator"></div>
-                <button type="button" class="ov-sub" id="cmp-label-btn" data-act="label-menu" aria-expanded="false" aria-controls="cmp-label-list"
-                  title="車から引き出す線(ラベル)の表示を選びます">ラベル: 非表示 ▾</button>
-                <div class="ov-sublist" id="cmp-label-list" role="group" aria-label="ラベル" hidden>
-                  ${(['off', 'speed', 'name'] as const).map((v) => `<button type="button" role="menuitemradio" data-act="carlabel" data-label="${v}" aria-checked="${v === 'off'}"${v === 'off' ? ' class="on"' : ''}>${LABEL_TEXT[v]}</button>`).join('')}
+              <div class="tool tg-line">
+                <button type="button" class="tool-btn" id="cmp-tool-line" data-act="menu-sub" data-sub="line" aria-haspopup="menu" aria-expanded="false" aria-controls="cmp-sub-line" title="ライン表示"><span data-now="line"></span></button>
+                <div class="ov-list tool-pop" id="cmp-sub-line" role="menu" aria-label="ライン表示" hidden>
+                  <button type="button" role="menuitemradio" data-act="mapmode" data-mode="line" aria-checked="true" class="on">走行ライン</button>
+                  <button type="button" role="menuitemradio" data-act="mapmode" data-mode="speed" aria-checked="false" title="速度で色分け(全車共通の色)">速度</button>
+                  <button type="button" role="menuitemradio" data-act="mapmode" data-mode="accel" aria-checked="false" title="加速・減速で色分け(全車共通の色)">加減速</button>
+                  <button type="button" role="menuitemradio" data-act="mapmode" data-mode="none" aria-checked="false" title="走行ラインを描かない">なし</button>
+                </div>
+              </div>
+              <div class="tool tg-label">
+                <button type="button" class="tool-btn" id="cmp-tool-label" data-act="menu-sub" data-sub="label" aria-haspopup="menu" aria-expanded="false" aria-controls="cmp-sub-label" title="ラベル"><span data-now="label"></span></button>
+                <div class="ov-list tool-pop" id="cmp-sub-label" role="menu" aria-label="ラベル" hidden>
+                  ${(['speed', 'name', 'off'] as const).map((v) => `<button type="button" role="menuitemradio" data-act="carlabel" data-label="${v}" aria-checked="${v === 'off'}"${v === 'off' ? ' class="on"' : ''} title="車から引き出す線(ラベル)">${LABEL_TEXT[v]}</button>`).join('')}
                 </div>
               </div>
             </div>
@@ -464,7 +464,8 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
 
   function pushMap() {
     if (!map) return;
-    map.setTracks(shown().map((c) => ({
+    // 「なし」のときは、走行ラインを 1 本も描かない(計測ラインと車の位置はそのまま)
+    map.setTracks(mapMode === 'none' ? [] : shown().map((c) => ({
       slot: c.slot, color: cssColor(c.slot),
       points: Array.from(c.series.t, (_, i) => [c.series.lat[i], c.series.lon[i]] as [number, number]),
       heat: mapMode === 'speed' ? c.speed : mapMode === 'accel' ? c.accel : undefined,
@@ -496,10 +497,11 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   /** 凡例: 速度は範囲の数値つき、加減速は「減速 ⇔ 加速」。全車共通の色であることも分かるように */
   function renderLegend() {
     const lg = $('cmp-legend');
-    lg.hidden = mapMode === 'line';
+    const heat = mapMode === 'speed' || mapMode === 'accel';
+    lg.hidden = !heat;
     // 凡例は地図の左下の細い帯(案件 42)。出ている間は、地図の拡大・縮小のボタンをその上へ上げる
-    root.querySelector('.cmp-map')!.classList.toggle('has-legend', mapMode !== 'line');
-    if (mapMode === 'line') return;
+    root.querySelector('.cmp-map')!.classList.toggle('has-legend', heat);
+    if (!heat) return;
     const speed = mapMode === 'speed';
     $('cmp-leg-bar').className = `legend-bar ${speed ? 'speed' : 'accel'}`;
     // 狭い幅では「低速」「高速」(さらに狭ければ km/h も)を隠し、出典の表示に重ならないようにする(CSS)
@@ -549,48 +551,52 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
     syncAutoUi();                                    // 「自動」の基準の車は、表示位置の選択で決まる
   }
 
-  // ---------- 地図の上のメニュー(案件 41): 左上「表示位置」、右上「表示」(走行ラインの表示と、ラベル)。どの幅でも同じ ----------
-  // ボタンには今の選択を出し、押すと選択肢が開く。選ぶ・外を押す・Esc・もう一度ボタンを押すと閉じる。片方を開くと、もう片方は閉じる
-  type MenuKey = 'follow' | 'view';
-  const menus: Record<MenuKey, { btn: HTMLButtonElement; list: HTMLElement; text: () => string }> = {
-    follow: { btn: $<HTMLButtonElement>('cmp-follow-btn'), list: $('cmp-follow-list'),
-      text: () => `表示位置: ${follow === 'fixed' ? '固定' : follow === 'leader' ? '先頭追従' : follow}` },
-    view: { btn: $<HTMLButtonElement>('cmp-view-btn'), list: $('cmp-view-list'),
-      text: () => `表示: ${({ line: '走行ライン', speed: '速度', accel: '加減速' } as const)[mapMode]}` },
-  };
-  const labelBtn = $<HTMLButtonElement>('cmp-label-btn'), labelList = $('cmp-label-list');
-  let openMenu: MenuKey | null = null;
-  function syncMenuButtons() {
-    for (const k of Object.keys(menus) as MenuKey[]) menus[k].btn.textContent = `${menus[k].text()} ${openMenu === k ? '▴' : '▾'}`;
-    labelBtn.textContent = `ラベル: ${LABEL_TEXT[labelMode]} ${labelList.hidden ? '▾' : '▴'}`;
-  }
-  /** メニューを閉じるために地図をタップした指(そのタップでは再生・停止しない) */
-  let menuClosingTap: number | null = null;
-  /** メニューの外を押したら閉じる */
-  const onOutside = (e: PointerEvent) => {
-    if (openMenu && (e.target as HTMLElement | null)?.closest?.('.ov-menu') === menus[openMenu].btn.parentElement) return;
-    menuClosingTap = e.pointerType === 'mouse' ? null : e.pointerId;
-    setMenu(null);
-  };
-  /** key のメニューを開く(null ですべて閉じる) */
-  function setMenu(key: MenuKey | null) {
-    if (key === openMenu) return;
-    openMenu = key;
-    for (const k of Object.keys(menus) as MenuKey[]) {
-      menus[k].list.hidden = k !== key;
-      menus[k].btn.setAttribute('aria-expanded', String(k === key));
+  // ---------- 地図の上の 3 つの札(案件 73): 左上に丸いボタンを並べる。押すと、その項目の選択肢が出る。
+  // 札には今の設定の名前を白抜き文字で出す(横長のカプセル)。選ぶと、その項目の選択肢は閉じる。外を押す・Esc・もう一度押しても閉じる
+  type SubKey = 'pos' | 'line' | 'label';
+  const SUBS: SubKey[] = ['pos', 'line', 'label'];
+  const toolBtn = (k: SubKey) => $<HTMLButtonElement>(`cmp-tool-${k}`);
+  const toolPop = (k: SubKey) => $(`cmp-sub-${k}`);
+  let openSub: SubKey | null = null;
+  const LINE_NAME: Record<MapMode, string> = { line: '走行ライン', speed: '速度', accel: '加減速', none: 'なし' };
+  /** 札の文字(今の設定の名前)と、その説明(札の title) */
+  function badgeOf(k: SubKey): { html: string; text: string } {
+    if (k === 'pos') {
+      if (follow === 'fixed') return { html: '固定', text: '追従設定: 固定' };
+      if (follow === 'leader') return { html: '先頭追従', text: '追従設定: 先頭追従' };
+      return { html: `${follow} を追従`, text: `追従設定: ${follow} を追従` };
     }
-    setLabelList(false);
-    syncMenuButtons();
-    if (key) document.addEventListener('pointerdown', onOutside, true);
-    else document.removeEventListener('pointerdown', onOutside, true);
+    // 札は横幅を取らないように、走行ラインだけ「ライン」と出す(説明の title は「走行ライン」のまま)
+    if (k === 'line') return { html: mapMode === 'line' ? 'ライン' : LINE_NAME[mapMode], text: `ライン表示: ${LINE_NAME[mapMode]}` };
+    return { html: LABEL_TEXT[labelMode], text: `ラベル: ${LABEL_TEXT[labelMode]}` };
   }
-  /** 「表示」のメニューの中の「ラベル」の選択肢を開く・閉じる */
-  function setLabelList(open: boolean) {
-    labelList.hidden = !open;
-    labelBtn.setAttribute('aria-expanded', String(open));
-    syncMenuButtons();
+  function syncMenuButtons() {
+    for (const k of SUBS) {
+      const b = badgeOf(k);
+      const host = $('cmp-menu').querySelector<HTMLElement>(`[data-now="${k}"]`);
+      if (host) host.innerHTML = b.html;
+      toolBtn(k).title = b.text;
+      toolBtn(k).setAttribute('aria-label', b.text);
+    }
   }
+  /** 札を開く・閉じる。一度に開くのは 1 つ(null で全部閉じる) */
+  function setSub(k: SubKey | null) {
+    const was = openSub;
+    openSub = k;
+    for (const s of SUBS) {
+      toolPop(s).hidden = s !== k;
+      toolBtn(s).setAttribute('aria-expanded', String(s === k));
+    }
+    if (k && !was) document.addEventListener('pointerdown', onOutside, true);
+    if (!k && was) document.removeEventListener('pointerdown', onOutside, true);
+  }
+  /** 札の外を押したら閉じる */
+  let menuClosingTap: number | null = null;
+  const onOutside = (e: PointerEvent) => {
+    if (openSub && (e.target as HTMLElement | null)?.closest?.('.ov-menu') === $('cmp-menu')) return;
+    menuClosingTap = e.pointerType === 'mouse' ? null : e.pointerId;
+    setSub(null);
+  };
 
   // ---------- 右パネル ----------
   function renderCards() {
@@ -987,17 +993,16 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
         break;
       case 'sync-release': releaseSync(); setAutoSync(false); break;     // 解除すると、自動もオフ
       case 'autosync': setAutoSync(!autoSync); break;
-      case 'menu': setMenu(openMenu === d.menu ? null : d.menu as MenuKey); break;
-      case 'label-menu': setLabelList(labelList.hidden); break;
-      case 'mapmode': setMapMode(d.mode as MapMode); setMenu(null); break;
+      case 'menu-sub': setSub(openSub === d.sub ? null : d.sub as SubKey); break;
+      case 'mapmode': setMapMode(d.mode as MapMode); setSub(null); break;     // 選んだあとは 3 項目の表示に戻る(メニューは開いたまま)
       case 'carlabel':
         labelMode = d.label as LabelV;
         prefs.saveLast('labels', labelMode);
         syncLabelBtn();
         updateFrame();
-        setMenu(null);
+        setSub(null);
         break;
-      case 'follow': setFollow(d.follow as Follow); setMenu(null); break;
+      case 'follow': setFollow(d.follow as Follow); setSub(null); break;
       case 'back': deps.onBack(); break;
       case 'edit-circuit': { const c = ref()?.log.circuit; if (c) deps.onEditCircuit?.(c.id); break; }
     }
@@ -1019,7 +1024,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
     if (!visible || e.ctrlKey || e.metaKey || e.altKey) return;
     const t = e.target as HTMLElement | null;
     if (isTextField(t) || modalOpen()) return;
-    if (e.key === 'Escape' && openMenu) { e.preventDefault(); const btn = menus[openMenu].btn; setMenu(null); btn.focus(); return; }
+    if (e.key === 'Escape' && openSub) { e.preventDefault(); const b = toolBtn(openSub); setSub(null); b.focus(); return; }
     if (e.key === ' ') {
       e.preventDefault();
       if (!e.repeat) engine.toggle();
@@ -1108,7 +1113,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
     },
     hide() {
       visible = false;
-      setMenu(null);
+      setSub(null);
       engine.pause();
       document.removeEventListener('keydown', onKey);
       document.removeEventListener('keyup', onKeyUp);

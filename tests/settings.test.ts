@@ -73,7 +73,7 @@ describe('設定タブ', () => {
   });
 
   it('「記憶する」にチェックすると、その項目は選べない(スライダー・ボタンが無効)。外すと選べる', () => {
-    expect(row('mapMode').querySelectorAll('button:disabled')).toHaveLength(3);
+    expect(row('mapMode').querySelectorAll('button:disabled')).toHaveLength(4);
     setRem('mapMode', false);
     expect(row('mapMode').querySelectorAll('button:disabled')).toHaveLength(0);
     setRem('zoom', true);

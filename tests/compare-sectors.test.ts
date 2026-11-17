@@ -55,40 +55,40 @@ function setupTwo() {
   goCompare();
 }
 
-describe('地図の上の「表示 ▾」(案件 41。どの幅でも同じメニュー)', () => {
-  it('ボタンには今の表示。押すと「走行ライン・速度・加減速」と「ラベル」のメニューが開き、選ぶと閉じる', () => {
+describe('地図の左上の 3 つの札(案件 73。どの幅でも同じ)', () => {
+  it('3 つの丸い札(追従設定・ライン表示・ラベル)。押すとその選択肢が開き、選んだら閉じる。札には今の設定を出す', () => {
     setupOne();
-    const btn = $<HTMLButtonElement>('#cmp-view-btn'), list = $('#cmp-view-list');
-    expect(btn.textContent).toBe('表示: 走行ライン ▾');
-    expect(list.hidden).toBe(true);
-    btn.click();
-    expect(list.hidden).toBe(false);
-    expect(btn.getAttribute('aria-expanded')).toBe('true');
-    expect(btn.textContent).toBe('表示: 走行ライン ▴');
-    expect($('#cmp-label-list').hidden).toBe(true);                       // ラベルの選択肢は、「ラベル」を押すと開く
+    const titles = () => ['#cmp-tool-pos', '#cmp-tool-line', '#cmp-tool-label'].map((sel) => $<HTMLElement>(sel).title);
+    expect(titles()).toEqual(['追従設定: 先頭追従', 'ライン表示: 走行ライン', 'ラベル: なし']);
+    const pos = $<HTMLButtonElement>('#cmp-tool-pos'), line = $<HTMLButtonElement>('#cmp-tool-line');
+    pos.click();
+    expect($('#cmp-sub-pos').hidden).toBe(false);
+    line.click();                                                          // 別の札を押すと、開いていた方は閉じる
+    expect($('#cmp-sub-pos').hidden).toBe(true);
+    expect($('#cmp-sub-line').hidden).toBe(false);
     root.querySelector<HTMLButtonElement>('[data-act="mapmode"][data-mode="speed"]')!.click();
-    expect(list.hidden).toBe(true);
-    expect(btn.textContent).toBe('表示: 速度 ▾');
-    btn.click();
-    $<HTMLButtonElement>('#cmp-label-btn').click();
-    expect($('#cmp-label-list').hidden).toBe(false);
-    expect($('#cmp-label-btn').textContent).toBe('ラベル: 非表示 ▴');
-    expect(Array.from(root.querySelectorAll('[data-act="carlabel"]')).map((b) => b.textContent)).toEqual(['非表示', '速度・差', 'カード名']);
-    root.querySelector<HTMLButtonElement>('[data-act="carlabel"][data-label="name"]')!.click();
-    expect(list.hidden).toBe(true);
-    expect($('#cmp-label-btn').textContent).toBe('ラベル: カード名 ▾');
-    btn.click();
-    expect($('#cmp-label-list').hidden).toBe(true);                       // 開き直すと、ラベルの選択肢は閉じている
+    expect($('#cmp-sub-line').hidden).toBe(true);
+    expect(line.title).toBe('ライン表示: 速度');
+    expect(line.textContent).toBe('速度');                                // 札の中は今の設定の名前(白抜き)
   });
 
-  it('「表示位置」と「表示」は、片方を開くともう片方が閉じる', () => {
+  it('「なし」を選ぶと、走行ラインを描かない(凡例も出ない)。「走行ライン」に戻すと描く', () => {
     setupOne();
-    $<HTMLButtonElement>('#cmp-follow-btn').click();
-    expect($('#cmp-follow-list').hidden).toBe(false);
-    $('#cmp-view-btn').dispatchEvent(new Event('pointerdown', { bubbles: true }));
-    $<HTMLButtonElement>('#cmp-view-btn').click();
-    expect($('#cmp-follow-list').hidden).toBe(true);
-    expect($('#cmp-view-list').hidden).toBe(false);
+    root.querySelector<HTMLButtonElement>('[data-act="mapmode"][data-mode="none"]')!.click();
+    expect(fake.tracks).toHaveLength(0);
+    expect($<HTMLElement>('#cmp-legend').hidden).toBe(true);
+    expect(root.querySelector('[data-act="mapmode"][data-mode="none"]')!.classList.contains('on')).toBe(true);
+    root.querySelector<HTMLButtonElement>('[data-act="mapmode"][data-mode="line"]')!.click();
+    expect(fake.tracks.length).toBeGreaterThan(0);
+  });
+
+  it('ラベルの札: 選ぶと、その選択肢が閉じ、札の文字が変わる。「表示」のボタンは無い', () => {
+    setupOne();
+    $<HTMLButtonElement>('#cmp-tool-label').click();
+    root.querySelector<HTMLButtonElement>('[data-act="carlabel"][data-label="name"]')!.click();
+    expect($('#cmp-sub-label').hidden).toBe(true);
+    expect($<HTMLElement>('#cmp-tool-label').title).toBe('ラベル: カード名');
+    expect(root.querySelector('#cmp-menu-btn')).toBeNull();
   });
 });
 
@@ -116,12 +116,12 @@ describe('地図をタップして再生・一時停止(案件 1)', () => {
     expect(state()).toBe('paused');
   });
 
-  it('表示位置のメニューが開いているときに地図をたたくと、メニューを閉じるだけで再生・停止はしない(案件 41)', () => {
+  it('札の選択肢が開いているときに地図をたたくと、閉じるだけで再生・停止はしない(案件 41)', () => {
     setupOne();
-    $<HTMLButtonElement>('#cmp-follow-btn').click();
-    expect($('#cmp-follow-list').hidden).toBe(false);
+    $<HTMLButtonElement>('#cmp-tool-pos').click();
+    expect($('#cmp-sub-pos').hidden).toBe(false);
     ptr('pointerdown'); ptr('pointerup');
-    expect($('#cmp-follow-list').hidden).toBe(true);
+    expect($('#cmp-sub-pos').hidden).toBe(true);
     expect(state()).toBe('paused');
     ptr('pointerdown'); ptr('pointerup');                                        // 閉じたあとは、今までどおり
     expect(state()).toBe('playing');
@@ -130,7 +130,7 @@ describe('地図をタップして再生・一時停止(案件 1)', () => {
   it('地図の上のボタンの付近(24px 以内)をたたいても切り替わらない(案件 43)', () => {
     setupOne();
     const rect = { left: 300, top: 10, right: 400, bottom: 40, x: 300, y: 10, width: 100, height: 30, toJSON: () => ({}) };
-    $('#cmp-view-btn').getBoundingClientRect = () => rect as DOMRect;           // jsdom は矩形が 0 なので、右上の「表示」の位置を決める
+    $('#cmp-tool-line').getBoundingClientRect = () => rect as DOMRect;           // jsdom は矩形が 0 なので、右上の「表示」の位置を決める
     ptr('pointerdown', { x: 290, y: 60 }); ptr('pointerup', { x: 290, y: 60 }); // 左へ 10px・下へ 20px(約 22px)
     expect(state()).toBe('paused');
     ptr('pointerdown', { x: 350, y: 65 }); ptr('pointerup', { x: 350, y: 65 }); // 真下へ 25px
@@ -347,9 +347,9 @@ describe('表記・外観の変更', () => {
     expect(root.querySelector('#cmp-hint')).toBeNull();
   });
 
-  it('地図の表示は「走行ライン / 速度 / 加減速」', () => {
+  it('地図の表示は「走行ライン / 速度 / 加減速 / なし」', () => {
     setupOne();
-    expect(Array.from(root.querySelectorAll('[data-act="mapmode"]')).map((b) => b.textContent)).toEqual(['走行ライン', '速度', '加減速']);
+    expect(Array.from(root.querySelectorAll('[data-act="mapmode"]')).map((b) => b.textContent)).toEqual(['走行ライン', '速度', '加減速', 'なし']);
   });
 
   it('上部の項目はタブ(使い方 / データ管理 / 比較 / 設定)。選んでいるものが分かる(aria-current)。サーキット登録はデータ管理の中', () => {

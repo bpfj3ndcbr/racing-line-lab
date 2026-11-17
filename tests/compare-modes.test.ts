@@ -125,7 +125,7 @@ describe('走行ライン / ヒートマップ(速度) / 加減速 の切り替�
 
   it('3つの表示。初期は走行ライン(色分けなし)で凡例は出ない', () => {
     setupOne();
-    expect(Array.from(root.querySelectorAll('[data-act="mapmode"]')).map((b) => b.textContent)).toEqual(['走行ライン', '速度', '加減速']);
+    expect(Array.from(root.querySelectorAll('[data-act="mapmode"]')).map((b) => b.textContent)).toEqual(['走行ライン', '速度', '加減速', 'なし']);
     expect(fake.tracks[0].heat).toBeUndefined();
     expect($<HTMLElement>('#cmp-legend').hidden).toBe(true);
   });
@@ -323,36 +323,38 @@ describe('地図の追従', () => {
     }
   });
 
-  it('表示位置はメニュー(案件 41): ボタンには今の表示位置。押すと開き、選ぶと閉じてボタンの文字が変わる', () => {
+  it('追従設定の札: 押すと選択肢が開く。選ぶと閉じ、札には今の設定だけを出す。地図を動かして固定に戻ると札も戻る(案件 73)', () => {
     setupOne();
-    const btn = $<HTMLButtonElement>('#cmp-follow-btn'), list = $('#cmp-follow-list');
-    expect(btn.textContent).toBe('表示位置: 先頭追従 ▾');
+    const btn = $<HTMLButtonElement>('#cmp-tool-pos'), list = $('#cmp-sub-pos');
     expect(list.hidden).toBe(true);
+    expect(btn.title).toBe('追従設定: 先頭追従');
+    expect(btn.getAttribute('aria-expanded')).toBe('false');
     expect(Array.from(list.querySelectorAll('[data-act="follow"]')).map((b) => b.textContent)).toEqual(['固定', '先頭追従', 'AA を追従', 'BB を追従', 'CC を追従', 'DD を追従']);
     expect(list.querySelectorAll('.ov-ico, .chip')).toHaveLength(6);                // どの行にも同じ幅の印(アイコン / A〜D の丸)があり、文字の頭がそろう
     btn.click();
     expect(list.hidden).toBe(false);
     expect(btn.getAttribute('aria-expanded')).toBe('true');
-    expect(btn.textContent).toBe('表示位置: 先頭追従 ▴');
     followBtn('A').click();
-    expect(list.hidden).toBe(true);
+    expect(list.hidden).toBe(true);                                      // 選んだら、この選択肢は閉じる
     expect(btn.getAttribute('aria-expanded')).toBe('false');
-    expect(btn.textContent).toBe('表示位置: A ▾');
+    expect(btn.title).toBe('追従設定: A を追従');
     expect(followBtn('A').classList.contains('on')).toBe(true);
-    fake.userDrags();                                  // 地図を動かして固定に戻ると、ボタンの文字も戻る
-    expect(btn.textContent).toBe('表示位置: 固定 ▾');
+    fake.userDrags();                                  // 地図を動かして固定に戻ると、札も固定へ戻る
+    expect(btn.title).toBe('追従設定: 固定');
+    expect(followBtn('fixed').classList.contains('on')).toBe(true);
+    expect(followBtn('A').classList.contains('on')).toBe(false);
   });
 
-  it('メニューは、もう一度ボタンを押す・外を押す・Esc で閉じる(選び直しはしない)', () => {
+  it('札は、もう一度押す・外を押す・Esc で閉じる(選び直しはしない)', () => {
     setupOne();
-    const btn = $<HTMLButtonElement>('#cmp-follow-btn'), list = $('#cmp-follow-list');
+    const btn = $<HTMLButtonElement>('#cmp-tool-pos'), list = $('#cmp-sub-pos');
     btn.click(); btn.click();
     expect(list.hidden).toBe(true);
     btn.click();
     $('#cmp-time').dispatchEvent(new Event('pointerdown', { bubbles: true }));
     expect(list.hidden).toBe(true);
     btn.click();
-    list.dispatchEvent(new Event('pointerdown', { bubbles: true }));      // メニューの中を押しても閉じない
+    list.dispatchEvent(new Event('pointerdown', { bubbles: true }));      // 選択肢の中を押しても閉じない
     expect(list.hidden).toBe(false);
     press(document.body, 'Escape');
     expect(list.hidden).toBe(true);
