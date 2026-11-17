@@ -99,12 +99,12 @@ describe('終端の調整', () => {
   });
 
   it('チェックを入れるとスライドバーが出る(終端はまだ変わらない)。縮めると参考値になり、タイムも変わる', () => {
-    const before = rowOf(2).children[1].textContent;
+    const before = rowOf(2).children[1].querySelector('.tm > span')!.textContent;
     check(2)!.click();
     expect(range(2)).not.toBeNull();
-    expect(rowOf(2).children[1].textContent).toBe(before);
+    expect(rowOf(2).children[1].querySelector('.tm > span')!.textContent).toBe(before);
     slide(2, 30);
-    expect(rowOf(2).children[1].textContent).toBe('0:30.0');
+    expect(rowOf(2).children[1].querySelector('.tm > span')!.textContent).toBe('0:30.0');
     expect(rowOf(2).textContent).toContain('終端: 0:30(参考値)');
     expect(lapOf((l) => l.number === 2)!.complete).toBe(false);
   });
@@ -140,7 +140,7 @@ describe('終端の調整', () => {
     expect(JSON.parse(store.get('lapEnds')!)).toEqual({ syn: { 2: 30 } });
     mount();
     session.addLog(sessionLog(), 'syn');
-    expect(rowOf(2).children[1].textContent).toBe('0:30.0');
+    expect(rowOf(2).children[1].querySelector('.tm > span')!.textContent).toBe('0:30.0');
   });
 
   it('計測ラインが変わると、調整をやめる(ラップ番号の意味が変わるため)。セクターだけの変更では残す', () => {

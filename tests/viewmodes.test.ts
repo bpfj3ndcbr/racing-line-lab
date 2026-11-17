@@ -30,10 +30,9 @@ beforeEach(() => {
 const $ = <T extends HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
 const goCompare = () => $<HTMLButtonElement>('[data-act="nav"][data-view="compare"]').click();
 const seekTo = (sec: number) => { const e = $<HTMLInputElement>('#cmp-seek'); e.value = String(sec); e.dispatchEvent(new Event('input')); };
-/** 「表示」のメニューを開き、「ラベル」を開いて v を選ぶ(案件 41) */
+/** 「表示」のメニューを開き、ラベルの v を選ぶ(案件 41・73) */
 const label = (v: string) => {
-  $<HTMLButtonElement>('#cmp-view-btn').click();
-  $<HTMLButtonElement>('#cmp-label-btn').click();
+  if ($('#cmp-sub-label').hidden) $<HTMLButtonElement>('#cmp-tool-label').click();
   $<HTMLButtonElement>(`[data-act="carlabel"][data-label="${v}"]`).click();
 };
 const labelOn = () => $<HTMLElement>('[data-act="carlabel"].on').dataset.label;
@@ -94,22 +93,21 @@ describe('地図の線と車両アイコン', () => {
     expect(session.getSetting('compare.labels', 'speed')).toBe('off');
   });
 
-  it('引き出し線は「表示」のメニューの「ラベル」で「非表示 / 速度・差 / カード名」から選ぶ(案件 41)。カード名は名前だけ(無ければ A〜D)', () => {
+  it('引き出し線は「表示」のメニューの「ラベル」で「なし / 速度・差 / カード名」から選ぶ(案件 41・73)。カード名は名前だけ(無ければ A〜D)', () => {
     setupTwo();
     seekTo(40);
-    const btn = $<HTMLButtonElement>('#cmp-label-btn');
-    expect(btn.textContent).toBe('ラベル: 非表示 ▾');
+    expect(labelOn()).toBe('off');
     label('speed');
-    expect(btn.textContent).toBe('ラベル: 速度・差 ▾');
+    expect(labelOn()).toBe('speed');
     expect(fake.cars[0].label).toMatch(/^\d+kph$/);
     label('name');
-    expect(btn.textContent).toBe('ラベル: カード名 ▾');
+    expect(labelOn()).toBe('name');
     expect(fake.cars.map((c) => c.label)).toEqual(['A', 'B']);
     session.setSlotAlias(session.activeIndex, 'A', '先週のベストラップ');
     expect(fake.cars[0].label).toBe('先週のベスト');               // 6 文字まで
     expect($('#cmp-cards').textContent).toContain('先週のベスト');
     label('off');
-    expect(btn.textContent).toBe('ラベル: 非表示 ▾');
+    expect(labelOn()).toBe('off');
     expect(fake.cars[0].label).toBeUndefined();
     expect(session.getSetting('compare.labels', 'x')).toBe('off');
   });

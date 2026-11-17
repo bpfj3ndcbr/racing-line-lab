@@ -29,8 +29,8 @@ const GROUPS: { title: string; rows: (Row | Plain)[] }[] = [
     { key: 'theme', name: 'テーマ', kind: 'seg', opts: [{ v: 'light', label: 'ライト' }, { v: 'dark', label: 'ダーク' }] },
   ] },
   { title: 'マップ', rows: [
-    { key: 'mapMode', name: '描画', kind: 'seg', opts: [{ v: 'line', label: '走行ライン' }, { v: 'speed', label: '速度' }, { v: 'accel', label: '加減速' }] },
-    { key: 'labels', name: '引き出し線の表示', kind: 'seg', opts: [{ v: 'off', label: '非表示' }, { v: 'speed', label: '速度・差' }, { v: 'name', label: 'カード名' }] },
+    { key: 'mapMode', name: '描画', kind: 'seg', opts: [{ v: 'line', label: '走行ライン' }, { v: 'speed', label: '速度' }, { v: 'accel', label: '加減速' }, { v: 'none', label: 'なし' }] },
+    { key: 'labels', name: '引き出し線の表示', kind: 'seg', opts: [{ v: 'off', label: 'なし' }, { v: 'speed', label: '速度・差' }, { v: 'name', label: 'カード名' }] },
     { key: 'zoom', name: '倍率', kind: 'zoom', hint: '「サーキット全体」は、比較画面では走行ライン全体が入る倍率、サーキット登録の地図では登録した表示位置です。数値は地図のズームで、比較画面とサーキット登録の地図の両方に使います(それぞれ別に管理します)。' },
     { name: '初期位置', kind: 'startpos', hint: '地図を開いたときの中心です。「地図の中心」は、登録した表示位置(無ければ走行ライン全体)の中心、「コントロールライン」はその線の中心です。「現在の表示位置」は、前回見ていた位置と倍率で始まります(倍率の初期値は使いません。サーキットが違うときや、まだ覚えていないときは「地図の中心」と同じです)。' },
     { name: '走行アニメをなめらかにする', kind: 'smooth', hint: '地図の車の位置と向きを、前後の位置からの加重移動平均でなめらかにします。見た目だけで、走行ライン・速度・タイム差は変わりません。' },

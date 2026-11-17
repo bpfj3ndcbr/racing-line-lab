@@ -37,7 +37,7 @@ const ABOUT_HTML = `
 </ul>
 <h4>ライセンスと権利表記</h4>
 <ul>
-<li>本アプリのソースコードは <a href="${GH}/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a> で公開されています。</li>
+<li>本アプリのソースコードは <a href="${GH}/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">PolyForm Shield License 1.0.0</a> で公開しています。使うこと自体は自由で、改変や再配布も、ライセンスに従えば可能です。ただし、このアプリと競合する製品・サービスとして提供することはできません。1.8.0 より前の版は MIT License です。</li>
 <li>背景地図: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener noreferrer">国土地理院</a> 「地理院タイル(シームレス空中写真)」</li>
 <li>Leaflet: © Volodymyr Agafonkin, BSD-2-Clause License / Electron: © Electron contributors, MIT License / Vite: © Evan You &amp; Vite Contributors, MIT License(ビルドに使用)</li>
 <li>各ライブラリの詳細は <a href="${GH}/blob/main/THIRD-PARTY-NOTICES.txt" target="_blank" rel="noopener noreferrer">THIRD-PARTY-NOTICES.txt</a> をご参照ください。</li>
