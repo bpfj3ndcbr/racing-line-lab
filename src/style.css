@@ -184,6 +184,16 @@ select{min-height:44px;padding:0 10px;background:var(--surface);border:1px solid
 .lap-end-val{color:var(--text);white-space:nowrap}
 .row.as{background:var(--row-assigned)}
 .hbtn{background:none;border:0;padding:0;min-height:36px;color:var(--text);font-size:11px;text-decoration:underline dotted;cursor:pointer}
+/* ラップ一覧の「LAP」の欄(番号と別名の入力欄)と、「タイム」の欄(タイムとその下の Delta。案件 68) */
+.lap-cell{gap:4px}
+.lap-name{font-weight:600}
+.run-name{font-weight:600}
+.fh .run-edit{flex:none}
+.run-alias{width:9em;max-width:100%;box-sizing:border-box;height:24px;padding:0 4px;font:inherit;font-size:12px;color:var(--text);background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r-s)}
+.row.hd .lap-edit{margin-left:4px;font-size:10px;padding:0 6px;white-space:nowrap}
+.lap-alias{flex:0 1 74px;min-width:0;box-sizing:border-box;height:24px;padding:0 3px;font:inherit;font-size:11px;color:var(--text);background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r-s)}
+.tm{display:flex;flex-direction:column;line-height:1.2}
+.tm .delta{font-size:9px;font-weight:400;color:var(--muted)}
 .best{color:var(--good);font-weight:700}
 .bsec{color:var(--bsec);font-weight:700}
 
@@ -1002,10 +1012,10 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
   .top-right .cur{min-width:0;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .top-right .seg{flex:none}
   .ttl{white-space:nowrap}
-  /* ラップ一覧: ラップ・タイム・割り当て(A〜D)を先に(列の幅は --cols-m)。Delta から右は横にスクロール */
+  /* ラップ一覧: ラップ・タイム・割り当て(A〜D)を先に(列の幅は --cols-m)。説明から右は横にスクロール */
   .row{grid-template-columns:var(--cols-m,var(--cols))}
   .row>*{order:3}
-  .row>:nth-child(1){order:0;padding-inline:8px}
+  .row>:nth-child(1){order:0;padding-inline:6px}
   .row>:nth-child(2){order:1;padding-inline:8px}
   .row>:last-child{order:2}
   /* 見出し・カード・タブの文字を折り返さない */
@@ -1019,6 +1029,7 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
   /* Run の見出し: 1 行目に Run 番号と「位置補正」「削除」、2 行目にファイル名(長いことが多い)、3 行目にベストとサーキット */
   .fh>*{order:3}
   .fh>.fno{order:0}
+  .fh>.run-alias{order:0;width:7.5em}
   .fh>.btn{order:1}
   .fh>.btn[data-act="correct"]{margin-left:auto}
   .fh>.fn{order:2;flex-basis:100%;min-width:0;word-break:break-all}
@@ -1028,6 +1039,8 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
    スマホ(縦向き)や、幅の狭いウィンドウ(767px まで。案件 1)。パソコンの幅の見た目は変えない
    ========================================================================== */
 @media (max-width:767px){
+  .slot .st .sub.rn,.card-run.rn{display:none}   /* スマホのカード: 別名があれば「Run n」は出さない。Run の別名は、カード名の下の段に出す */
+  .slot .st .sub.ra,.card-run.ra{display:block}
   .map-legend .lg-word{display:none}           /* 凡例は「50 ▬ 180 km/h」だけにして、出典の左に収める(案件 42) */
   .map-legend{gap:4px;padding:0 4px;font-size:10px}
   .legend-bar{width:22px}
@@ -1050,7 +1063,7 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
   .slots-circuit{display:inline;margin-left:auto;overflow:hidden;text-overflow:ellipsis}   /* 上部のバーではサーキット名を出さないので、ここに右寄せで出す */
   .slots-title b{font-size:12px}
   .slots-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;width:100%}
-  .slot{min-height:36px;padding:2px 5px;gap:4px;font-size:10px}
+  .slot{min-height:54px;padding:2px 5px;gap:4px;font-size:10px}   /* 4 枚とも、カード名・Run の別名・タイムの 3 段が入る高さにそろえる */
   .slots .chip{width:18px;height:18px;font-size:11px}
   .slot-main{flex-direction:column;gap:0;align-items:stretch}
   .slot-pen,.slot .lapno{display:none}   /* 幅が足りないので、「LAP n:」は省き、タイムだけ出す */
@@ -1191,6 +1204,8 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .rn-body p{margin:0;font-size:14px;font-weight:700}
 .rn-body .sub{font-size:12px;color:var(--muted);font-weight:400}
 @media (orientation:landscape) and (max-height:500px){
+  .slot .st .sub.rn,.card-run{display:none}   /* スマホの横向き: 比較のカードは、LAP の別名(カード名)だけ。Run の別名は出さない */
+  .slot .st .sub.ra{display:block}
   :root{--top-h:41px}
   /* 上部バー: ロゴ・タブ・「表示中」と比較セット・セクターの動作・About を 1 行に。サーキット名は出さない。
      比較セットを上に出す分、右の列はカードから始まる */

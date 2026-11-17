@@ -145,6 +145,11 @@ ${SETS_HTML}
     if (inp.classList.contains('slot-alias-input')) slots.onAliasKey(e);
     else sets.onAliasKey(e, inp);
   });
+  // LAP の別名: Enter で確定、Esc でやめる(変換中の Enter は使わない)
+  root.addEventListener('keydown', (e) => {
+    const t = e.target as HTMLElement;
+    if (t.classList?.contains('lap-alias') || t.classList?.contains('run-alias')) sets.onLapAliasKey(e, t as HTMLInputElement);
+  });
   root.addEventListener('keyup', (e) => { if ((e.target as HTMLElement).closest('.alias-input')) e.stopPropagation(); });
   root.addEventListener('click', (e) => sets.onClickGuard(e));   // 見出しの別名の操作・タブのときの見出しでは、折りたたみを開閉しない
   // タブのキーボード操作(←→ / Home / End)

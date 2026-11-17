@@ -598,12 +598,12 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
       const c = cars.find((x) => x.slot === s);
       const k = s.toLowerCase();
       if (!c) return `<div class="card slot-${k} off"><span class="chip s${k}">${s}</span><div class="mut">未割り当て</div></div>`;
-      const run = `Run ${c.log.no}`;
+      const run = esc(session.runLabel(c.log));
       const alias = session.slotAliasOf(session.activeIndex, s);
       return `<button type="button" class="card slot-${k}" data-act="toggle-car" data-slot="${s}" aria-pressed="true"
           title="押すと地図上の表示 / 非表示を切り替えます" aria-label="${s} ${alias ? esc(alias) + ' ' : ''}${run} LAP ${c.lap.number} を地図に表示">
         <span class="chip s${k}" aria-hidden="true">${s}</span><span class="card-body">
-        <span class="c1">${alias ? `${esc(alias)} <small class="card-run">${run}</small>` : run}<span class="tag-hidden" hidden> ・ 非表示</span></span>
+        <span class="c1">${alias ? `${esc(alias)} <small class="card-run ${session.runAliasOf(c.log.id) ? 'ra' : 'rn'}">${run}</small>` : run}<span class="tag-hidden" hidden> ・ 非表示</span></span>
         <span class="c2 num">LAP ${c.lap.number}: ${formatLapTime(c.lap.duration)}</span>
         <span class="c3 num"><span data-live="speed-${k}">-</span><span class="c3-gap"${xKind === 'dist' ? ' hidden' : ''}> / <span data-live="gap-${k}">-</span></span></span></span></button>`;
     }).join('');
@@ -1047,7 +1047,10 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
 
   deps.theme?.subscribe(() => { if (visible) pushMap(); });
   renderSetSelect();
-  const aliasSigOf = () => SLOTS.map((s) => session.slotAliasOf(session.activeIndex, s)).join('|');
+  const aliasSigOf = () => SLOTS.map((s) => {
+    const a = session.assignment[s];
+    return session.slotAliasOf(session.activeIndex, s) + '~' + (a ? session.runAliasOf(a.logId) : '');
+  }).join('|');
   session.subscribe(() => {
     renderSetSelect();
     if (visible && signature() !== sig) { sig = signature(); aliasSig = aliasSigOf(); rebuild(); return; }

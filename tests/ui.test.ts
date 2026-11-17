@@ -174,8 +174,8 @@ describe('レイアウトとセクター表示', () => {
     session.registerCircuit('オートポリス', cln, sci);
     session.addLog(utc(), 'u');
     const row = root.querySelector<HTMLElement>('.file .row:not(.hd)')!;
-    expect(row.style.getPropertyValue('--cols')).toBe('90px 110px 110px minmax(160px,1fr) 200px');
-    expect(row.style.getPropertyValue('--cols-m')).toBe('66px 72px 168px 90px minmax(140px,1fr)');
+    expect(row.style.getPropertyValue('--cols')).toBe('120px 90px minmax(160px,1fr) 200px');
+    expect(row.style.getPropertyValue('--cols-m')).toBe('108px 60px 168px minmax(140px,1fr)');
     expect(row.lastElementChild!.classList.contains('pk')).toBe(true);           // DOM の並びは変えない(並べ替えは CSS の order)
   });
 
@@ -188,7 +188,7 @@ describe('レイアウトとセクター表示', () => {
       root.querySelector<HTMLButtonElement>(`[data-act="sector-mode"][data-mode="${mode}"]`)!.click();
       const ordinary = rows().filter((r) => !r.classList.contains('ex'));
       for (let k = 0; k < 7; k++) {
-        const cell = (r: Element) => r.children[3 + k] as HTMLElement;
+        const cell = (r: Element) => r.children[2 + k] as HTMLElement;
         const min = Math.min(...ordinary.map((r) => toSec(cell(r).textContent!)));
         const marked = ordinary.filter((r) => cell(r).classList.contains('bsec'));
         expect(marked.length).toBeGreaterThan(0);

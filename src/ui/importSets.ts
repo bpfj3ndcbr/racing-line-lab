@@ -1,7 +1,7 @@
 import {
   SLOTS, type Lap, type Slot, bestPerColumn, formatLapTime, isBest, sectorSplits, escapeHtml as esc, fmtMinSec, endFromStep, endSteps, stepFromEnd
 } from '../core';
-import { ALIAS_MAX, SET_COUNT, type LoadedLog, type Session, type WorkSet, bestDuration } from '../store/session';
+import { ALIAS_MAX, LAP_ALIAS_MAX, RUN_ALIAS_MAX, SET_COUNT, type LoadedLog, type Session, type WorkSet, bestDuration } from '../store/session';
 import { type ImportActions, type ImportPart, SEC_HINT, dateOf } from './importParts';
 import { candidateLabel } from './loadDialog';
 import { SHOWN_MARK } from './marks';
@@ -59,6 +59,8 @@ export interface SetsPart extends ImportPart {
   closeSets(): void;
   /** 比較セットの別名の入力欄でのキー操作(Enter で確定、Esc でやめる) */
   onAliasKey(e: KeyboardEvent, inp: HTMLInputElement): void;
+  /** LAP の別名の入力欄でのキー操作(Enter で確定、Esc でやめる。案件 68) */
+  onLapAliasKey(e: KeyboardEvent, inp: HTMLInputElement): void;
   /** クリックの既定の動作を止めるか(見出しの別名の操作・タブのときの見出しで、折りたたみを開閉しない) */
   onClickGuard(e: MouseEvent): void;
   /** input を受ける(終端の調整のスライドバーを動かしている間) */
@@ -72,6 +74,32 @@ export function createSets(root: HTMLElement, session: Session, actions: ImportA
   const groupEl = root.querySelector<HTMLElement>('#sets-group')!, tabsEl = groupEl.querySelector<HTMLElement>('.sets-tabs')!;
   const setEls = Array.from({ length: SET_COUNT }, (_, i) => root.querySelector<HTMLDetailsElement>(`#sec-set-${i}`)!);
   const openedBefore = Array.from({ length: SET_COUNT }, () => false);
+
+  // ---------- LAP の別名の編集(案件 68。ファイルごとの表で、見出しの「別名の変更」から) ----------
+  const lapEditing = new Set<string>();                  // 編集中の表(比較セット|ファイル)
+  const lapDraft = new Map<string, string>();            // 入力中の文字(一覧を作り直しても消さない)
+  const lapKey = (set: number, log: string) => `${set}|${log}`;
+  function endLapEdit(set: number, log: string) {
+    lapEditing.delete(lapKey(set, log));
+    for (const k of [...lapDraft.keys()]) if (k.startsWith(`${lapKey(set, log)}|`)) lapDraft.delete(k);
+  }
+  // 走行ログ(Run)の別名: 見出しの「Run N」の横の「別名の変更」から
+  const runEditing = new Set<string>();
+  const runDraft = new Map<string, string>();
+  function endRunEdit(set: number, log: string) { runEditing.delete(lapKey(set, log)); runDraft.delete(lapKey(set, log)); }
+  function commitRunAlias(set: number, log: string) {
+    const file = Array.from(setEls[set].querySelectorAll<HTMLElement>('.file')).find((f) => f.dataset.id === log);
+    const text = file?.querySelector<HTMLInputElement>('.run-alias')?.value ?? '';
+    endRunEdit(set, log);
+    session.setRunAlias(log, text);
+  }
+  function commitLapAlias(set: number, log: string) {
+    const file = Array.from(setEls[set].querySelectorAll<HTMLElement>('.file')).find((f) => f.dataset.id === log);
+    const texts: Record<number, string> = {};
+    file?.querySelectorAll<HTMLInputElement>('.lap-alias').forEach((inp) => { texts[Number(inp.dataset.lap)] = inp.value; });
+    endLapEdit(set, log);
+    session.setLapAliases(log, texts);
+  }
 
   // ---------- セットの別名(見出しの「表示中」の印の右) ----------
   let aliasEditing: number | null = null;
@@ -159,12 +187,31 @@ export function createSets(root: HTMLElement, session: Session, actions: ImportA
       aria-label="Run ${l.no} LAP${lap.number} の終端"><span class="num lap-end-val">${esc(endLabel(lap))}</span></span>`;
   }
 
+  /** 見出しの「Run N」: 別名があれば「Run N. 別名」。「別名の変更」を押すと入力欄になり、ボタンは「確定」 */
+  function runHead(l: LoadedLog, i: number): string {
+    const alias = session.runAliasOf(l.id), editing = runEditing.has(lapKey(i, l.id));
+    const btn = `<button class="btn xs run-edit${editing ? ' pri' : ''}" data-act="${editing ? 'run-alias-ok' : 'run-alias-edit'}" data-set="${i}" data-log="${esc(l.id)}" data-fk="s${i}-rae-${esc(l.id)}">${editing ? '確定' : '別名の変更'}</button>`;
+    if (!editing) return `<div class="fno">Run ${l.no}${alias ? `. <span class="run-name">${esc(alias)}</span>` : ''}</div>${btn}`;
+    return `<div class="fno">Run ${l.no}</div><input type="text" class="run-alias" maxlength="${RUN_ALIAS_MAX}" value="${esc(runDraft.get(lapKey(i, l.id)) ?? alias)}"
+      placeholder="名前" data-fk="s${i}-rn-${esc(l.id)}" aria-label="Run ${l.no} の別名(${RUN_ALIAS_MAX}文字まで)">${btn}`;
+  }
+
+  /** LAP の欄: 編集中は別名の入力欄、ふだんは「1. 別名」(別名が無ければ番号だけ) */
+  function lapCell(l: LoadedLog, i: number, n: number): string {
+    const alias = session.lapAliasOf(l.id, n);
+    if (!lapEditing.has(lapKey(i, l.id))) return `<span class="lap-no">${n}${alias ? `. <span class="lap-name">${esc(alias)}</span>` : ''}</span>`;
+    const draft = lapDraft.get(`${lapKey(i, l.id)}|${n}`);
+    return `<span class="lap-no">${n}</span><input type="text" class="lap-alias" maxlength="${LAP_ALIAS_MAX}" value="${esc(draft ?? alias)}"
+      placeholder="名前" data-lap="${n}" data-fk="s${i}-ln-${esc(l.id)}-${n}" aria-label="Run ${l.no} LAP${n} の別名(${LAP_ALIAS_MAX}文字まで)">`;
+  }
+
   function renderFile(l: LoadedLog, i: number, w: WorkSet): string {
     const ns = l.circuit?.sectors.length ?? 0;
     const showSec = w.showSectors && ns > 0;
-    const cols = `90px 110px 110px ${showSec ? `repeat(${ns},76px) ` : ''}minmax(160px,1fr) 200px`;
+    // LAP の欄は、番号と別名の入力欄(全角 6 文字)、タイムの欄は、タイムとその下の Delta(案件 68)
+    const cols = `120px 90px ${showSec ? `repeat(${ns},76px) ` : ''}minmax(160px,1fr) 200px`;
     // スマホの幅では、ラップ・タイム・割り当て(A〜D)を先に並べる(CSS の order で並べ替え、列の幅はこちら。案件 1)
-    const colsM = `66px 72px 168px 90px ${showSec ? `repeat(${ns},70px) ` : ''}minmax(140px,1fr)`;
+    const colsM = `108px 60px 168px ${showSec ? `repeat(${ns},70px) ` : ''}minmax(140px,1fr)`;
     const grid = `--cols:${cols};--cols-m:${colsM}`;
     const best = bestDuration(l);
     const { key, dir } = w.sort;
@@ -182,7 +229,6 @@ export function createSets(root: HTMLElement, session: Session, actions: ImportA
     const circuitTag = l.circuit
       ? `<span class="tag ok">${esc(l.circuit.name)}${l.auto ? '(自動判定)' : ''}</span>`
       : l.outside ? `<span class="tag ng">${esc(l.outside.name)} を通らない</span>` : '<span class="tag ng">サーキット未判定</span>';
-    const arrow = (k: string) => (key === k ? (dir === 1 ? '▲' : '▼') : '');
     const sortAttr = (k: string) => (key === k ? (dir === 1 ? 'ascending' : 'descending') : 'none');
 
     let rows: string;
@@ -202,12 +248,12 @@ export function createSets(root: HTMLElement, session: Session, actions: ImportA
       rows = '<div class="empty">ラップを検出できませんでした(コントロールラインを通過していません)。</div>';
     } else {
       const head = l.hasHead
-        ? `<div class="row ex head" style="${grid}"><div class="num">—</div><div></div><div></div>${showSec ? '<div></div>'.repeat(ns) : ''}<div class="sub">始点が無いので非表示</div><div></div></div>`
+        ? `<div class="row ex head" style="${grid}"><div class="num">—</div><div></div>${showSec ? '<div></div>'.repeat(ns) : ''}<div class="sub">始点が無いので非表示</div><div></div></div>`
         : '';
       // 取り込み範囲で切った所をまたぐので出さなかったラップ: 番号の順のときだけ、その位置に灰色の行で出す
       // (続いた番号は 1 行にまとめる)
-      // タイム・Delta・(セクター)・説明の欄を 1 つにつないで、左寄せで書く(スマホの並びでも、番号のすぐ右から)
-      const skipRow = (from: number, to: number) => `<div class="row ex skip" style="${grid}"><div class="num">${from === to ? from : `${from}〜${to}`}</div><div class="sub" style="grid-column:span ${3 + (showSec ? ns : 0)}">${from === to ? `LAP ${from} は取り込み範囲外` : `LAP ${from} から ${to} までは取り込み範囲外`}</div><div></div></div>`;
+      // タイム・(セクター)・説明の欄を 1 つにつないで、左寄せで書く(スマホの並びでも、番号のすぐ右から)
+      const skipRow = (from: number, to: number) => `<div class="row ex skip" style="${grid}"><div class="num">${from === to ? from : `${from}〜${to}`}</div><div class="sub" style="grid-column:span ${2 + (showSec ? ns : 0)}">${from === to ? `LAP ${from} は取り込み範囲外` : `LAP ${from} から ${to} までは取り込み範囲外`}</div><div></div></div>`;
       const groups: [number, number][] = [];
       for (const n of [...l.cutLaps].sort((a, b) => a - b)) {
         const g = groups[groups.length - 1];
@@ -237,19 +283,20 @@ export function createSets(root: HTMLElement, session: Session, actions: ImportA
             data-fk="s${i}-a-${esc(l.id)}-${lap.number}-${s}" aria-pressed="${on}" aria-label="Run ${l.no} LAP${lap.number} を ${s} に${on ? 'の割り当てを解除' : '割り当て'}">${s}</button>`;
         }).join('');
         return `<div class="row${ex ? ' ex' : ''}${assigned ? ' as' : ''}" style="${grid}">
-          <div class="num">${lap.number}</div>
-          <div class="num${d === 0 ? ' best' : ''}">${formatLapTime(lap.duration)}</div>
-          <div class="num${d === 0 ? ' best' : ''}">${d === 0 ? 'ベスト' : fmtDelta(d)}</div>
+          <div class="num lap-cell">${lapCell(l, i, lap.number)}</div>
+          <div class="num${d === 0 ? ' best' : ''}"><span class="tm"><span>${formatLapTime(lap.duration)}</span><small class="delta">${d === 0 ? 'ベスト' : fmtDelta(d)}</small></span></div>
           ${secCells}
           <div class="sub lap-note"${joined(l, lap) ? ` title="${JOINED_TITLE}"` : ''}>${noteOf(l, lap, i, best, showSec)}</div>
           <div class="pk">${btns}</div></div>`;
       })()).join('') + skipsBefore(dir === 1 ? Infinity : -Infinity);
     }
 
+    const editing = lapEditing.has(lapKey(i, l.id));
+    const lapEditBtn = `<button class="btn xs lap-edit${editing ? ' pri' : ''}" data-act="${editing ? 'lap-alias-ok' : 'lap-alias-edit'}" data-set="${i}" data-log="${esc(l.id)}" data-fk="s${i}-lae-${esc(l.id)}">${editing ? '確定' : '別名の変更'}</button>`;
     const secHead = showSec ? Array.from({ length: ns }, (_, i) => `<div>S${i + 1}</div>`).join('') : '';
     return `<section class="file" data-id="${esc(l.id)}">
       <div class="fh">
-        <div class="fno">Run ${l.no}</div>
+        ${runHead(l, i)}
         <div class="fn">${esc(l.log.fileName)} : ${dateOf(l)}</div>
         <span class="sub">${Number.isNaN(best) ? '' : 'ベスト ' + formatLapTime(best)}</span>
         ${circuitTag}
@@ -259,9 +306,9 @@ export function createSets(root: HTMLElement, session: Session, actions: ImportA
       <div class="scroll" tabindex="0" role="region" aria-label="Run ${l.no} のラップ一覧(横にスクロールできます)">
         <div class="tbl">
           <div class="row hd" style="${grid}">
-            <div><button class="hbtn" data-act="sort" data-set="${i}" data-key="lap" data-fk="s${i}-sort-lap" aria-sort="${sortAttr('lap')}">ラップ ${arrow('lap')}</button></div>
-            <div><button class="hbtn" data-act="sort" data-set="${i}" data-key="time" data-fk="s${i}-sort-time" aria-sort="${sortAttr('time')}">タイム ${arrow('time')}</button></div>
-            <div>Delta</div>${secHead}<div></div><div>割り当て</div>
+            <div><button class="hbtn" data-act="sort" data-set="${i}" data-key="lap" data-fk="s${i}-sort-lap" aria-sort="${sortAttr('lap')}">LAP</button>${laps.length ? lapEditBtn : ''}</div>
+            <div><button class="hbtn" data-act="sort" data-set="${i}" data-key="time" data-fk="s${i}-sort-time" aria-sort="${sortAttr('time')}">タイム</button></div>
+            ${secHead}<div></div><div>割り当て</div>
           </div>${rows}
         </div>
       </div></section>`;
@@ -474,6 +521,10 @@ export function createSets(root: HTMLElement, session: Session, actions: ImportA
       switch (act) {
         case 'alias-edit': aliasEditing = set; aliasShown.delete(set); renderAlias(set); return true;
         case 'alias-ok': commitAlias(set); return true;
+        case 'run-alias-edit': runEditing.add(lapKey(set, d.log!)); render(); return true;
+        case 'run-alias-ok': commitRunAlias(set, d.log!); return true;
+        case 'lap-alias-edit': lapEditing.add(lapKey(set, d.log!)); render(); return true;
+        case 'lap-alias-ok': commitLapAlias(set, d.log!); return true;
         case 'add': case 'drop-pick': actions.addLogs(set); return true;
         case 'sectors': session.toggleSectors(set); return true;
         case 'sector-mode': session.setSectorMode(d.mode as 'split' | 'cumulative', set); return true;
@@ -497,12 +548,29 @@ export function createSets(root: HTMLElement, session: Session, actions: ImportA
       if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); commitAlias(i); }
       else if (e.key === 'Escape') { e.preventDefault(); aliasEditing = null; aliasShown.delete(i); renderAlias(i); }
     },
+    onLapAliasKey(e, inp) {
+      const set = Number(inp.closest<HTMLElement>('.set-sec')?.dataset.set), log = inp.closest<HTMLElement>('.file')?.dataset.id;
+      if (!log) return;
+      const run = inp.classList.contains('run-alias');
+      if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); if (run) commitRunAlias(set, log); else commitLapAlias(set, log); }
+      else if (e.key === 'Escape') { e.preventDefault(); if (run) endRunEdit(set, log); else endLapEdit(set, log); render(); }
+    },
     onClickGuard(e) {
       if ((e.target as HTMLElement).closest('.set-alias')) e.preventDefault();
       if (asTabs() && (e.target as HTMLElement).closest('.set-sec > summary') && !(e.target as HTMLElement).closest('input,button')) e.preventDefault();   // タブでは閉じない
     },
     // 「終端の調整」のスライドバー: 動かしている間は値の表示だけを変える(一覧を作り直すと、つかめなくなるため)。手を離したら change で反映
     onInput(t) {
+      if (t.classList.contains('run-alias')) {
+        const set = t.closest<HTMLElement>('.set-sec')?.dataset.set, log = t.closest<HTMLElement>('.file')?.dataset.id;
+        if (set !== undefined && log) runDraft.set(lapKey(Number(set), log), (t as HTMLInputElement).value);
+        return;
+      }
+      if (t.classList.contains('lap-alias')) {                    // 入力中の文字を覚える
+        const set = t.closest<HTMLElement>('.set-sec')?.dataset.set, log = t.closest<HTMLElement>('.file')?.dataset.id;
+        if (set !== undefined && log) lapDraft.set(`${lapKey(Number(set), log)}|${t.dataset.lap}`, (t as HTMLInputElement).value);
+        return;
+      }
       if (!t.classList.contains('lap-end-range')) return;
       const val = t.parentElement?.querySelector('.lap-end-val');
       if (val) val.textContent = `終端: ${fmtMinSec(endFromStep(Number((t as HTMLInputElement).value), Number(t.dataset.max)))}`;

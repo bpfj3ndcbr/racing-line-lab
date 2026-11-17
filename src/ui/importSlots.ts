@@ -32,7 +32,7 @@ export function createSlots(el: HTMLElement, session: Session): SlotsPart {
         body = `<div class="slot-edit"><input type="text" class="alias-input slot-alias-input" maxlength="${SLOT_ALIAS_MAX}" value="${esc(alias)}" placeholder="カード名(${SLOT_ALIAS_MAX}文字まで)" aria-label="${s} のカード名" data-slot="${s}">
           <button class="btn xs pri" data-act="slot-alias-ok" data-slot="${s}">確定</button></div>`;
       } else if (r) {
-        body = `<div class="st">${alias ? `${esc(alias)} <span class="sub">Run ${r.log.no}</span>` : `Run ${r.log.no}`}</div>
+        body = `<div class="st">${alias ? `${esc(alias)} <span class="sub ${session.runAliasOf(r.log.id) ? 'ra' : 'rn'}">${esc(session.runLabel(r.log))}</span>` : esc(session.runLabel(r.log))}</div>
            <div class="sub num"><span class="lapno">LAP ${r.lap.number}: </span>${formatLapTime(r.lap.duration)}</div>`;
       } else body = '<div class="mut">未割り当て</div>';
       const pen = r && !edit ? `<button class="btn xs slot-pen" data-act="slot-alias-edit" data-slot="${s}" aria-label="${s} のカード名を編集" title="カード名を編集">✎</button>` : '';

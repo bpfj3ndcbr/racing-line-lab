@@ -100,6 +100,12 @@ export const ALIAS_MAX = 15;
 /** カード名(A〜D の別名)の長さの上限(文字数。地図の引き出し線に出すので短い) */
 export const SLOT_ALIAS_MAX = 6;
 
+/** LAP の別名の長さの上限(カード名と同じ。ラップ一覧の「LAP」の欄に入る長さ) */
+export const LAP_ALIAS_MAX = SLOT_ALIAS_MAX;
+
+/** 走行ログ(Run)の別名の長さの上限(カードの表示にも出すので、カード名と同じ) */
+export const RUN_ALIAS_MAX = SLOT_ALIAS_MAX;
+
 export class Session {
   circuits: Circuit[];
   /** 比較セット 1〜5 */
@@ -130,6 +136,10 @@ export class Session {
   private offsets: Record<string, Offset>;
   /** 「終端の調整」の値(ファイル → ラップ番号 → ラップ開始からの秒) */
   private lapEnds: Record<string, Record<string, number>>;
+  /** LAP の別名(案件 68。ファイル → ラップ番号 → 別名)。ラップ番号の意味が変わったときは「終端の調整」と同じく消す */
+  private lapAliases: Record<string, Record<string, string>>;
+  /** 走行ログ(Run)の別名(案件 68。ファイル → 別名。ラップ番号に関わらないので、計測ラインが変わっても残す) */
+  private runAliases: Record<string, string>;
   /** 取り込まない区間(案件 59。ファイル → 元のログの時刻の区間) */
   private trims: Record<string, TrimCut[]>;
   private listeners = new Set<() => void>();
@@ -138,6 +148,8 @@ export class Session {
     this.circuits = readJson<Circuit[]>(store, 'circuits', []);
     this.offsets = readJson<Record<string, Offset>>(store, 'offsets', {});
     this.lapEnds = readJson<Record<string, Record<string, number>>>(store, 'lapEnds', {});
+    this.lapAliases = readJson<Record<string, Record<string, string>>>(store, 'lapAliases', {});
+    this.runAliases = readJson<Record<string, string>>(store, 'runAliases', {});
     this.trims = readJson<Record<string, TrimCut[]>>(store, 'trims', {});
   }
 
@@ -155,15 +167,63 @@ export class Session {
     this.setSetting('setAliases', all);
     this.emit();
   }
-  /** セット i の、カード(A〜D)の別名。セットごと・A〜D ごとに持つ(割り当てるラップを替えても残る)。無ければ空文字 */
-  slotAliasOf(i: number, slot: Slot): string { return this.getSetting<Record<string, string>>('slotAliases', {})[`${i}${slot}`] ?? ''; }
+  /** セット i の、カード(A〜D)の別名。セットごと・A〜D ごとに持つ(割り当てるラップを替えても残る)。無ければ、割り当てたラップの別名。それも無ければ空文字 */
+  slotAliasOf(i: number, slot: Slot): string {
+    const own = this.getSetting<Record<string, string>>('slotAliases', {})[`${i}${slot}`];
+    if (own) return own;
+    const a = this.sets[i]?.assignment[slot];                      // カード名が無ければ、割り当てたラップの別名を使う(案件 68)
+    return a ? this.lapAliasOf(a.logId, a.lap) : '';
+  }
   setSlotAlias(i: number, slot: Slot, text: string): void {
     if (i < 0 || i >= SET_COUNT || !SLOTS.includes(slot)) return;
     const all = { ...this.getSetting<Record<string, string>>('slotAliases', {}) };
     const v = Array.from(text.trim()).slice(0, SLOT_ALIAS_MAX).join('');
     if (v) all[`${i}${slot}`] = v; else delete all[`${i}${slot}`];
     this.setSetting('slotAliases', all);
+    const a = this.sets[i].assignment[slot];                       // 割り当て中のラップの別名としても保存する(案件 68)
+    if (a) this.putLapAlias(a.logId, a.lap, v);
     this.emit();
+  }
+  /** ファイル id の走行ログ(Run)の別名(無ければ空文字。案件 68) */
+  runAliasOf(id: string): string { return this.runAliases[id] ?? ''; }
+  /** 走行ログの別名を設定する(前後の空白は除き、上限を超える分は切る。空なら別名なし) */
+  setRunAlias(id: string, text: string): void {
+    const v = Array.from(text.trim()).slice(0, RUN_ALIAS_MAX).join('');
+    if (v) this.runAliases[id] = v; else delete this.runAliases[id];
+    this.store.set('runAliases', JSON.stringify(this.runAliases));
+    this.emit();
+  }
+  /** 走行ログの表示名(別名があれば別名、無ければ「Run N」) */
+  runLabel(l: { id: string; no: number }): string { return this.runAliasOf(l.id) || `Run ${l.no}`; }
+  /** ファイル id のラップ番号 lap の別名(無ければ空文字。案件 68) */
+  lapAliasOf(id: string, lap: number): string { return this.lapAliases[id]?.[lap] ?? ''; }
+  /**
+   * ラップ番号 lap の別名を設定する(前後の空白は除き、上限を超える分は切る。空なら別名なし)。
+   * そのラップを割り当てているカード(全セット)の名前も、同じ別名にする
+   */
+  setLapAlias(id: string, lap: number, text: string): void { this.setLapAliases(id, { [lap]: text }); }
+  /** 同じファイルの複数のラップの別名を、まとめて設定する(画面の更新は 1 回) */
+  setLapAliases(id: string, texts: Record<number, string>): void {
+    const all = { ...this.getSetting<Record<string, string>>('slotAliases', {}) };
+    for (const [k, text] of Object.entries(texts)) {
+      const lap = Number(k);
+      const v = Array.from(text.trim()).slice(0, LAP_ALIAS_MAX).join('');
+      this.putLapAlias(id, lap, v);
+      this.sets.forEach((w, i) => {
+        for (const s of SLOTS) {
+          const a = w.assignment[s];
+          if (a && a.logId === id && a.lap === lap) { if (v) all[`${i}${s}`] = v; else delete all[`${i}${s}`]; }
+        }
+      });
+    }
+    this.setSetting('slotAliases', all);
+    this.emit();
+  }
+  private putLapAlias(id: string, lap: number, v: string) {
+    const cur = { ...(this.lapAliases[id] ?? {}) };
+    if (v) cur[lap] = v; else delete cur[lap];
+    if (Object.keys(cur).length) this.lapAliases[id] = cur; else delete this.lapAliases[id];
+    this.store.set('lapAliases', JSON.stringify(this.lapAliases));
   }
   /** カード名(別名が無ければ「A」「B」「C」「D」) */
   cardName(slot: Slot, i: number = this.activeIndex): string { return this.slotAliasOf(i, slot) || slot; }
@@ -542,6 +602,12 @@ export class Session {
     this.saveLapEnds();
     return true;
   }
+  /** ラップ番号の意味が変わったとき、そのファイルの LAP の別名を消す(案件 68) */
+  private clearLapAliases(id: string) {
+    if (!this.lapAliases[id]) return;
+    delete this.lapAliases[id];
+    this.store.set('lapAliases', JSON.stringify(this.lapAliases));
+  }
   private saveLapEnds() { this.store.set('lapEnds', JSON.stringify(this.lapEnds)); }
 
   /** 位置補正の値を持っているファイルの数 */
@@ -740,6 +806,7 @@ export class Session {
       if (l.id !== added && (b !== a || (controlChangedId && (b === controlChangedId || a === controlChangedId)))) {
         w.assignment = clearLog(w.assignment, l.id);
         this.clearLapEnds(l.id);
+        this.clearLapAliases(l.id);
       }
       this.computeLaps(l);
     }
