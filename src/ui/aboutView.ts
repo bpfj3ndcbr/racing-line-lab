@@ -35,6 +35,7 @@ const ABOUT_HTML = `
 <li>リポジトリ: <a href="${GH}" target="_blank" rel="noopener noreferrer">${GH}</a></li>
 <li>© 2026 bpfj3ndcbr</li>
 </ul>
+<p>ソースコードへの貢献(プルリクエスト)は受け付けていません。ご意見や不具合は <a href="${GH}/issues" target="_blank" rel="noopener noreferrer">Issues</a> へお寄せください。ライセンスの範囲で、改変や再配布はご自由にどうぞ。</p>
 <h4>ライセンスと権利表記</h4>
 <ul>
 <li>本アプリのソースコードは <a href="${GH}/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">PolyForm Shield License 1.0.0</a> で公開しています。使うこと自体は自由で、改変や再配布も、ライセンスに従えば可能です。ただし、このアプリと競合する製品・サービスとして提供することはできません。1.8.0 より前の版は MIT License です。</li>
