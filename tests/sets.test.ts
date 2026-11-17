@@ -166,6 +166,19 @@ describe('比較セットのタブの切り替え: 全体のスクロールは�
     expect(y).toBe(FILES - 91);
   });
 
+  it('止めている間は、スクロールを固定する(scroll-lock)。止めたあとの入力が途切れたら外す', async () => {
+    const FILES = 1400;
+    $<HTMLElement>('#sec-set-0 .sec-body').getBoundingClientRect = () => ({ top: FILES - y }) as DOMRect;
+    const other = $<HTMLElement>('#sec-set-0 .sec-body');
+    userScroll(other, FILES - 100);
+    userScroll(other, FILES + 100);                      // 越えて、止まる
+    expect(document.documentElement.classList.contains('scroll-lock')).toBe(true);        // jsdom ではページ全体が、スクロールする要素
+    expect($<HTMLElement>('#view-import').classList.contains('scroll-held')).toBe(true);
+    await new Promise((r) => setTimeout(r, 260));        // 入力が途切れる
+    expect(document.documentElement.classList.contains('scroll-lock')).toBe(false);
+    expect($<HTMLElement>('#view-import').classList.contains('scroll-held')).toBe(false);
+  });
+
   it('切り替える前の高さを min-height に保つ。一覧に切り替えると外す', () => {
     expect(group().style.minHeight).toBe('');
     tab(1).click();

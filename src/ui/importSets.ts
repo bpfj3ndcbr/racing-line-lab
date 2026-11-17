@@ -385,7 +385,15 @@ export function createSets(root: HTMLElement, session: Session, actions: ImportA
   }
   const catcher = createScrollCatch({
     getY: () => scroller().get(), setY: (y) => scroller().set(y), pin: catchPin,
-    onHold: (held) => root.classList.toggle('scroll-held', held),      // 止めている間は、画面の操作を受け付けない(CSS)
+    // 止めている間は、画面の操作を受け付けない(CSS)。さらに、スクロールそのものを固定する(overflow:hidden)。
+    // スマホの指の勢い(慣性)は、位置を戻すだけでは止まらず、跳ね返って見えるため、止めた瞬間に打ち切る
+    onHold: (held) => {
+      root.classList.toggle('scroll-held', held);
+      const ov = getComputedStyle(root).overflowY;
+      const lockEl = ov === 'auto' || ov === 'scroll' ? root : document.documentElement;     // PC は画面の中、スマホはページ全体
+      if (held) lockEl.classList.add('scroll-lock');
+      else { root.classList.remove('scroll-lock'); document.documentElement.classList.remove('scroll-lock'); }
+    },
   });
   root.addEventListener('scroll', () => catcher.onScroll(), { passive: true });   // PC: この画面の中をスクロールする
   window.addEventListener('scroll', () => { if (root.isConnected) catcher.onScroll(); }, { passive: true });   // スマホ: ページ全体をスクロールする(画面を作り直したあとの古い部品は、動かさない)
