@@ -756,6 +756,7 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 #view-import{height:calc(100vh - var(--top-h));height:calc(100dvh - var(--top-h));overflow:auto;position:relative}   /* PC: 上部のタブは動かさず、この中をスクロールする。カード・簡易のはじめかた・比較セットのタブは、上に固定する(案件 65) */
 #view-import>.body{max-width:none}
 #view-import.scroll-held>*{pointer-events:none}   /* スクロールを境目で止めている間(案件 74 のあと)は、マウスを乗せた色の変化・クリックを受け付けない。ホイールは、この画面そのものが受ける */
+#view-import.scroll-lock,html.scroll-lock,html.scroll-lock body{overflow:hidden}   /* 止めている間は、スクロールそのものを固定する(スマホの慣性を打ち切る) */
 #view-import>.body>*{max-width:1392px;width:100%;box-sizing:border-box}
 .guide-wrap{margin:0;padding:10px 24px;background:var(--bg);border-bottom:1px solid var(--border)}
 /* 簡易のはじめかた: はじめかた(大)がカードの下に隠れたら、カードの下に重ねて固定する。高さは持たない(出し入れで下がずれない) */
