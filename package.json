@@ -29,7 +29,7 @@
   "main": "electron/main.cjs",
   "description": "シンプル走行ライン比較ツール",
   "author": "racing-line-lab",
-  "license": "MIT",
+  "license": "PolyForm-Shield-1.0.0",
   "build": {
     "appId": "io.github.bpfj3ndcbr.racing-line-lab",
     "productName": "Racing Line Lab",

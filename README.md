@@ -502,7 +502,10 @@ Web 版は、スマホなどにアプリとしてインストールできます�
 
 ### 1. 本アプリケーションのライセンス
 
-本プロジェクトのソースコードは [MIT License](https://github.com/bpfj3ndcbr/racing-line-lab/blob/main/LICENSE) のもとで公開されています。商用・非商用を問わず自由にご利用・改変・再配布いただけます。
+本プロジェクトのソースコードは [PolyForm Shield License 1.0.0](https://github.com/bpfj3ndcbr/racing-line-lab/blob/main/LICENSE) のもとで公開しています。
+使うこと自体は自由です。個人でも、お仕事(商用)でも、改変や再配布も、ライセンスに従えば OK です。
+ただし、このアプリと競合する製品やサービスとして提供すること(販売でも、無料配布でも)はできません。
+1.8.0 より前の版は、これまでどおり MIT License です。
 
 ### 2. 地図タイルに関する権利表記
 
