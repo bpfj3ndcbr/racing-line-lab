@@ -12,6 +12,7 @@ import { OFFSETS_HTML, createOffsets } from './importOffsets';
 import type { ImportActions, ImportPart } from './importParts';
 import { SETS_HTML, createSets } from './importSets';
 import { createSlots } from './importSlots';
+import { TOP_TABS_HTML, createTopTabs } from './importTabs';
 import type { MapFactory } from './mapTypes';
 import type { ThemeController } from './theme';
 
@@ -54,7 +55,7 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
     <div id="guide" class="guide-wrap"></div>
     <div id="guide-mini" class="guide-mini"></div>
     <div id="work" class="work" hidden></div>
-    <div class="body" id="import-body">${CIRCUITS_HTML}
+    <div class="body" id="import-body">${TOP_TABS_HTML}${CIRCUITS_HTML}
 ${OFFSETS_HTML}
 ${SETS_HTML}
     </div>
@@ -73,10 +74,10 @@ ${SETS_HTML}
     openWork: (kind, id, set) => openWork(kind, id, set),
     openMapRegister: (set, logId) => openMapRegister(set, logId),
     openLoadCheck: (set, logId) => { void openLoadCheck(set, logId); },
-    openCircuitSection: (tab) => circuits.openSection(tab),
-    focusCircuitSelect: (set) => sets.focusCircuitSelect(set),
-    scrollToSet: (set) => sets.scrollToSet(set),
-    autoAssign(set) { session.autoAssignFastest(set); sets.scrollToSet(set); },
+    openCircuitSection: (tab) => { top.show('circuit'); circuits.openSection(tab); },
+    focusCircuitSelect: (set) => { top.show('sets'); sets.focusCircuitSelect(set); },
+    scrollToSet: (set) => showSet(set),
+    autoAssign(set) { session.autoAssignFastest(set); showSet(set); },
     toCompare: () => opts.onCompare?.(),
   };
   /** サーキットの登録・編集中(保存していないラインがあるので、画面を移れない) */
@@ -86,7 +87,10 @@ ${SETS_HTML}
   const circuits = createCircuits(root, session, actions);
   const offsets = createOffsets(root, session);
   const sets = createSets(root, session, actions);
-  const parts: ImportPart[] = [slots, guide, circuits, offsets, sets];
+  const top = createTopTabs(root);              // 幅が広いときの、「サーキット」「走行ライン補正データ」「比較セット」のタブ(案件 74)
+  /** 比較セット set を見せる(タブのときは「比較セット」のタブに切り替えてから) */
+  const showSet = (set: number) => { top.show('sets'); sets.scrollToSet(set); };
+  const parts: ImportPart[] = [slots, guide, top, circuits, offsets, sets];
 
   function render() {
     const focusKey = (document.activeElement as HTMLElement | null)?.dataset?.fk;
@@ -95,6 +99,7 @@ ${SETS_HTML}
     circuits.render();
     offsets.render();
     sets.render();
+    top.render();
     if (focusKey) {
       const el = Array.from(root.querySelectorAll<HTMLElement>('[data-fk]')).find((e) => e.dataset.fk === focusKey);
       el?.focus({ preventScroll: true });
@@ -144,7 +149,8 @@ ${SETS_HTML}
   root.addEventListener('click', (e) => sets.onClickGuard(e));   // 見出しの別名の操作・タブのときの見出しでは、折りたたみを開閉しない
   // タブのキーボード操作(←→ / Home / End)
   root.addEventListener('keydown', (e) => {
-    if ((e.target as HTMLElement).closest('[role="tab"]')) circuits.onTabKey(e);
+    if (!(e.target as HTMLElement).closest('[role="tab"]')) return;
+    if (top.contains(e.target)) top.onKey(e); else circuits.onTabKey(e);
   });
   root.addEventListener('input', (e) => sets.onInput(e.target as HTMLElement));
   root.addEventListener('change', async (e) => {
@@ -207,7 +213,7 @@ ${SETS_HTML}
     if (!files.some((f) => hasExt(f.name, '.vbo'))) { await addFiles(files, session.activeIndex); return; }
     const set = await chooseShareSet(files.filter((f) => hasExt(f.name, '.vbo')).length);
     if (set === null) { session.say('共有された走行ログは追加しませんでした。', true); return; }
-    sets.scrollToSet(set);
+    showSet(set);
     await addFiles(files, set);
   }
 
@@ -274,14 +280,14 @@ ${SETS_HTML}
       session.say(`読み込みを取り消しました(${ids.length} 件)。`);
       return;
     }
-    if (o.kind === 'circuit') { session.setCircuit(o.circuit.id, set); sets.scrollToSet(set); }
+    if (o.kind === 'circuit') { session.setCircuit(o.circuit.id, set); showSet(set); }
     if (o.kind === 'cand') {
       // ファイルの計測ラインとセクターは、そのまま(ダイアログで直したなら、直した線で)登録して、ラップの割り当てに進む
       const c = o.candidate;
       const r = session.registerCircuitLines(name, control ?? c.control, sectors ?? c.sectors, { announce: true });   // 表示位置は決めない(走行ラインに合わせて表示)
       if (!r.ok) { session.say(r.message, true); return; }
       session.setCircuit(session.circuits[session.circuits.length - 1].id, set);
-      sets.scrollToSet(set);
+      showSet(set);
     }
     if (o.kind === 'map') { pending = { set, circuits: session.circuits.length }; openMapRegister(set, o.log.id); }
   }

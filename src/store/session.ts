@@ -402,13 +402,9 @@ export class Session {
   /** 読み込み中の案内(空文字で消す)。一時保存から元に戻す間など(案件 30) */
   setLoading(text: string): void { this.loading = text; this.notify(); }
 
-  /** 「はじめかた」を閉じているか。未設定なら、一度でも比較を開いた後は閉じた状態で始まる */
-  get guideClosed(): boolean {
-    const c = this.getSetting<boolean | null>('guideClosed', null);
-    return c ?? this.getSetting<boolean>('guideSeen', false);
-  }
+  /** 「はじめかた」を閉じているか。「閉じる」を押したときだけ閉じる(ふだんは開いている。古い版の `guideSeen` は読まない) */
+  get guideClosed(): boolean { return this.getSetting<boolean>('guideClosed', false); }
   setGuideClosed(closed: boolean): void { this.setSetting('guideClosed', closed); this.emit(); }
-  markGuideSeen(): void { if (!this.getSetting<boolean>('guideSeen', false)) this.setSetting('guideSeen', true); }
 
   addLog(log: TrackLog, id: string, set?: number): void {
     // 表示中が無いあいだは、走行ログを入れた比較セットを「表示予定のセット」にする(案件 28)

@@ -89,7 +89,6 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
         mapFactory, theme, onBack: () => navigate('import'), topSlot: root.querySelector<HTMLElement>('#top-set')!,
         onEditCircuit: (id) => { navigate('import'); importApi?.editCircuit(id); },     // 編集が終わったら比較に戻る
       });
-      if (SLOTS.some((s) => session.assignment[s])) session.markGuideSeen();            // 一度比較まで進んだら、「はじめかた」は畳んで始める
       compare.show();
     } else {
       compare?.hide();

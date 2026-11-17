@@ -244,14 +244,20 @@ describe('はじめかた', () => {
     expect($('#guide').querySelector('.gstep')).not.toBeNull();
   });
 
-  it('一度比較まで進むと、次の起動からは畳んで始まる(開き直した後はそのまま)', () => {
+  it('比較まで進んでも、次の起動で開いたまま。「閉じる」を押したときだけ畳む', () => {
     session.registerCircuit('オートポリス', cln, sci);
     session.addLog(parseOne(), 'u', 0);
     session.toggleAssignment('A', { logId: 'u', lap: 1 }, 0);
     nav('compare');
     boot();
+    expect($('#guide').querySelector('.gstep')).not.toBeNull();
+    $<HTMLButtonElement>('[data-act="guide-close"]').click();
+    boot();
     expect($('#guide').querySelector('.gstep')).toBeNull();
-    $<HTMLButtonElement>('[data-act="guide-open"]').click();
+  });
+
+  it('古い版で「一度比較まで進んだ」と覚えていても、開いて始まる(guideSeen は読まない)', () => {
+    session.setSetting('guideSeen', true);
     boot();
     expect($('#guide').querySelector('.gstep')).not.toBeNull();
   });

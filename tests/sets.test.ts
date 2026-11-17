@@ -74,6 +74,107 @@ describe('比較セット 1〜5', () => {
   });
 });
 
+describe('比較セットのタブの切り替え: 全体のスクロールは変えず、タブの中の位置を比較セットごとに覚える', () => {
+  let y = 0;
+  const PIN = 1000;                                    // 比較セットのタブが上に固定されるスクロール量
+  const group = () => $<HTMLElement>('#sets-group');
+  const tab = (i: number) => root.querySelectorAll<HTMLButtonElement>('.set-tab')[i];
+  beforeEach(() => {
+    y = 0;
+    Object.defineProperty(window, 'scrollY', { get: () => y, configurable: true });
+    window.scrollTo = ((_x: number, v: number) => { y = v; }) as typeof window.scrollTo;
+    group().getBoundingClientRect = () => ({ top: PIN - y }) as DOMRect;       // 画面の上からの位置(スクロールすると上へ動く)
+    Object.defineProperty(group(), 'offsetHeight', { value: 2000, configurable: true });
+    session.registerCircuit('オートポリス', cln, sci);
+    session.addLog(log(), 'u', 0);
+    session.addLog(log(), 'u', 1);                       // 比較セット1・2には走行ログがあり、3 は空
+  });
+
+  it('タブの中の位置を、比較セットごとに覚えて、戻ったときに元へ。初めて開くタブは、今の位置のまま', () => {
+    y = PIN + 300;
+    tab(1).click();
+    expect(y).toBe(PIN + 300);                           // 初めて開く
+    y = PIN + 700;
+    tab(0).click();
+    expect(y).toBe(PIN + 300);                           // 比較セット1 は 300 を覚えている
+    tab(1).click();
+    expect(y).toBe(PIN + 700);                           // 比較セット2 は 700
+  });
+
+  it('空の比較セットは、タブの中を上から出す。全体(タブが固定されるまで)は変えない', () => {
+    y = PIN + 500;
+    tab(2).click();
+    expect(y).toBe(PIN);                                 // タブの中は 0。「はじめかた」が簡易表示のままになる位置
+    tab(0).click();
+    expect(y).toBe(PIN + 500);                           // 空のタブの位置は覚えず、比較セット1 の 500 へ
+    y = 600;                                             // まだタブが固定されていない(全体を途中までスクロールした)位置
+    tab(2).click();
+    expect(y).toBe(600);                                 // 全体の位置は、そのまま
+  });
+
+  it('固定されるのは、見出しの行の下のタブ。見出しの高さの分だけ手前で数える(空の比較セットでも、見出しが出てこない)', () => {
+    Object.defineProperty($<HTMLElement>('#sets-group .sets-group-h'), 'offsetHeight', { value: 40, configurable: true });
+    group().getBoundingClientRect = () => ({ top: PIN - 40 - y }) as DOMRect;    // 見出し(40px)の下で、タブが固定される
+    y = PIN + 500;
+    tab(2).click();
+    expect(y).toBe(PIN);                                 // 見出しは上に隠れたまま、タブの下から中身を出す
+  });
+
+  /** 人のスクロール(wheel)が target の上で起きて、y まで動いたことにする */
+  const userScroll = (target: Element, to: number) => {
+    target.dispatchEvent(new WheelEvent('wheel', { deltaY: 100, bubbles: true }));
+    y = to;
+    window.dispatchEvent(new Event('scroll'));
+  };
+
+  it('引っかけるのは 1 か所だけ: 比較セットの中身の枠の上端の線(固定している行のすぐ下)。タブが固定される位置(はじめかた付近)では引っかけない', () => {
+    const FILES = 1400;                                  // 中身の枠の上端が、固定している行のすぐ下に来るスクロール量
+    $<HTMLElement>('#sec-set-0 .sec-body').getBoundingClientRect = () => ({ top: FILES - y }) as DOMRect;
+    const other = $<HTMLElement>('#sec-set-0 .sec-body');
+    userScroll(other, PIN - 100);
+    userScroll(other, PIN + 100);                        // タブが固定される位置を越える
+    expect(y).toBe(PIN + 100);                           // 引っかからない
+    userScroll(other, FILES - 100);
+    userScroll(other, FILES + 100);                      // 中身の枠の上端の線を越える
+    expect(y).toBe(FILES);                               // ここで止まる
+  });
+
+  it('引っかける位置は、簡易のはじめかたが出た状態の高さで数える(勢いよく越えたあとで、位置がずれない)', () => {
+    const FILES = 1400;
+    $<HTMLElement>('#sec-set-0 .sec-body').getBoundingClientRect = () => ({ top: FILES - y }) as DOMRect;
+    Object.defineProperty($<HTMLElement>('#slots'), 'offsetHeight', { value: 91, configurable: true });             // 固定している A〜D のカード
+    Object.defineProperty($<HTMLElement>('#guide'), 'offsetHeight', { value: 200, configurable: true });
+    $<HTMLElement>('#guide').getBoundingClientRect = () => ({ bottom: 300 - y }) as DOMRect;                        // はじめかた(大)は、上の方にある
+    Object.defineProperty($<HTMLElement>('#guide-mini').firstElementChild!, 'offsetHeight', { value: 37, configurable: true });   // 簡易のはじめかた
+    const other = $<HTMLElement>('#sec-set-0 .sec-body');
+    const at = FILES - 91 - 37;                          // カードと簡易のはじめかたの下に、Run の一覧が来る位置
+    userScroll(other, at - 100);
+    userScroll(other, at + 100);
+    expect(y).toBe(at);
+  });
+
+  it('「はじめかた」を閉じているときは、簡易のはじめかたの高さを数えない', () => {
+    const FILES = 1400;
+    $<HTMLElement>('#sec-set-0 .sec-body').getBoundingClientRect = () => ({ top: FILES - y }) as DOMRect;
+    Object.defineProperty($<HTMLElement>('#slots'), 'offsetHeight', { value: 91, configurable: true });
+    Object.defineProperty($<HTMLElement>('#guide'), 'offsetHeight', { value: 200, configurable: true });
+    Object.defineProperty($<HTMLElement>('#guide-mini').firstElementChild ?? $<HTMLElement>('#guide-mini'), 'offsetHeight', { value: 37, configurable: true });
+    session.setGuideClosed(true);
+    const other = $<HTMLElement>('#sec-set-0 .sec-body');
+    userScroll(other, FILES - 91 - 100);
+    userScroll(other, FILES - 91 + 100);
+    expect(y).toBe(FILES - 91);
+  });
+
+  it('切り替える前の高さを min-height に保つ。一覧に切り替えると外す', () => {
+    expect(group().style.minHeight).toBe('');
+    tab(1).click();
+    expect(group().style.minHeight).toBe('2000px');
+    $<HTMLButtonElement>('[data-act="sets-view"][data-view="list"]').click();
+    expect(group().style.minHeight).toBe('');
+  });
+});
+
 describe('タブの「表示中」の印(案件 27・28)', () => {
   it('表示中の比較セットのタブにだけ印。中の見出しの印は CSS で隠す(data-k="on")', () => {
     session.registerCircuit('オートポリス', cln, sci);
