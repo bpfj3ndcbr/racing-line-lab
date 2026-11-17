@@ -10,6 +10,7 @@
  *
  * - 速さが CATCH_SPEED(px/ms)以上で境目を越えたら、境目へ戻して止める。速さは、直前のスクロールのイベントからの動きで測る
  *   (動きの最初のイベントは、1 コマ(16ms)の動きとして測る)。
+ * - トラックパッドの慣性で動いているとき(ホイールの量が、続けて減っていくとき)は、ゆっくりでも、境目で止める。
  * - 止めている間は、触れたまま・慣性で、どちらへ動かしても、止めた位置へ戻す。位置は、止めた時のものに固定する
  *   (上に固定している行の高さが変わっても、動かない)。
  * - スクロールの動きが止まって CATCH_IDLE_MS たつと、1 回の操作が終わったと見なす。そのあとの操作は、そのまま動く。
@@ -21,6 +22,8 @@
 
 /** スクロールの動きが止まって、1 回の操作が終わったと見なすまでの時間(ミリ秒) */
 export const CATCH_IDLE_MS = 160;
+/** 慣性と見なす、ホイールの量が続けて減っている回数 */
+export const INERTIA_RUN = 5;
 /** この速さ(px/ms)以上で境目を越えようとしたときだけ止める。ゆっくり動かしたときは止めない。16ms の 1 コマで 12px 以上動く速さ */
 export const CATCH_SPEED = 0.75;
 
@@ -51,6 +54,8 @@ export function createScrollCatch(host: CatchHost): ScrollCatch {
   let userUntil = -Infinity;
   let lastT: number | null = null;                 // 直前のスクロールのイベントの時刻
   let lastWheel = 0;                               // 直前のホイールの量(符号つき)
+  let lastWheelT: number | null = null;            // 直前のホイールの時刻
+  let runLen = 0, runStart = 0;                    // ホイールの量が続けて減っている回数と、その初めの量
   let timer: ReturnType<typeof setTimeout> | null = null;
   const reset = () => {
     if (heldAt !== null) { heldAt = null; host.onHold?.(false); }
@@ -67,7 +72,12 @@ export function createScrollCatch(host: CatchHost): ScrollCatch {
       if (heldAt !== null && ms > 0) arm();                  // 入力が続いている間は、止めたまま
     },
     noteWheel(dy) {
-      const prev = lastWheel;
+      const now = Date.now();
+      const prev = lastWheelT !== null && now - lastWheelT <= CATCH_IDLE_MS ? lastWheel : 0;     // 間が空いたら、新しい動き
+      lastWheelT = now;
+      // 慣性は、量が続けて減っていく(触れたままのゆっくりした動きは、減り続けない)
+      if (prev !== 0 && Math.sign(dy) === Math.sign(prev) && Math.abs(dy) <= Math.abs(prev)) runLen++;
+      else { runLen = 0; runStart = Math.abs(dy); }
       lastWheel = dy;
       if (heldAt !== null && prev !== 0) {
         const grew = Math.abs(dy) > Math.abs(prev) * 1.3 + 6;      // 慣性は減っていく。増えたら、新しく動かし始めた
@@ -93,7 +103,9 @@ export function createScrollCatch(host: CatchHost): ScrollCatch {
         return;
       }
       const crossing = (lastY < pin && y > pin) || (lastY > pin && y < pin);
-      if (!crossing || speed < CATCH_SPEED) { lastY = y; return; }     // 越えない・ゆっくり越える: 止めない
+      // 慣性で動いている(ホイールの量が、続けて 15% 以上減ってきた)ときは、ゆっくりでも止める
+      const inertia = lastWheelT !== null && now - lastWheelT <= CATCH_IDLE_MS && runLen >= INERTIA_RUN && Math.abs(lastWheel) <= runStart * 0.85;
+      if (!crossing || (speed < CATCH_SPEED && !inertia)) { lastY = y; return; }     // 越えない・ゆっくり越える: 止めない
       host.setY(pin);                                        // 境目で止める
       heldAt = pin;
       host.onHold?.(true);

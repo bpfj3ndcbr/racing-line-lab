@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CATCH_IDLE_MS, CATCH_SPEED, createScrollCatch } from '../src/ui/scrollCatch';
+import { CATCH_IDLE_MS, CATCH_SPEED, INERTIA_RUN, createScrollCatch } from '../src/ui/scrollCatch';
 
 /** 境目の位置を pin、いまのスクロール位置を y とする。人の操作で y まで動いた(スクロールのイベントが届いた)ことにする */
 let y: number, pin: number | null;
@@ -128,6 +128,48 @@ describe('スクロールの引っかかり(比較セットの中の 1 か所。
     c.noteWheel(50);
     c.noteWheel(-20);
     expect(held).toBe(false);
+  });
+
+  it('慣性で動いているとき(ホイールの量が続けて減るとき)は、ゆっくり越えても止める', () => {
+    const c = catcher();
+    y = 960;
+    c.sync();
+    for (const d of [60, 54, 48, 42, 36, 30, 24]) { vi.advanceTimersByTime(16); c.noteWheel(d); }    // 慣性: 減っていく
+    expect(scrollTo(c, 1006, true, 0)).toBe(1000);        // 1 コマで 46px 動くが、仮に遅くても慣性なら止める
+    vi.advanceTimersByTime(CATCH_IDLE_MS + 1);
+    y = 994;
+    c.sync();
+    for (const d of [60, 54, 48, 42, 36, 30, 24]) { vi.advanceTimersByTime(16); c.noteWheel(d); }
+    vi.advanceTimersByTime(60);
+    expect(scrollTo(c, 1002, true, 0)).toBe(1000);        // ゆっくり(8px)越えても、慣性の間は止める
+  });
+
+  it('触れたままのゆっくりした動き(量が減り続けない)は、これまでどおり止めない', () => {
+    const c = catcher();
+    y = 994;
+    c.sync();
+    for (const d of [10, 10, 10, 10, 10, 10, 10, 10]) { vi.advanceTimersByTime(16); c.noteWheel(d); }   // 同じ量が続く
+    expect(scrollTo(c, 1002, true, 0)).toBe(1002);
+    const n = catcher();
+    y = 994;
+    n.sync();
+    for (const d of [5, 9, 4, 8, 6, 9, 5]) { vi.advanceTimersByTime(16); n.noteWheel(d); }             // 増減がある
+    expect(scrollTo(n, 1002, true, 0)).toBe(1002);
+  });
+
+  it(`慣性と見なすには、量が ${INERTIA_RUN} 回続けて減ることが要る。間が空いたら、新しい動き`, () => {
+    const c = catcher();
+    y = 994;
+    c.sync();
+    for (const d of [60, 40, 20]) { vi.advanceTimersByTime(16); c.noteWheel(d); }    // まだ 3 回
+    expect(scrollTo(c, 1002, true, 0)).toBe(1002);
+    vi.advanceTimersByTime(CATCH_IDLE_MS + 1);
+    y = 994;
+    c.sync();
+    for (const d of [60, 54, 48, 42, 36, 30]) { vi.advanceTimersByTime(16); c.noteWheel(d); }
+    vi.advanceTimersByTime(CATCH_IDLE_MS + 1);                                       // 間が空いた
+    c.noteInput(300);
+    expect(scrollTo(c, 1002, true, 0)).toBe(1002);
   });
 
   it('上へ境目を越えるときも、境目で止める', () => {

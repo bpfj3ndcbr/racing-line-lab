@@ -673,7 +673,7 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .sets-group .set-sec>.sec-h h2{font-size:15px}
 .sets-group .set-sec.set-active{border-color:var(--border);box-shadow:inset 4px 0 0 var(--accent)}
 .sets-group .set-sec.set-active>.sec-h{box-shadow:inset 4px 0 0 var(--accent)}
-.sets-group .set-sec[open]{background:var(--set-open-bg)}
+.sets-group .set-sec[open]{background:var(--set-open-bg);display:flow-root}   /* flow-root: 中身の枠の下の余白(margin)を、枠の外へはみ出させない(はみ出すと、下の余白だけ、まとまりの背景の色になる) */
 .sets-group .set-sec[open]>.sec-h{min-height:38px;background:var(--set-open-head);border-bottom:2px solid var(--accent);border-radius:0}
 .sets-group .set-sec[open]>.sec-h h2{font-size:17px}
 .sets-group .set-sec[open]>.sec-body{margin:12px 16px 16px 40px;border:1px solid var(--border-strong);border-radius:var(--r-m);background:var(--sec-bg)}
@@ -690,6 +690,7 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 /* 「表示中」の印(比較セットのタブ・比較画面) */
 .shown-mark{display:inline-flex;align-items:center;gap:3px;flex:none;padding:0 6px;height:18px;border:1px solid var(--accent);border-radius:9px;background:var(--surface);color:var(--accent);font-size:10px;font-weight:700;line-height:1}
 .sets-group.as-tabs .set-sec:not(.tab-on){display:none}
+.sets-group.as-tabs{background:var(--set-open-bg)}   /* タブを切り替える前の高さを保つ(min-height)と、比較セットの下に余白が出る。その余白も、中身と同じ背景にする */
 /* タブが画面の最上部に来たら、タブと「表示中にする」「別名」の行を固定し、その下をスクロールさせる(案件 63)。タブの高さは --sets-tabs-h(importSets.ts が測る) */
 .sets-group.as-tabs .sets-tabs{position:sticky;top:var(--imp-stack,0px);z-index:6}   /* --imp-stack: 上に固定しているもの(カード・簡易のはじめかた)の高さの合計 */
 .sets-group.as-tabs .set-sec.tab-on>.sec-h{position:sticky;top:calc(var(--imp-stack,0px) + var(--sets-tabs-h,0px));z-index:5}
@@ -702,7 +703,7 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 /* データ管理の上のタブ(案件 74): 幅 768px 以上で「サーキット」「走行ライン補正データ」「比較セット」を 1 本のタブで切り替える。タブの下に、選んだ節だけを続けて出す(スマホの縦画面は、今までの開閉の見出し) */
 .body.tabbed{gap:0}
 .tabbed .top-off{display:none}
-.tabbed>.top-tabs{border:1px solid var(--border-strong);border-bottom:1px solid var(--accent);border-radius:var(--r-l) var(--r-l) 0 0}
+.tabbed>.top-tabs{border:0;border-bottom:1px solid var(--accent);border-radius:0;background:transparent}   /* タブのエリアに枠は付けない。背景は、裏(ページ)と同じ */
 .tabbed #sec-circuit,.tabbed #sec-offsets,.tabbed #sets-group{border-top:0;border-radius:0 0 var(--r-l) var(--r-l)}
 .tabbed #sec-circuit>.sec-h,.tabbed #sec-offsets>.sec-h{display:none}   /* 見出しはタブに置き換わる */
 .tabbed #sets-group>.sets-group-h{border-radius:0}
