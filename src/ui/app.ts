@@ -72,6 +72,13 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
   /** 起動時の自動の画面の切り替え(前の画面に戻す・自動読み込み・共有の受け取り)では、知らせを消さない */
   const autoNavigate = (v: ViewName) => { const n = notice; navigate(v); notice = n; if (n) renderTop(); };
 
+  /** スマホの縦画面で、上部バーの 1 行目(ロゴ)をスクロールで隠し、タブを最上部にする(比較で、カードまでが入るように。案件 79) */
+  function scrollToTabs() {
+    if (typeof window.matchMedia !== 'function' || !window.matchMedia('(max-width:767px) and (orientation:portrait)').matches) return;
+    const tabs = root.querySelector<HTMLElement>('.navtabs');
+    if (tabs) window.scrollTo(0, Math.max(0, tabs.getBoundingClientRect().top + window.scrollY - 6));
+  }
+
   function navigate(v: ViewName) {
     if (v !== current && importApi?.isEditing()) return;     // サーキットの登録・編集中は、保存かキャンセルするまで移れない
     if (v === 'import' && current !== 'import') importApi?.closeSets();     // ほかのタブから戻ったら、比較セットはすべて閉じる(案件 26)
@@ -90,6 +97,7 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
         onEditCircuit: (id) => { navigate('import'); importApi?.editCircuit(id); },     // 編集が終わったら比較に戻る
       });
       compare.show();
+      if (from !== 'compare') scrollToTabs();     // スマホの縦画面: タブを最上部に(案件 79)
     } else {
       compare?.hide();
     }

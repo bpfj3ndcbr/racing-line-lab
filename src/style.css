@@ -1311,3 +1311,23 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
   .top-right .seg button[data-act="about"]{font-size:0;padding:0 8px}
   .top-right .seg button[data-act="about"] .ico{width:13px;height:13px;margin:0}
 }
+
+/* 画面のスクロールのつまみ(案件 79): スマホの縦画面だけ。再生の操作の行の右端。押さえたまま上下に動かす */
+.scroll-grip{display:none}
+@media (max-width:767px) and (orientation:portrait){
+  .scroll-grip{display:flex;align-items:center;justify-content:center;flex:none;margin-left:auto;width:44px;height:32px;
+    touch-action:none;cursor:grab;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
+    background:linear-gradient(var(--btn-top),var(--btn-bottom));border:1px solid var(--btn-border);border-radius:var(--r-s);box-shadow:var(--btn-shadow)}
+  .scroll-grip{flex-direction:column;gap:4px}
+  .scroll-grip i{display:block;width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent}   /* 上下の三角 */
+  .scroll-grip i.up{border-bottom:7px solid var(--muted)}
+  .scroll-grip i.dn{border-top:7px solid var(--muted)}
+  .scroll-grip.on{background:var(--accent);border-color:var(--accent);box-shadow:var(--btn-pressed);position:relative;z-index:5}
+  .scroll-grip.on i.up{border-bottom-color:var(--accent-on)}
+  .scroll-grip.on i.dn{border-top-color:var(--accent-on)}
+}
+@media (max-width:420px) and (orientation:portrait){
+  .cmp-ctl{gap:4px}                      /* 狭い幅でも、4 つのボタン・再生速度・つまみが 1 行に入るように */
+  .cmp-ctl .seg.sm button{padding:0 6px}
+  .scroll-grip{width:40px}
+}
