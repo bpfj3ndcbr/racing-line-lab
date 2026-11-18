@@ -414,6 +414,10 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .ov-sublist button{padding-left:26px}
 .map-secs{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end;left:56px;right:8px;bottom:8px;pointer-events:none}   /* 地図の下部(右寄せ。出典の表示があったところ)。少し透明(案件 73) */
 .map-secs .btn.sec{pointer-events:auto;min-height:30px;height:30px;min-width:34px;padding:0 6px;font-size:12px;justify-content:center;background:color-mix(in srgb,var(--surface) 72%,transparent)}
+/* セクターを通ったとき(案件 78): ボタンの枠が 2 回光る。選んでいる状態(押された表示)とは別の見た目 */
+@keyframes sec-pass{0%,100%{box-shadow:0 0 0 0 transparent}50%{box-shadow:0 0 0 4px var(--accent)}}
+.btn.sec.pass{animation:sec-pass .9s ease-in-out 2}
+@media (prefers-reduced-motion:reduce){.btn.sec.pass{animation:none;box-shadow:0 0 0 3px var(--accent)}}
 .map-secs .btn.sec[aria-pressed="true"]{background:color-mix(in srgb,var(--accent) 82%,transparent);border-color:var(--accent);color:var(--accent-on);font-weight:700}
 /* 出典の表示は、比較画面では地図の右上へ(案件 73)。右上のメニューはなくなったので、ここに置ける */
 .cmp-map .leaflet-bottom.leaflet-right{top:0;bottom:auto}

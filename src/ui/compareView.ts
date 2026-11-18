@@ -71,6 +71,8 @@ const VIEW_SAVE_MS = 400;
 /** 速度グラフの高さの下限(これより低いと文字が読めない)、境界線の太さ、上の部分の高さが測れないときの値 */
 const GRAPH_MIN_H = 170, SPLITTER_H = 6, UPPER_FALLBACK_H = 400;
 const EASE_MS = 400;
+/** セクターを通ったときの、ボタンの点滅の長さ(CSS の .btn.sec.pass のアニメーションと合わせる) */
+const PASS_FLASH_MS = 1900;
 
 /** 比較画面: 地図 + 速度グラフ + 再生。 */
 export function mountCompareView(root: HTMLElement, session: Session, deps: CompareDeps): CompareView {
@@ -730,9 +732,24 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
     }
     return best?.k ?? null;
   }
-  function autoCheck(tau0: number, tau1: number) {
+  /** セクターを通ったとき、そのセクターのボタンを点滅させる(案件 78)。再生中に基準の車が通ったときだけ。「自動」のオン・オフに関わらない */
+  const passTimers = new WeakMap<HTMLElement, ReturnType<typeof setTimeout>>();
+  function flashSector(k: number) {
+    findAll(`[data-act="sector"][data-k="${k}"]`).forEach((b) => {
+      const prev = passTimers.get(b);
+      if (prev) clearTimeout(prev);
+      b.classList.remove('pass');
+      void b.offsetWidth;                                         // 続けて通ったときも、アニメーションを最初からやり直す
+      b.classList.add('pass');
+      passTimers.set(b, setTimeout(() => { b.classList.remove('pass'); passTimers.delete(b); }, PASS_FLASH_MS));
+    });
+  }
+  /** 再生で進んだ間(tau0 → tau1)の通過を調べる: ボタンを点滅させ、「自動」がオンなら、そのセクターで合わせる */
+  function sectorPass(tau0: number, tau1: number) {
     const k = crossedSector(tau0, tau1);
     if (k === null) return;
+    flashSector(k);
+    if (!autoSync) return;
     if (autoSkip === k) { autoSkip = null; return; }
     pressSector(k, true);
     const c = xKind === 'dist' ? null : cars.find((x) => x.slot === autoSlot());
@@ -966,7 +983,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
     raf = requestAnimationFrame(loop);
     const tau0 = engine.t;
     engine.tick(dt);
-    if (autoSync) autoCheck(tau0, engine.t);          // 自動合わせは再生で進んだときだけ(シークやセクターボタンでは動かない)
+    sectorPass(tau0, engine.t);                       // 通過の点滅と自動合わせは再生で進んだときだけ(シークやセクターボタンでは動かない)
   }
   engine.subscribe(() => {
     updateFrame();
