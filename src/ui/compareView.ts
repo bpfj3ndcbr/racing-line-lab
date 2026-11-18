@@ -661,7 +661,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   }
 
   /** 地図の上の線のうち、今の走行位置の区間(基準の車が通ったセクターの数)。値が変わったときだけ DOM に書く(案件 82) */
-  let segOn = -1;
+  let segOn: 'start' | 'end' | number = -1;
   function paintSegs() {
     const r = ref();
     const n = r?.log.circuit?.sectors.length ?? 0;
@@ -672,10 +672,16 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
       const s = r.lap.sectorTimes[k];
       if (s != null && t >= s) at++;
     }
-    if (at === segOn) return;
-    segOn = at;
-    $('cmp-map-secs').querySelectorAll<HTMLElement>('.sec-seg').forEach((el) =>
-      el.classList.toggle('on', Number(el.dataset.seg) === at));
+    // 今の位置は、1 か所だけ光らせる: スタート地点(まだ走っていない)・エンド地点(到着した)の縦線、または走っている区間の横線
+    const where: 'start' | 'end' | number = t >= r.series.duration - 1e-3 ? 'end' : t <= 1e-3 ? 'start' : at;
+    if (where === segOn) return;
+    segOn = where;
+    const track = $('cmp-map-secs');
+    track.querySelectorAll<HTMLElement>('.sec-seg').forEach((el) =>
+      el.classList.toggle('on', Number(el.dataset.seg) === where));
+    const [start, end] = Array.from(track.querySelectorAll<HTMLElement>('.sec-tick'));   // DOM の順: スタート → エンド
+    start?.classList.toggle('on', where === 'start');
+    end?.classList.toggle('on', where === 'end');
   }
 
   function renderSectors() {

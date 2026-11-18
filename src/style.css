@@ -88,7 +88,7 @@
   --menu-follow: #2b78c9; --menu-follow-on: #ffffff;
   --menu-line: #11808f; --menu-line-on: #ffffff;
   --menu-label: #b8620a; --menu-label-on: #ffffff;
-  --seg-off: #5aaeff; --seg-on: #2e5a8c;
+  --seg-off: #1757a6; --seg-on: #9cc5f2;
 }
 
 /* ==========================================================================
@@ -427,6 +427,7 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .map-secs .sec-seg{flex:0 0 6px;align-self:center;height:2px;background:var(--seg-off);pointer-events:none}
 .map-secs .sec-seg.on{background:var(--seg-on)}
 .map-secs .sec-tick{flex:0 0 2px;align-self:center;height:14px;background:var(--seg-off);pointer-events:none}
+.map-secs .sec-tick.on{background:var(--seg-on)}
 /* 出典の表示は、比較画面では地図の右上へ(案件 73)。右上のメニューはなくなったので、ここに置ける */
 .cmp-map .leaflet-bottom.leaflet-right{top:0;bottom:auto}
 .cmp-map .leaflet-bottom.leaflet-right .leaflet-control-attribution{margin-top:4px}

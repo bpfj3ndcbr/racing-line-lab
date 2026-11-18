@@ -631,14 +631,27 @@ describe('地図の上のセクターの線(案件 82)', () => {
     expect(kids[1]).toBe('sec-seg');
     expect(kids[2]).toBe('btn');
     expect(kids[kids.length - 1]).toBe('sec-tick');
+    const tickOn = () => Array.from(root.querySelectorAll<HTMLElement>('#cmp-map-secs .sec-tick')).flatMap((el, i) => (el.classList.contains('on') ? [i === 0 ? 'start' : 'end'] : []));
     const onNow = () => Array.from(root.querySelectorAll<HTMLElement>('#cmp-map-secs .sec-seg.on')).map((s) => s.dataset.seg);
-    expect(onNow()).toEqual(['0']);                        // 開始の位置は、スタート〜S1 の区間
-    const lap = lapOf('A');
-    const s1 = lap.sectorTimes[0];
-    expect(s1).not.toBeNull();
-    seekTo((s1 as number) + 0.5);                          // S1 を過ぎた
+    // スタート位置(まだ走っていない): スタートの縦線だけが走行色。最初の横線は通常色
+    expect(onNow()).toEqual([]);
+    expect(tickOn()).toEqual(['start']);
+    const s1 = lapOf('A').sectorTimes[0] as number;         // この 1 周ログでは S1 がスタートのすぐ後(0.12 秒)にある
+    expect(s1).toBeGreaterThan(0.02);
+    seekTo(s1 / 2);                                        // 走り出した(S1 の手前): スタート〜S1 の横線が走行色、スタートの縦線は通常色
+    expect(onNow()).toEqual(['0']);
+    expect(tickOn()).toEqual([]);
+    seekTo(s1 + 0.5);                          // S1 を過ぎた: 次の区間の横線が走行色、スタートの縦線は通常色
     expect(onNow()).toEqual(['1']);
-    seekTo(Number($<HTMLInputElement>('#cmp-seek').max) - 0.5);   // ゴール手前
-    expect(onNow()).toEqual([String(n)]);                  // 最後の区間
+    expect(tickOn()).toEqual([]);
+    seekTo(0);                                             // スタート位置に戻ると、スタートの縦線だけが走行色
+    expect(tickOn()).toEqual(['start']);
+    expect(onNow()).toEqual([]);
+    seekTo(Number($<HTMLInputElement>('#cmp-seek').max) - 0.5);   // エンド前: 最後のセクターとエンドの間の横線が走行色
+    expect(onNow()).toEqual([String(n)]);
+    expect(tickOn()).toEqual([]);
+    seekTo(Number($<HTMLInputElement>('#cmp-seek').max));          // エンドに到着: エンドの縦線が走行色、横線は通常色に戻る
+    expect(tickOn()).toEqual(['end']);
+    expect(onNow()).toEqual([]);
   });
 });
