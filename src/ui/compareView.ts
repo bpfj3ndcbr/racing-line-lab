@@ -12,6 +12,7 @@ import type { ThemeController } from './theme';
 import { SHOWN_MARK } from './marks';
 import { nearAnyRect } from './mapPointer';
 import { installLongPressScroll } from './longPressScroll';
+import { installScrollGrip } from './scrollGrip';
 
 /**
  * series: ラップの時系列(距離は速度の積み上げ)。
@@ -119,6 +120,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
             <button class="ib" id="cmp-ff" data-act="frame-fwd" aria-label="1コマ進む(0.1秒)" title="1コマ進む [→](一時停止中のみ)  1秒進む [Shift+→]">${icon(ICONS.fwd)}</button>
             <span class="seg sm" role="group" aria-label="再生速度">${RATES.map((r) =>
               `<button data-act="rate" data-rate="${r}" aria-pressed="${r === 1}" class="${r === 1 ? 'on' : ''}">${r}x</button>`).join('')}</span>
+            <div class="scroll-grip" id="cmp-grip" role="presentation" aria-label="画面のスクロール(押さえたまま上下に動かす)" title="押さえたまま上下に動かすと、画面がスクロールします"><i class="up"></i><i class="dn"></i></div>
             <span class="num cmp-time" id="cmp-time">0:00.0 / 0:00.0</span>
             <input id="cmp-seek" class="cmp-seek" type="range" min="0" max="0" step="0.1" value="0" aria-label="再生位置(秒)">
           </div>
@@ -294,6 +296,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   });
   const relayout = () => { applyLayout(); sideSplit.refresh(); graphSplit.refresh(); };
 
+  installScrollGrip(root.querySelector<HTMLElement>('#cmp-grip')!);   // スマホの縦画面: つまみを押さえたまま上下に動かすと、画面をスクロールする(案件 79)
   installLongPressScroll(root);   // 長押ししてから縦になぞると、画面をスクロールする(地図・グラフの上でも。案件 44)
   const graph: SpeedGraph = new SpeedGraph($('cmp-graph'), (v) => {
     const r = ref();

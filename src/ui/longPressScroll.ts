@@ -19,7 +19,7 @@ export const HOLD_MS = 400;
 export const MOVE_PX = 10;
 
 /** el から上へたどって、縦にスクロールできる要素を探す。無ければ文書全体 */
-function scrollerOf(el: Element): Element {
+export function scrollerOf(el: Element): Element {
   const doc = el.ownerDocument;
   for (let p = el.parentElement; p && p !== doc.body && p !== doc.documentElement; p = p.parentElement) {
     const oy = getComputedStyle(p).overflowY;
@@ -60,6 +60,7 @@ export function installLongPressScroll(root: HTMLElement): () => void {
     if (fingers.size > 1) { finish(); return; }                  // 2 本の指は地図・グラフの側に任せる
     const t = e.target as Element | null;
     if (!t) return;
+    if (t.closest('.scroll-grip')) return;                      // 画面のスクロールのつまみの上では、長押しを受け付けない(案件 79)
     finish();
     press = { id: e.pointerId, x: e.clientX, y: e.clientY, lastY: e.clientY, target: t, timer: 0, held: false, scrolling: false };
     press.timer = win.setTimeout(hold, HOLD_MS);
