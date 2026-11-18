@@ -127,11 +127,12 @@ export function trimDialog(log: TrackLog, deps: TrimDialogDeps = {}, host: HTMLE
       <div class="tr-main">
         ${deps.mapFactory ? '<div class="tr-map"><div class="map"></div></div>' : ''}
         <div class="tr-list" aria-label="取り込む範囲"></div>
-        <div class="tr-tl"><div class="tr-cap"><span class="tr-ovl">全体(速度)<span class="tr-ovz"><button type="button" class="btn sm tr-z" data-trim="zout" aria-label="全体のグラフを縮小" title="縮小">−</button><span class="tr-zl"></span><button type="button" class="btn sm tr-z" data-trim="zin" aria-label="全体のグラフを拡大" title="拡大(拡大したら、横にスクロールできます)">＋</button></span></span><span class="tr-sum" role="status"></span></div><div class="tr-g tr-all"><div class="tr-all-in"></div></div></div>
+        <div class="tr-work"><div class="tr-tl"><div class="tr-cap"><span class="tr-ovl">全体(速度)<span class="tr-ovz"><button type="button" class="btn sm tr-z" data-trim="zout" aria-label="全体のグラフを縮小" title="縮小">−</button><span class="tr-zl"></span><button type="button" class="btn sm tr-z" data-trim="zin" aria-label="全体のグラフを拡大" title="拡大(拡大したら、横にスクロールできます)">＋</button></span></span><span class="tr-sum" role="status"></span></div><div class="tr-g tr-all"><div class="tr-all-in"></div></div></div>
         <div class="tr-det">
-          <div class="tr-cap"><span class="tr-det-cap"></span><span class="tr-det-r"><span class="tr-hint" role="status"></span><button type="button" class="btn sm tr-add" data-trim="include" title="選んだ取り込まない区間を、取り込む範囲にします(前後の範囲とは 1 つにつなぎます)">取り込み範囲にする</button><button type="button" class="btn sm tr-add" data-trim="split" title="グラフで押した位置に 1 分の取り込まない区間を入れて、2 つに分けます">範囲を分ける</button></span></div>
+          <div class="tr-cap"><span class="tr-det-cap"></span><span class="tr-det-r"><button type="button" class="btn sm tr-add" data-trim="include" title="選んだ取り込まない区間を、取り込む範囲にします(前後の範囲とは 1 つにつなぎます)">取り込み範囲にする</button><button type="button" class="btn sm tr-add" data-trim="split" title="グラフで押した位置に 1 分の取り込まない区間を入れて、2 つに分けます">範囲を分ける</button></span></div>
+          <div class="tr-hint" role="status"></div>
           <div class="tr-edges">${EDGES.map((e) => `<div class="tr-edge" data-edge="${e}"><div class="tr-cap"><span><span class="tr-e-l"></span> <b class="tr-e-t"></b></span><span>表示の幅 ${EDGE_WIN_SEC / 60} 分</span></div><div class="tr-g tr-zoom"></div></div>`).join('')}</div>
-        </div>
+        </div></div>
       </div>
       </div>
       <div class="modal-actions tr-actions"><button type="button" class="btn" data-trim="abort">全ての読み込みを止める</button><button type="button" class="btn" data-trim="skip">このファイルの読み込みを止める</button><span class="sp"></span><button type="button" class="btn pri" data-trim="next">次へ</button></div>`;
