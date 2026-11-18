@@ -613,3 +613,32 @@ describe('上部バーのセクターボタンの動作(スマホの横向き。
     expect($('#top-set [id]')?.id).toBe('cmp-set-top');            // 右の列のボタンの id は写さない
   });
 });
+
+describe('地図の上のセクターの線(案件 82)', () => {
+  it('ボタンの間の線と、スタート・エンドの縦線が出る。今の走行位置の区間の線だけ濃い(on)。線は点滅しない', () => {
+    setupOne();
+    const n = root.querySelectorAll('#cmp-map-secs [data-act="sector"]').length;
+    expect(n).toBeGreaterThan(0);
+    const segs = Array.from(root.querySelectorAll<HTMLElement>('#cmp-map-secs .sec-seg'));
+    const ticks = root.querySelectorAll('#cmp-map-secs .sec-tick');
+    expect(segs.length).toBe(n + 1);                       // 区間は、スタート〜S1 から Sn〜エンドまで n + 1 本
+    expect(ticks.length).toBe(2);                          // スタート・エンドの縦線
+    expect(segs.map((s) => s.dataset.seg)).toEqual(Array.from({ length: n + 1 }, (_, i) => String(i)));
+    expect(root.querySelectorAll('#cmp-map-secs .pass').length).toBe(0);
+    // 並び: スタート | 区間0 | S1 | 区間1 | …
+    const kids = Array.from(root.querySelector('#cmp-map-secs')!.children).map((el) => el.className.split(' ')[0]);
+    expect(kids[0]).toBe('sec-tick');
+    expect(kids[1]).toBe('sec-seg');
+    expect(kids[2]).toBe('btn');
+    expect(kids[kids.length - 1]).toBe('sec-tick');
+    const onNow = () => Array.from(root.querySelectorAll<HTMLElement>('#cmp-map-secs .sec-seg.on')).map((s) => s.dataset.seg);
+    expect(onNow()).toEqual(['0']);                        // 開始の位置は、スタート〜S1 の区間
+    const lap = lapOf('A');
+    const s1 = lap.sectorTimes[0];
+    expect(s1).not.toBeNull();
+    seekTo((s1 as number) + 0.5);                          // S1 を過ぎた
+    expect(onNow()).toEqual(['1']);
+    seekTo(Number($<HTMLInputElement>('#cmp-seek').max) - 0.5);   // ゴール手前
+    expect(onNow()).toEqual([String(n)]);                  // 最後の区間
+  });
+});

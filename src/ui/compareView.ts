@@ -660,6 +660,24 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
     updateFrame();
   }
 
+  /** 地図の上の線のうち、今の走行位置の区間(基準の車が通ったセクターの数)。値が変わったときだけ DOM に書く(案件 82) */
+  let segOn = -1;
+  function paintSegs() {
+    const r = ref();
+    const n = r?.log.circuit?.sectors.length ?? 0;
+    if (!r || !n) { segOn = -1; return; }
+    const t = localOf(r, engine.t);
+    let at = 0;                                                  // 通ったセクターの数 = 区間の番号
+    for (let k = 0; k < n; k++) {
+      const s = r.lap.sectorTimes[k];
+      if (s != null && t >= s) at++;
+    }
+    if (at === segOn) return;
+    segOn = at;
+    $('cmp-map-secs').querySelectorAll<HTMLElement>('.sec-seg').forEach((el) =>
+      el.classList.toggle('on', Number(el.dataset.seg) === at));
+  }
+
   function renderSectors() {
     const n = ref()?.log.circuit?.sectors.length ?? 0;
     $('cmp-edit-circuit').hidden = !(ref()?.log.circuit && deps.onEditCircuit);
@@ -670,13 +688,21 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
       renderSyncStatus();
       return;
     }
-    const btns = Array.from({ length: n }, (_, i) => {
+    const one = (i: number) => {
       const any = cars.some((c) => c.lap.sectorTimes[i] != null);
       return `<button class="btn sec" data-act="sector" data-k="${i}" ${any ? '' : 'disabled title="このラップは通過していません"'}
         aria-pressed="${activeSector === i}" aria-label="セクター S${i + 1} へ移動">S${i + 1}</button>`;
-    }).join('');
+    };
+    const btns = Array.from({ length: n }, (_, i) => one(i)).join('');
     $('cmp-sectors').innerHTML = btns;
-    $('cmp-map-secs').innerHTML = btns;            // スマホの幅では、地図の上にも出す(よく使うため。案件 1)
+    // 地図の上: スタート・エンドの縦線と、ボタンの間の線(今の走行位置の区間だけ薄く。案件 82)
+    // 並び: スタート | 区間0 | S1 | 区間1 | S2 … | Sn | 区間n | エンド
+    const seg = (j: number) => `<span class="sec-seg" data-seg="${j}" aria-hidden="true"></span>`;
+    const tick = '<span class="sec-tick" aria-hidden="true"></span>';
+    const mapBtns = Array.from({ length: n }, (_, i) => seg(i) + one(i)).join('');
+    $('cmp-map-secs').innerHTML = tick + mapBtns + seg(n) + tick;   // スマホの幅では、地図の上にも出す(よく使うため。案件 1)
+    segOn = -1;
+    paintSegs();
     syncModeUi();
     renderSyncStatus();
   }
@@ -890,6 +916,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
       if (b.disabled !== engine.playing) b.disabled = engine.playing;
     }
     if (!r) { graph.setCursor(null, []); map?.setCars([]); return; }
+    paintSegs();                                                  // 地図の上の線: 今の走行位置の区間(案件 82)
 
     // 時間ベース: 全車が同じ経過時間の位置。距離ベース(速度グラフが「距離」): 基準の車と同じ距離の位置(その場所での走行ラインと速度を比べる)。
     // 距離ベースの距離は、物差しの走行ラインに投影したもの(コース上の同じ断面にいれば同じ距離)
