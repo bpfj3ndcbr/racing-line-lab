@@ -47,6 +47,8 @@
   --menu-follow: #1f6fd1; --menu-follow-on: #ffffff;
   --menu-line: #0f7c8c; --menu-line-on: #ffffff;
   --menu-label: #c46a00; --menu-label-on: #ffffff;
+  /* 地図の下のセクターの線(案件 82): 通常の区間は濃い青、今の走行位置の区間は薄い青。透明にしない */
+  --seg-off: #1757a6; --seg-on: #9cc5f2;
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
@@ -86,6 +88,7 @@
   --menu-follow: #2b78c9; --menu-follow-on: #ffffff;
   --menu-line: #11808f; --menu-line-on: #ffffff;
   --menu-label: #b8620a; --menu-label-on: #ffffff;
+  --seg-off: #1757a6; --seg-on: #9cc5f2;
 }
 
 /* ==========================================================================
@@ -412,13 +415,19 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .ov-sublist{display:flex;flex-direction:column;gap:2px}
 .ov-sublist[hidden]{display:none}
 .ov-sublist button{padding-left:26px}
-.map-secs{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end;left:56px;right:8px;bottom:8px;pointer-events:none}   /* 地図の下部(右寄せ。出典の表示があったところ)。少し透明(案件 73) */
+.map-secs{display:flex;flex-wrap:wrap;gap:0;justify-content:flex-end;left:56px;right:8px;bottom:8px;pointer-events:none}   /* 地図の下部(右寄せ。出典の表示があったところ)。少し透明(案件 73) */
 .map-secs .btn.sec{pointer-events:auto;min-height:30px;height:30px;min-width:34px;padding:0 6px;font-size:12px;justify-content:center;background:color-mix(in srgb,var(--surface) 72%,transparent)}
 /* セクターを通ったとき(案件 78): ボタンの枠が 2 回光る。選んでいる状態(押された表示)とは別の見た目 */
 @keyframes sec-pass{0%,100%{box-shadow:0 0 0 0 transparent}50%{box-shadow:0 0 0 4px var(--accent)}}
 .btn.sec.pass{animation:sec-pass .9s ease-in-out 2}
 @media (prefers-reduced-motion:reduce){.btn.sec.pass{animation:none;box-shadow:0 0 0 3px var(--accent)}}
 .map-secs .btn.sec[aria-pressed="true"]{background:color-mix(in srgb,var(--accent) 82%,transparent);border-color:var(--accent);color:var(--accent-on);font-weight:700}
+/* ボタンの間の線と、スタート・エンドの縦線(案件 82)。線は透明にしない。今の区間(.on)だけ薄い青。点滅はしない */
+/* 線はボタンの間(6px。以前の間隔 4px より 2px 広い)をちょうど埋める。縁と接触し、ボタンの中心の高さに揃える */
+.map-secs .sec-seg{flex:0 0 6px;align-self:center;height:2px;background:var(--seg-off);pointer-events:none}
+.map-secs .sec-seg.on{background:var(--seg-on)}
+.map-secs .sec-tick{flex:0 0 2px;align-self:center;height:14px;background:var(--seg-off);pointer-events:none}
+.map-secs .sec-tick.on{background:var(--seg-on)}
 /* 出典の表示は、比較画面では地図の右上へ(案件 73)。右上のメニューはなくなったので、ここに置ける */
 .cmp-map .leaflet-bottom.leaflet-right{top:0;bottom:auto}
 .cmp-map .leaflet-bottom.leaflet-right .leaflet-control-attribution{margin-top:4px}

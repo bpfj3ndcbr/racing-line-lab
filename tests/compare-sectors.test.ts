@@ -613,3 +613,45 @@ describe('上部バーのセクターボタンの動作(スマホの横向き。
     expect($('#top-set [id]')?.id).toBe('cmp-set-top');            // 右の列のボタンの id は写さない
   });
 });
+
+describe('地図の上のセクターの線(案件 82)', () => {
+  it('ボタンの間の線と、スタート・エンドの縦線が出る。今の走行位置の区間の線だけ濃い(on)。線は点滅しない', () => {
+    setupOne();
+    const n = root.querySelectorAll('#cmp-map-secs [data-act="sector"]').length;
+    expect(n).toBeGreaterThan(0);
+    const segs = Array.from(root.querySelectorAll<HTMLElement>('#cmp-map-secs .sec-seg'));
+    const ticks = root.querySelectorAll('#cmp-map-secs .sec-tick');
+    expect(segs.length).toBe(n + 1);                       // 区間は、スタート〜S1 から Sn〜エンドまで n + 1 本
+    expect(ticks.length).toBe(2);                          // スタート・エンドの縦線
+    expect(segs.map((s) => s.dataset.seg)).toEqual(Array.from({ length: n + 1 }, (_, i) => String(i)));
+    expect(root.querySelectorAll('#cmp-map-secs .pass').length).toBe(0);
+    // 並び: スタート | 区間0 | S1 | 区間1 | …
+    const kids = Array.from(root.querySelector('#cmp-map-secs')!.children).map((el) => el.className.split(' ')[0]);
+    expect(kids[0]).toBe('sec-tick');
+    expect(kids[1]).toBe('sec-seg');
+    expect(kids[2]).toBe('btn');
+    expect(kids[kids.length - 1]).toBe('sec-tick');
+    const tickOn = () => Array.from(root.querySelectorAll<HTMLElement>('#cmp-map-secs .sec-tick')).flatMap((el, i) => (el.classList.contains('on') ? [i === 0 ? 'start' : 'end'] : []));
+    const onNow = () => Array.from(root.querySelectorAll<HTMLElement>('#cmp-map-secs .sec-seg.on')).map((s) => s.dataset.seg);
+    // スタート位置(まだ走っていない): スタートの縦線だけが走行色。最初の横線は通常色
+    expect(onNow()).toEqual([]);
+    expect(tickOn()).toEqual(['start']);
+    const s1 = lapOf('A').sectorTimes[0] as number;         // この 1 周ログでは S1 がスタートのすぐ後(0.12 秒)にある
+    expect(s1).toBeGreaterThan(0.02);
+    seekTo(s1 / 2);                                        // 走り出した(S1 の手前): スタート〜S1 の横線が走行色、スタートの縦線は通常色
+    expect(onNow()).toEqual(['0']);
+    expect(tickOn()).toEqual([]);
+    seekTo(s1 + 0.5);                          // S1 を過ぎた: 次の区間の横線が走行色、スタートの縦線は通常色
+    expect(onNow()).toEqual(['1']);
+    expect(tickOn()).toEqual([]);
+    seekTo(0);                                             // スタート位置に戻ると、スタートの縦線だけが走行色
+    expect(tickOn()).toEqual(['start']);
+    expect(onNow()).toEqual([]);
+    seekTo(Number($<HTMLInputElement>('#cmp-seek').max) - 0.5);   // エンド前: 最後のセクターとエンドの間の横線が走行色
+    expect(onNow()).toEqual([String(n)]);
+    expect(tickOn()).toEqual([]);
+    seekTo(Number($<HTMLInputElement>('#cmp-seek').max));          // エンドに到着: エンドの縦線が走行色、横線は通常色に戻る
+    expect(tickOn()).toEqual(['end']);
+    expect(onNow()).toEqual([]);
+  });
+});
