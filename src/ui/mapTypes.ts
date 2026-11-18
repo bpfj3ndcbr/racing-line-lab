@@ -30,6 +30,8 @@ export interface TrackMap {
   setCenter(lat: number, lon: number): void;
   /** 利用者が地図をドラッグして動かしたとき */
   onUserDrag(cb: () => void): void;
+  /** 利用者が地図のドラッグを終えたとき(慣性で動き終わったあとの位置は、getView で読む。案件 77) */
+  onUserDragEnd(cb: () => void): void;
   /**
    * 位置補正用: 関数を渡すと、地図のドラッグで地図が動かなくなり、代わりにマウスの動きが
    * 緯度・経度の変化量として通知される(ラインを動かすため)。null で通常のドラッグ(地図の移動)に戻る。

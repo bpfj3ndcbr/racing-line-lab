@@ -53,6 +53,8 @@ const MENU_ICONS = {
   pin: '<path d="M8 14.5s-4.5-4.2-4.5-7.7A4.5 4.5 0 0 1 12.5 6.8c0 3.5-4.5 7.7-4.5 7.7z"/><circle cx="8" cy="6.8" r="1.6"/>',
   flag: '<path d="M3.5 14.5V2"/><path d="M3.5 2.5h8l-1.8 3 1.8 3h-8"/>',
 };
+/** 札の「中心へ」の頭に付ける、中心を示すアイコン(案件 77) */
+const CENTER_ICON = '<svg class="tool-ico" width="11" height="11" viewBox="0 0 16 16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="8" cy="8" r="5.2"/><circle cx="8" cy="8" r="1.8" fill="currentColor" stroke="none"/><path d="M8 0v3M8 13v3M0 8h3M13 8h3"/></svg>';
 const menuIcon = (p: string) =>
   `<span class="ov-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16" focusable="false" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${p}</svg></span>`;
 const icon = (p: string) =>
@@ -206,6 +208,13 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   let followSlot: Slot | null = null;
   let camera: { lat: number; lon: number } | null = null;
   let ease: { from: { lat: number; lon: number }; start: number } | null = null;
+  /**
+   * 追従中に、利用者が地図を動かした分(地図の中心 - 追従の中心。緯度・経度の差。案件 77)。
+   * 追従は止めず、中心を「追従の中心 + この差」に合わせ続ける。無いとき null。保存しない。
+   * ドラッグの途中(慣性で止まるまで)は、地図を戻さない
+   */
+  let panOffset: { lat: number; lon: number } | null = null;
+  let userDragging = false;
 
   const ref = () => cars[0];
   const offOf = (c: Car) => off.get(c.slot) ?? 0;
@@ -355,7 +364,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
     $('cmp-empty').hidden = has;
     applyLayout();
     // 割り当てが無くなった枠への追従は、固定に戻す
-    if (follow !== 'fixed' && follow !== 'leader' && !cars.some((c) => c.slot === follow)) follow = 'fixed';
+    if (follow !== 'fixed' && follow !== 'leader' && !cars.some((c) => c.slot === follow)) { follow = 'fixed'; panOffset = null; }
     syncFollowButtons();
     engine.setDuration(totalDuration());
     engine.seek(0);
@@ -383,6 +392,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
     if (!map) return;
     const z = prefs.initial('zoom');
     viewTouched = false;
+    panOffset = null;                                           // 地図を合わせ直すので、動かした分は消す(案件 77)
     const ctl = ref()?.log.circuit?.control;
     const atControl = prefs.startPos === 'control' && !!ctl;     // 初期位置: コントロールラインの中心
     // 初期位置が「現在の表示位置」: 前回見ていた位置と倍率(同じサーキットのときだけ。無ければ、地図の中心と同じ)
@@ -410,7 +420,17 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
       const lo = ZOOM_CHOICES[0], hi = ZOOM_CHOICES[ZOOM_CHOICES.length - 1];
       prefs.saveLast('zoom', Math.min(hi, Math.max(lo, Math.round(z))));
     });
-    map.onUserDrag(() => { viewTouched = true; setFollow('fixed'); });   // 地図を手で動かしたら追従をやめる
+    // 地図を手で動かしても追従は続ける(案件 77)。動かした分を覚えて、「追従の中心 + その分」に合わせ続ける。
+    // ドラッグの途中は、追従が地図を戻さない。慣性が止まったときに、地図の中心から差を求める
+    map.onUserDrag(() => { viewTouched = true; userDragging = true; });
+    map.onUserDragEnd(() => {
+      userDragging = false;
+      if (!map || follow === 'fixed' || !camera) return;
+      const v = map.getView();
+      const d = { lat: v.lat - camera.lat, lon: v.lon - camera.lon };
+      panOffset = Math.abs(d.lat) < 1e-9 && Math.abs(d.lon) < 1e-9 ? null : d;
+      syncMenuButtons();
+    });
     map.onViewChange(() => {                                   // 見ている位置と倍率を、前回の位置として覚える(動きが止まってから 1 回)
       if (applyingView) return;
       if (viewTimer) clearTimeout(viewTimer);
@@ -534,7 +554,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   function setFollow(f: Follow) {
     follow = f;
     prefs.saveLast('follow', f);
-    followSlot = null; ease = null;
+    followSlot = null; ease = null; panOffset = null;
     syncFollowButtons();
     updateFrame();
   }
@@ -562,6 +582,8 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   /** 札の文字(今の設定の名前)と、その説明(札の title) */
   function badgeOf(k: SubKey): { html: string; text: string } {
     if (k === 'pos') {
+      // 追従中に地図を動かしたあとは、札が「中心へ」になる。押すと、追従の中心に戻す(案件 77)
+      if (panOffset && follow !== 'fixed') return { html: `${CENTER_ICON}中心へ`, text: '追従の中心に戻す' };
       if (follow === 'fixed') return { html: '固定', text: '追従設定: 固定' };
       if (follow === 'leader') return { html: '先頭追従', text: '追従設定: 先頭追従' };
       return { html: `${follow} を追従`, text: `追従設定: ${follow} を追従` };
@@ -929,7 +951,8 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
       }
     }
     camera = c;
-    map.setCenter(c.lat, c.lon);
+    if (userDragging) return;                       // 利用者がドラッグしている間は、地図を戻さない(案件 77)
+    map.setCenter(c.lat + (panOffset?.lat ?? 0), c.lon + (panOffset?.lon ?? 0));
   }
 
   // ---------- 再生ループ ----------
@@ -993,7 +1016,16 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
         break;
       case 'sync-release': releaseSync(); setAutoSync(false); break;     // 解除すると、自動もオフ
       case 'autosync': setAutoSync(!autoSync); break;
-      case 'menu-sub': setSub(openSub === d.sub ? null : d.sub as SubKey); break;
+      case 'menu-sub':
+        if (d.sub === 'pos' && panOffset && follow !== 'fixed') {      // 地図を動かしたあと: 追従の中心に戻す(案件 77)
+          panOffset = null;
+          setSub(null);
+          syncMenuButtons();
+          updateFrame();
+          break;
+        }
+        setSub(openSub === d.sub ? null : d.sub as SubKey);
+        break;
       case 'mapmode': setMapMode(d.mode as MapMode); setSub(null); break;     // 選んだあとは 3 項目の表示に戻る(メニューは開いたまま)
       case 'carlabel':
         labelMode = d.label as LabelV;

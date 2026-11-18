@@ -287,11 +287,52 @@ describe('地図の追従', () => {
     }
   });
 
-  it('地図を手でドラッグすると追従をやめて固定になる', () => {
+  it('地図を手でドラッグしても追従は続き、動かした分だけずらして追う。札を押すと追従の中心に戻る(案件 77)', () => {
     setupOne();
     followBtn('A').click();
+    const pure = (t: number) => { seekTo(t); return fake.centers[fake.centers.length - 1]; };
+    const c40 = pure(40), c50 = pure(50);            // 動かす前の、追従の中心
+    expect(c50).not.toEqual(c40);
+    seekTo(30);
+    const dLat = 0.0005, dLon = -0.0007;
     fake.userDrags();
-    expect(followBtn('fixed').getAttribute('aria-checked')).toBe('true');
+    expect(followBtn('A').getAttribute('aria-checked')).toBe('true');    // 追従のまま(固定にならない)
+    const n = fake.centers.length;
+    seekTo(40);
+    expect(fake.centers).toHaveLength(n);                                 // ドラッグの途中は、地図を戻さない
+    fake.userDragEnds(c40[0] + dLat, c40[1] + dLon);                      // 追従の中心から (dLat, dLon) ずれた所で、ドラッグを終えた
+    seekTo(50);
+    const now = fake.centers[fake.centers.length - 1];
+    expect(now[0]).toBeCloseTo(c50[0] + dLat, 9);                         // ずれたまま、追従を続ける
+    expect(now[1]).toBeCloseTo(c50[1] + dLon, 9);
+    const btn = $<HTMLButtonElement>('#cmp-tool-pos');
+    expect(btn.title).toBe('追従の中心に戻す');                            // 札は「中心へ」になる
+    expect(btn.textContent).toBe('中心へ');
+    expect($('#cmp-sub-pos').hidden).toBe(true);
+    btn.click();                                                          // 押すと、選択肢は開かず、追従の中心に戻る
+    expect($('#cmp-sub-pos').hidden).toBe(true);
+    expect(fake.centers[fake.centers.length - 1]).toEqual(c50);
+    expect(btn.title).toBe('追従設定: A を追従');
+    expect(btn.textContent).toBe('A を追従');
+    btn.click();                                                          // もう一度押すと、選択肢が開く
+    expect($('#cmp-sub-pos').hidden).toBe(false);
+  });
+
+  it('追従の設定を選び直すと、動かした分は消える。固定で動かしても、札は変わらない(案件 77)', () => {
+    setupOne();
+    const btn = $<HTMLButtonElement>('#cmp-tool-pos');
+    followBtn('A').click();
+    seekTo(40);
+    const c = fake.centers[fake.centers.length - 1];
+    fake.userDrags();
+    fake.userDragEnds(c[0] + 0.001, c[1]);
+    expect(btn.title).toBe('追従の中心に戻す');
+    followBtn('leader').click();                                          // 設定を選び直した
+    expect(btn.title).toBe('追従設定: 先頭追従');
+    followBtn('fixed').click();
+    fake.userDrags();
+    fake.userDragEnds(c[0] + 0.001, c[1]);
+    expect(btn.title).toBe('追従設定: 固定');                              // 固定では、動かしても札は変わらない
     const n = fake.centers.length;
     seekTo(60);
     expect(fake.centers).toHaveLength(n);
@@ -323,7 +364,7 @@ describe('地図の追従', () => {
     }
   });
 
-  it('追従設定の札: 押すと選択肢が開く。選ぶと閉じ、札には今の設定だけを出す。地図を動かして固定に戻ると札も戻る(案件 73)', () => {
+  it('追従設定の札: 押すと選択肢が開く。選ぶと閉じ、札には今の設定だけを出す。固定を選ぶと札も固定になる(案件 73)', () => {
     setupOne();
     const btn = $<HTMLButtonElement>('#cmp-tool-pos'), list = $('#cmp-sub-pos');
     expect(list.hidden).toBe(true);
@@ -339,7 +380,8 @@ describe('地図の追従', () => {
     expect(btn.getAttribute('aria-expanded')).toBe('false');
     expect(btn.title).toBe('追従設定: A を追従');
     expect(followBtn('A').classList.contains('on')).toBe(true);
-    fake.userDrags();                                  // 地図を動かして固定に戻ると、札も固定へ戻る
+    btn.click();
+    followBtn('fixed').click();                        // 固定を選ぶと、札も固定になる
     expect(btn.title).toBe('追従設定: 固定');
     expect(followBtn('fixed').classList.contains('on')).toBe(true);
     expect(followBtn('A').classList.contains('on')).toBe(false);

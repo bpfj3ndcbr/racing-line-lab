@@ -91,6 +91,8 @@ export const createLeafletMap: MapFactory = (el): TrackMap => {
   const lineLayer = L.layerGroup().addTo(map);
   const cars = new Map<Slot, L.Marker>();
   const labels = new Map<Slot, L.Marker>();
+  /** 利用者のドラッグの途中(慣性で動き終わるまで)。案件 77 */
+  let dragging = false;
   let bounds: L.LatLngBounds | null = null;
   let lineBounds: L.LatLngBounds | null = null;
   let widthLayers: { layer: L.Polyline; base: number; min?: number }[] = [];
@@ -251,6 +253,11 @@ export const createLeafletMap: MapFactory = (el): TrackMap => {
       map.panTo(L.latLng(lat, lon), { animate: false });
     },
     onUserDrag(cb: () => void) { map.on('dragstart', cb); },
+    // ドラッグを離したあとの慣性が止まった(moveend)ときに通知する
+    onUserDragEnd(cb: () => void) {
+      map.on('dragstart', () => { dragging = true; });
+      map.on('moveend', () => { if (dragging) { dragging = false; cb(); } });
+    },
     fit() { const b = bounds ?? lineBounds; if (b) map.fitBounds(b, { padding: [32, 32], maxZoom: 18, animate: false }); },
     setView(lat, lon, zoom) { map.setView([lat, lon], zoom, { animate: false }); },
     getView() { const c = map.getCenter(); return { lat: c.lat, lon: c.lng, zoom: map.getZoom() }; },
