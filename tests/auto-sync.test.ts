@@ -153,3 +153,50 @@ describe('「自動」ボタン(案件 58)', () => {
     expect(status()).toContain('自動:');                            // オンにしたときの案内のまま
   });
 });
+
+describe('セクターを通ったときのボタンの点滅(案件 78)', () => {
+  const flashed = () => root.querySelector<HTMLElement>('#cmp-sectors .pass')?.dataset.k;
+  const flashedOnMap = () => root.querySelector<HTMLElement>('#cmp-map-secs .pass')?.dataset.k;
+
+  it.skipIf(!big)('「自動」がオフでも、先頭の車がセクターを通ると、そのボタンが点滅する(押された状態にはならず、時刻も動かない)', () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    setupTwo();
+    const k = laterSectors()[0];
+    const tB = lapOf('B').sectorTimes[k] as number;
+    seekTo(tB - 1);
+    expect(auto().getAttribute('aria-pressed')).toBe('false');
+    expect(flashed()).toBeUndefined();
+    click('[data-act="toggle"]');
+    expect(play(30, () => flashed() !== undefined)).toBe(true);
+    expect(flashed()).toBe(String(k));
+    expect(flashedOnMap()).toBe(String(k));                         // 地図の上のボタンも同じ
+    expect(pressed()).toBeUndefined();                              // 選んだ状態(押された表示)にはならない
+    expect(tau()).toBeGreaterThan(tB - 0.2);                        // 時刻は飛ばない(再生のまま進む)
+    expect(tau()).toBeLessThan(tB + 0.5);
+    vi.advanceTimersByTime(2000);                                   // しばらくすると、点滅の印は消える
+    expect(flashed()).toBeUndefined();
+    vi.useRealTimers();
+  });
+
+  it.skipIf(!big)('表示位置を A にすると、A がセクターを通ったときに点滅する(先に通った B では点滅しない)', () => {
+    setupTwo();
+    click('[data-act="follow"][data-follow="A"]');
+    const k = laterSectors()[0];
+    const tA = lapOf('A').sectorTimes[k] as number, tB = lapOf('B').sectorTimes[k] as number;
+    expect(tB).toBeLessThan(tA);
+    seekTo(tB + 0.3);                                               // B は通った後、A はまだ
+    click('[data-act="toggle"]');
+    expect(play(Math.ceil((tA - tB) * 10) + 30, () => flashed() !== undefined)).toBe(true);
+    expect(flashed()).toBe(String(k));
+    expect(tau()).toBeGreaterThan(tA - 0.2);                        // A が通った時点で点滅した
+  });
+
+  it.skipIf(!big)('シークで通り過ぎただけでは点滅しない(再生で通ったときだけ)', () => {
+    setupTwo();
+    const k = laterSectors()[0];
+    seekTo((lapOf('B').sectorTimes[k] as number) - 1);
+    seekTo((lapOf('B').sectorTimes[k] as number) + 2);
+    expect(flashed()).toBeUndefined();
+    expect(flashedOnMap()).toBeUndefined();
+  });
+});
