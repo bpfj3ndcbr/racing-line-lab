@@ -103,6 +103,31 @@ describe('地図のキーボード', () => {
     m.destroy();
   });
 
+  it('ドラッグを終えて地図が止まったときに通知する。プログラムの移動では通知しない(案件 77)', async () => {
+    const el = document.createElement('div');
+    el.style.width = '400px'; el.style.height = '300px';
+    document.body.appendChild(el);
+    const m = createLeafletMap(el);
+    let ended = 0;
+    m.onUserDragEnd(() => { ended++; });
+    m.setCenter(33.04, 130.98);                               // 追従などの移動は、利用者のドラッグではない
+    await new Promise((r) => setTimeout(r, 50));
+    expect(ended).toBe(0);
+    const mouse = (target: EventTarget, type: string, x: number, y: number) => {
+      const e = new MouseEvent(type, { bubbles: true, cancelable: true, button: 0, clientX: x, clientY: y });
+      Object.defineProperty(e, 'which', { value: 1 });
+      target.dispatchEvent(e);
+    };
+    const pane = el.querySelector('.leaflet-map-pane')!;
+    mouse(pane, 'mousedown', 100, 100);
+    mouse(pane, 'mousemove', 140, 140);
+    expect(ended).toBe(0);                                    // 動かしている間は通知しない
+    mouse(pane, 'mouseup', 140, 140);
+    await new Promise((r) => setTimeout(r, 800));             // 慣性が止まるのを待つ
+    expect(ended).toBe(1);
+    m.destroy();
+  });
+
   it('地図の画像の取得先: デスクトップ版で窓口に tileUrl があればメイン側(案件 2)、無ければ地理院', () => {
     const gsi = 'https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg';
     expect(tileUrlTemplate(undefined)).toBe(gsi);

@@ -32,6 +32,13 @@ export class FakeMap implements TrackMap {
   onUserDrag(cb: () => void) { this.dragCb = cb; }
   /** 利用者が地図をドラッグした、という操作を再現する */
   userDrags() { this.dragCb?.(); }
+  dragEndCb: (() => void) | null = null;
+  onUserDragEnd(cb: () => void) { this.dragEndCb = cb; }
+  /** 利用者が地図を (lat, lon) まで動かして、ドラッグを終えた、を再現する */
+  userDragEnds(lat?: number, lon?: number) {
+    if (lat !== undefined && lon !== undefined) this.view = { ...this.view, lat, lon };
+    this.dragEndCb?.();
+  }
   editCb: ((dLat: number, dLon: number) => void) | null = null;
   setEditDrag(cb: ((dLat: number, dLon: number) => void) | null) { this.editCb = cb; }
   /** 位置補正で、地図の上をドラッグした(緯度・経度の変化量)を再現する */
