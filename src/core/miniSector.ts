@@ -86,3 +86,17 @@ export function miniTone(v: number | null, ref: number | null, pb: number | null
   if (ref === null) return 'none';
   return v >= ref ? 'faster' : 'slower';
 }
+
+/**
+ * セクターの通過時刻(ラップ開始からの秒、ラインの順)が、通った順になっているか。
+ * 順番がずれていると、隣り合うセクターの区間が成り立たない(案件 83)。通過の無い所(null)は比べない。
+ */
+export function isInPassOrder(times: (number | null)[]): boolean {
+  let prev: number | null = null;
+  for (const t of times) {
+    if (t === null) continue;
+    if (prev !== null && t < prev) return false;
+    prev = t;
+  }
+  return true;
+}
