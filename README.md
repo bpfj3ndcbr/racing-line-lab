@@ -1,12 +1,12 @@
-<p align="center"><img src="docs/images/logo.png" alt="Racing Line Lab" width="160"></p>
 
 # Racing Line Lab
+<img align="right" width="150" src="docs/images/logo.png" alt="Racing Line Lab">
 
 **シンプル走行ライン比較ツール**
 
 RaceChronoなどのサーキットの走行ログ(.vbo)を読み込み、ラップごとの走行ラインと速度を、航空写真の地図の上で見比べる個人開発のアプリです。
 
-  
+## 概要
 目標の走行ログを事前に入れておきサーキットの現場で、
 
 - **1本目を走った後にRaceChrono からログを飛ばして「イメージしていた走りが出来ていたのか」を確認して2本目に繋げる**
