@@ -1,6 +1,6 @@
 import {
   type HeatRun as CoreRun, type Lap, type LapSeries, PlaybackEngine, SLOTS, type Slot,
-  MINI_COUNT, accelSeries, fastestLap, alignedSeries, buildLapSeries, miniIndexAt, miniSpeeds, miniTone, pickRuler, sectorRange, formatLapTime, heatColor, heatRuns, sampleSeries, sampleSeriesSmooth, speedColor, speedRange, speedRuns, timeAtDistance, escapeHtml as esc
+  MINI_COUNT, accelSeries, fastestLap, isInPassOrder, alignedSeries, buildLapSeries, miniIndexAt, miniSpeeds, miniTone, pickRuler, sectorRange, formatLapTime, heatColor, heatRuns, sampleSeries, sampleSeriesSmooth, speedColor, speedRange, speedRuns, timeAtDistance, escapeHtml as esc
 } from '../core';
 import type { LoadedLog, Session } from '../store/session';
 import { Prefs, RATE_CHOICES, ZOOM_CHOICES, type FollowV as Follow, type LabelV, type MapModeV as MapMode, type PrefKey, type SyncV as SyncMode } from '../store/prefs';
@@ -179,6 +179,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
                 <div id="cmp-sectors" class="secs"></div>
                 <div id="cmp-sync-status" class="sub sync-status" role="status" hidden>
                   <span id="cmp-sync-text"></span>
+                  <span id="cmp-sec-warn" class="sec-warn" hidden>セクターの順番が通った順ではありません。サーキットの編集で「セクター整列」をしてください</span>
                 </div>
               </div>
             </div>
@@ -988,7 +989,10 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
 
   function renderSyncStatus() {
     const box = $('cmp-sync-status');
-    box.hidden = !anchor && !syncMsg;
+    // 通った順になっていないセクターのあるラップ(保存より前に作ったサーキットなど)は、注意を出す(案件 83)
+    const warn = cars.some((c) => !isInPassOrder(c.lap.sectorTimes));
+    $('cmp-sec-warn').hidden = !warn;
+    box.hidden = !anchor && !syncMsg && !warn;
     $('cmp-sync-text').textContent = anchor ? `S${anchor.k + 1} で全車一致中${autoSync ? '(自動)' : ''}` : syncMsg;
     findAll('[data-act="sync-release"]').forEach((b) => { (b as HTMLButtonElement).disabled = activeSector === null && !autoSync; });   // 解除は、セクターを選んでいるか、「自動」がオンのとき
     root.querySelectorAll<HTMLElement>('[data-act="sector"]').forEach((b) =>

@@ -662,6 +662,11 @@ describe('ミニセクター表(案件 6): 「セクター」欄', () => {
   const tones = (slot: string, tone: string) => root.querySelectorAll(`#cmp-sectors .mini-cell[data-slot="${slot}"] .t-${tone}`).length;
   const follow = (f: string) => $<HTMLButtonElement>(`[data-act="follow"][data-follow="${f}"]`).click();
 
+  it('通った順になっているラップでは、注意(セクターの順番)は出ない', () => {
+    setupOne();
+    expect($<HTMLElement>('#cmp-sec-warn').hidden).toBe(true);
+  });
+
   it('車ごとの行に、セクターの数だけ並び、1 セクターは 5 つの区間。見出しはセクターボタン。比較する車が無いので色は付かない', () => {
     setupOne();
     const n = lapOf('A').sectorTimes.length;

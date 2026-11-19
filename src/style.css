@@ -524,6 +524,8 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .sync-row{display:contents}
 .sync-status{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .sync-status[hidden]{display:none}
+.sec-warn{color:var(--alert);font-weight:700;font-size:11px}   /* 通った順になっていないセクター(案件 83) */
+.sec-warn[hidden]{display:none}
 
 /* セクターの欄: 走行データとの間に境界線(動かせない) */
 .sec-block{border-top:1px solid var(--border-strong);padding-top:8px;display:flex;flex-direction:column;gap:6px}

@@ -1,7 +1,7 @@
 import {
   type Assignment, type Circuit, type GeoLine, type Lap, type LapRef, type LineCandidate, type MapView, type Offset, type Slot, type TrackLog, type TrimCut,
   MAX_SECTORS, SLOTS, applyCuts, clearLog, closeLoop, detectLapRun, emptyAssignment, findCrossings, lineCandidate, matchCircuit, matchLap, nameExists, parseCln, parseSci, parseVbo,
-  roundLine, toggleAssign,
+  roundLine, sectorPassTimes, shiftLine, toggleAssign,
 } from '../core';
 import type { KeyValueStore } from '../io/storage';
 
@@ -659,7 +659,34 @@ export class Session {
     this.emit();
   }
 
-  /** ファイル(.cln / .sci の中身)からサーキットを登録する。線はファイルの値のまま */
+  /**
+   * セクターを、読み込み済みの走行ログが通った順に並べ替える(保存のとき。案件 83)。
+   * 判定に使うログは、表示中のセット → ほかのセットの順で、計測ラインを通る完了ラップがある最初のもの(位置補正はラインを逆にずらして判定)。
+   * 走行ログが無いときは並べ替えず、その旨を知らせる。通らないセクターは最後に、元の順で。
+   * 並べ替えたとき・並べ替えられなかったときは、知らせる文を返す(無ければ空)。
+   */
+  private arrangeSectors(control: GeoLine, sectors: GeoLine[]): { sectors: GeoLine[]; note: string } {
+    if (sectors.length < 2) return { sectors, note: '' };
+    const seen = new Set<string>();
+    const logs = [this.active, ...this.sets.filter((w) => w !== this.active)].flatMap((w) => w.logs)
+      .filter((l) => (seen.has(l.id) ? false : (seen.add(l.id), true)));
+    const back = (l: LoadedLog, g: GeoLine) => shiftLine(g, -l.offset.east, -l.offset.north);
+    const log = logs.find((l) => sectorPassTimes(l.log, back(l, control), []) !== null) ?? null;
+    if (!log) return { sectors, note: '走行ログが無いため、セクターを並べ替えていません' };
+    const times = sectorPassTimes(log.log, back(log, control), sectors.map((g) => back(log, g)));
+    if (!times) return { sectors, note: '走行ログが無いため、セクターを並べ替えていません' };
+    const order = sectors.map((line, k) => ({ line, k, t: times[k] }))
+      .sort((p, q) => (p.t === q.t ? p.k - q.k : p.t < q.t ? -1 : 1));
+    if (order.every((x, i) => x.k === i)) return { sectors, note: '' };
+    const missed = order.filter((x) => x.t === Infinity).length;
+    const miss = missed ? `(走行ログが通らないセクター ${missed} 本は最後に回しました)` : '';
+    return { sectors: order.map((x) => x.line), note: `セクターを通った順に並べ替えて保存しました(走行ログ: ${log.log.fileName})${miss}` };
+  }
+
+  /** 保存のときの並べ替えの知らせ(あれば通知にする。編集画面は保存後に閉じるため、画面内ではなく通知) */
+  private noteArranged(note: string, show: boolean): void { if (note && show) { this.tell(note); this.emit(); } }
+
+  /** ファイル(.cln / .sci の中身)からサーキットを登録する。線はファイルの値のまま(保存のとき、通った順に並べ替える。案件 83) */
   registerCircuit(name: string, clnText: string, sciText: string, view?: MapView): CircuitResult {
     const bad = this.circuitNameError(name);
     if (bad) return bad;
@@ -668,7 +695,10 @@ export class Session {
     const sectors = parseSci(sciText).map((x) => x.line);
     const many = this.sectorLimitError(sectors.length);
     if (many) return many;
-    return this.addCircuit(name.trim(), control, sectors, view, false);
+    const arr = this.arrangeSectors(control, sectors);
+    const r = this.addCircuit(name.trim(), control, arr.sectors, view, false);
+    this.noteArranged(arr.note, false);
+    return r;
   }
 
   /**
@@ -680,7 +710,10 @@ export class Session {
     if (bad) return bad;
     const many = this.sectorLimitError(sectors.length);
     if (many) return many;
-    return this.addCircuit(name.trim(), roundLine(control), sectors.map(roundLine), opts.view, opts.announce === true);
+    const arr = this.arrangeSectors(roundLine(control), sectors.map(roundLine));
+    const r = this.addCircuit(name.trim(), roundLine(control), arr.sectors, opts.view, opts.announce === true);
+    this.noteArranged(arr.note, opts.announce === true);
+    return r;
   }
 
   /** セクターが多すぎるときの結果(多すぎなければ null) */
@@ -724,11 +757,14 @@ export class Session {
     if (!c) return { ok: false, reason: 'invalid', message: 'サーキットが見つかりません。' };
     const many = this.sectorLimitError(sectors.length);
     if (many) return many;
-    const ctl = roundLine(control), secs = sectors.map(roundLine);
+    const ctl = roundLine(control);
+    const arr = this.arrangeSectors(ctl, sectors.map(roundLine));
+    const secs = arr.sectors;
     const patch: Partial<Pick<Circuit, 'control' | 'sectors'>> = {};
     if (JSON.stringify(ctl) !== JSON.stringify(c.control)) patch.control = ctl;
     if (JSON.stringify(secs) !== JSON.stringify(c.sectors)) patch.sectors = secs;
     if (Object.keys(patch).length) this.updateCircuit(id, patch);
+    this.noteArranged(arr.note, true);
     return { ok: true, message: `「${c.name}」のラインを保存しました(セクター ${secs.length} 本)。` };
   }
 
@@ -757,8 +793,10 @@ export class Session {
     if (!sectors.length) return { ok: false, reason: 'invalid', message: '.sci からセクターを読み取れませんでした。' };
     const many = this.sectorLimitError(sectors.length);
     if (many) return many;
-    this.updateCircuit(id, { sectors });
-    return { ok: true, message: `「${c.name}」のセクターを更新しました(${sectors.length} 本)。` };
+    const arr = this.arrangeSectors(c.control, sectors);
+    this.updateCircuit(id, { sectors: arr.sectors });
+    this.noteArranged(arr.note, true);
+    return { ok: true, message: `「${c.name}」のセクターを更新しました(${arr.sectors.length} 本)。` };
   }
 
   private updateCircuit(id: string, patch: Partial<Pick<Circuit, 'control' | 'sectors'>>) {
