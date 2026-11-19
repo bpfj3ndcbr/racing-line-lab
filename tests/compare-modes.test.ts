@@ -430,7 +430,7 @@ describe('画面の構成: 左 = 地図 + 再生の操作 / 右 = カード・�
     const side = $('#cmp-side');
     expect(Array.from(side.children).map((c) => c.id)).toEqual(['cmp-side-tabs', 'cmp-upper', 'cmp-sp-g', 'cmp-graphwrap']);   // 先頭のタブは横向きのスマホだけに出る(案件 63)
     const upper = Array.from($('#cmp-upper-in').children).map((c) => c.id);
-    expect(upper).toEqual(['cmp-set-wrap', 'cmp-cards', 'cmp-sec-block']);
+    expect(upper).toEqual(['cmp-set-wrap', 'cmp-base-info', 'cmp-cards', 'cmp-sec-block']);
     expect($('#cmp-set-wrap .shown-mark').textContent).toBe('表示中');                    // 比較セットのタブと同じ「表示中」の印(案件 27)
     expect($('#cmp-graphwrap').contains($('#cmp-graph'))).toBe(true);
     expect($('#cmp-graphwrap').contains($('#cmp-zin'))).toBe(true);

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
-import { distanceM, formatLapTime, parseVbo } from '../src/core';
+import { buildLapSeries, distanceM, formatLapTime, miniSpeeds, parseVbo, sectorRange } from '../src/core';
 import { MemoryStore } from '../src/io/storage';
 import { Session } from '../src/store/session';
 import { mountApp } from '../src/ui/app';
@@ -10,6 +10,7 @@ import { FakeMap } from './helpers';
 import { GRAPH_LEFT, GRAPH_RIGHT } from '../src/ui/speedGraph';
 
 const fx = (n: string) => `fixtures/${n}`;
+const flush = () => new Promise<void>((r) => setTimeout(r, 20));
 const cln = readFileSync(fx('cl_autopolis.cln'), 'utf8');
 const sci = readFileSync(fx('autopolis.sci'), 'utf8');
 const utc = () => parseVbo(readFileSync(fx('20260913140139_UTC.vbo'), 'utf8'), 'u.vbo');
@@ -653,5 +654,236 @@ describe('地図の上のセクターの線(案件 82)', () => {
     seekTo(Number($<HTMLInputElement>('#cmp-seek').max));          // エンドに到着: エンドの縦線が走行色、横線は通常色に戻る
     expect(tickOn()).toEqual(['end']);
     expect(onNow()).toEqual([]);
+  });
+});
+
+describe('ミニセクター表(案件 6): 「セクター」欄', () => {
+  const cells = (slot: string) => Array.from(root.querySelectorAll<HTMLElement>(`#cmp-sectors .mini-cell[data-slot="${slot}"]`));
+  const tones = (slot: string, tone: string) => root.querySelectorAll(`#cmp-sectors .mini-cell[data-slot="${slot}"] .t-${tone}`).length;
+  const follow = (f: string) => $<HTMLButtonElement>(`[data-act="follow"][data-follow="${f}"]`).click();
+
+  it('車ごとの行に、セクターの数だけ並び、1 セクターは 5 つの区間。見出しはセクターボタン。比較する車が無いので色は付かない', () => {
+    setupOne();
+    const n = lapOf('A').sectorTimes.length;
+    expect(n).toBeGreaterThan(0);
+    expect(root.querySelectorAll('#cmp-sectors .mini-tbl > [data-act="sector"]')).toHaveLength(n);
+    expect(cells('A')).toHaveLength(n);
+    for (const c of cells('A')) expect(c.querySelectorAll('.mini-seg')).toHaveLength(5);
+    expect(tones('A', 'faster') + tones('A', 'slower') + tones('A', 'pb')).toBe(0);    // 基準の車(1 台だけ)・自己ベストの別名も無い
+    expect(root.querySelector('#cmp-edit-circuit')).toBeNull();                          // 「セクターを追加・編集…」は無い
+  });
+
+  it('未割り当ての枠も空の行になる(スマホの縦画面で、カードの行と表の行をそろえるため)', () => {
+    setupOne();
+    const n = lapOf('A').sectorTimes.length;
+    expect(root.querySelectorAll('#cmp-sectors .mini-name')).toHaveLength(4);             // A〜D の 4 行
+    expect(root.querySelectorAll('#cmp-sectors .mini-name.empty')).toHaveLength(3);        // B〜D は空
+    expect(root.querySelectorAll('#cmp-sectors .mini-cell.empty')).toHaveLength(3 * n);
+    expect(root.querySelectorAll('#cmp-sectors .mini-cell.empty .mini-seg')).toHaveLength(0);
+  });
+
+  it('入れ替えボタン: 初めはセクターのエリアが上(data-first="sectors")。押すとグラフが上になり、覚える。もう一度押すと戻る', () => {
+    setupOne();
+    const side = $('#cmp-side');
+    const btn = () => $<HTMLButtonElement>('#cmp-sync [data-act="swap-graph"]');
+    expect(side.dataset.first).toBe('sectors');
+    btn().click();
+    expect(side.dataset.first).toBe('graph');
+    expect(btn().getAttribute('aria-pressed')).toBe('false');
+    expect(session.getSetting('compare.sectorsFirst', true)).toBe(false);
+    btn().click();
+    expect(side.dataset.first).toBe('sectors');
+    expect(session.getSetting('compare.sectorsFirst', false)).toBe(true);
+  });
+
+  it('比較を離れてサーキットのセクターを変えると、戻ったとき、ミニセクター表は新しいセクターで計算し直される', async () => {
+    setupOne();
+    const shown = () => Array.from(root.querySelectorAll('#cmp-sectors .mini-cell[data-slot="A"]'))
+      .map((c) => Array.from(c.querySelectorAll('.mini-seg')).map((g) => g.getAttribute('data-v')));
+    const expected = () => {
+      const r = session.resolveRef(session.assignment.A)!;
+      const ser = buildLapSeries(r.log.log, r.lap, r.log.offset);
+      return r.lap.sectorTimes.map((_, k) => {
+        const g = sectorRange(r.lap, k);
+        return g ? miniSpeeds(ser, g.a, g.b).map((v) => (v === null ? '' : v.toFixed(1))) : Array(5).fill('');
+      });
+    };
+    const c = session.circuits[0];
+    for (const [a, b] of [[0, 3], [1, 4], [2, 5], [0, 7]]) {                              // 本数が変わる・同じ本数で線が変わる
+      $<HTMLButtonElement>('[data-act="nav"][data-view="import"]').click();
+      session.setCircuitLines(c.id, c.control, c.sectors.slice(a, b));
+      await flush();
+      $<HTMLButtonElement>('[data-act="nav"][data-view="compare"]').click();
+      expect(shown()).toHaveLength(b - a);
+      expect(shown()).toEqual(expected());
+    }
+  });
+
+  it('カードは「LAP の別名・LAP のタイム」。LAP の文字だけを包んである(スマホの縦画面で隠す)', () => {
+    setupOne();
+    const c2 = $('.card .c2');
+    expect(c2.querySelector('.lapno')!.textContent).toMatch(/^LAP \d+: $/);
+  });
+
+  it('比較基準: 「Runベスト」は、自分の走行データの最速ラップと比べる(基準の車の行にも色が付く)。「基準車」に戻すと付かない。覚える', () => {
+    setupOne();
+    const t = (tone: string) => root.querySelectorAll(`#cmp-sectors .mini-cell[data-slot="A"] .t-${tone}`).length;
+    const mode = (m: string) => $<HTMLButtonElement>(`#cmp-sync [data-act="minibase"][data-mode="${m}"]`);
+    expect(mode('car').getAttribute('aria-pressed')).toBe('true');
+    expect(t('faster') + t('slower')).toBe(0);                    // 基準車(A だけ): 基準の行は色が付かない
+    mode('run').click();
+    expect(mode('run').getAttribute('aria-pressed')).toBe('true');
+    expect(t('faster')).toBeGreaterThan(0);                         // A のラップは最速のラップ(同じ走行データの 1 周): 全区間が「速い」側
+    expect(t('slower')).toBe(0);
+    expect(session.getSetting('compare.miniBase', 'car')).toBe('run');
+    mode('car').click();
+    expect(t('faster') + t('slower')).toBe(0);
+    expect(session.getSetting('compare.miniBase', 'run')).toBe('car');
+  });
+
+  it('比較基準「全体ベスト」: 比較セット全体の最速ラップと比べる(1 本のログなら Run ベストと同じ)。覚える', () => {
+    setupOne();
+    const t = (tone: string) => root.querySelectorAll(`#cmp-sectors .mini-cell[data-slot="A"] .t-${tone}`).length;
+    $<HTMLButtonElement>('#cmp-sync [data-act="minibase"][data-mode="all"]').click();
+    expect(t('faster')).toBeGreaterThan(0);
+    expect(t('slower')).toBe(0);
+    expect(session.getSetting('compare.miniBase', 'car')).toBe('all');
+  });
+
+  it.skipIf(!big)('比較基準「全体ベスト」: ほかのログに速いラップがあれば、遅い車は黄色の区間が出る', () => {
+    setupTwo();                                                     // A = big の 2 周目(2:26.5)、B = u の 1 周(2:22.9、速い)
+    const t = (s: string, tone: string) => root.querySelectorAll(`#cmp-sectors .mini-cell[data-slot="${s}"] .t-${tone}`).length;
+    $<HTMLButtonElement>('#cmp-sync [data-act="minibase"][data-mode="all"]').click();
+    expect(t('A', 'slower')).toBeGreaterThan(0);
+  });
+
+  it.skipIf(!big)('比較基準「Runベスト」: 最速ラップより遅い車は、遅い区間が黄色になる', () => {
+    setupTwo();                                                     // A = big の 2 周目(最速ではない)
+    $<HTMLButtonElement>('#cmp-sync [data-act="minibase"][data-mode="run"]').click();
+    const t = (s: string, tone: string) => root.querySelectorAll(`#cmp-sectors .mini-cell[data-slot="${s}"] .t-${tone}`).length;
+    const log = session.resolveRef(session.assignment.A)!.log;
+    const fastest = log.laps.filter((l) => l.complete).reduce((a, b) => (b.duration < a.duration ? b : a));
+    if (fastest.number !== lapOf('A').number) expect(t('A', 'slower')).toBeGreaterThan(0);
+    else expect(t('A', 'slower')).toBe(0);
+  });
+
+  it('比較基準のラップの情報(スマホの縦画面でカードの上に出す 1 段): 基準車の Run・LAP(別名があれば別名)・タイム', () => {
+    setupOne();
+    const info = $('#cmp-base-info');
+    const lap = lapOf('A');
+    expect(info.textContent).toBe(`基準Run 1LAP ${lap.number}${formatLapTime(lap.duration)}`);
+    session.setLapAlias('u', lap.number, 'ベスト周');
+    session.setRunAlias('u', '朝');
+    expect(info.textContent).toBe(`基準朝ベスト周${formatLapTime(lap.duration)}`);
+    $<HTMLButtonElement>('#cmp-sync [data-act="minibase"][data-mode="run"]').click();
+    expect(info.textContent).toBe('基準LAPが入っている走行ログのベスト');
+    $<HTMLButtonElement>('#cmp-sync [data-act="minibase"][data-mode="all"]').click();
+    expect(info.textContent).toContain('朝');                       // 全体ベストのラップ(1 本のログなので、その最速ラップ)
+  });
+
+  it('セクター合わせの札: 状態で表示と有効・無効が変わる(時間: 合わせなし → S1 全車一致 → 自動。距離: 基準車の位置)', () => {
+    setupOne();                                                      // 横軸は「時間」
+    const tag = () => $<HTMLButtonElement>('#cmp-tool-sync');
+    const modeBtn = (m: string) => $<HTMLButtonElement>(`#cmp-sub-sync [data-mode="${m}"]`);
+    const rel = () => $<HTMLButtonElement>('#cmp-sub-sync [data-act="sync-release"]');
+    // 未選択・自動オフ: 合わせなし。札も押せない(中身が全部使えない)
+    expect($('#cmp-sync-note').hidden).toBe(true);
+    expect(tag().textContent!.trim()).toBe('合わせなし');
+    expect(tag().disabled).toBe(true);
+    expect(modeBtn('leader').disabled).toBe(true);
+    expect(rel().disabled).toBe(true);
+    // セクターを選ぶ: 「S1 全車一致」。動作を選べて、解除できる
+    sector(0).click();
+    expect(tag().textContent!.trim()).toBe('S1 全車一致');
+    expect(tag().disabled).toBe(false);
+    expect(modeBtn('leader').disabled).toBe(false);
+    expect(rel().disabled).toBe(false);
+    tag().click();
+    expect($('#cmp-sub-sync').hidden).toBe(false);
+    modeBtn('leader').click();
+    expect(tag().textContent!.trim()).toBe('S1 先頭車両');
+    expect($('#cmp-sub-sync').hidden).toBe(true);
+    // 解除: 合わせなしに戻る
+    tag().click();
+    rel().click();
+    expect(tag().textContent!.trim()).toBe('合わせなし');
+    expect(tag().disabled).toBe(true);
+    // 「自動」をオンにすると、セクターを選ばなくても動作を選べる。解除は自動をオフにする
+    $<HTMLButtonElement>('#cmp-sync-tags [data-act="autosync"]').click();
+    expect(tag().textContent!.trim()).toBe('自動 先頭車両');
+    expect(modeBtn('all').disabled).toBe(false);
+    expect(rel().disabled).toBe(false);
+    tag().click(); rel().click();
+    expect($('#cmp-sync-tags [data-act="autosync"]').classList.contains('on')).toBe(false);
+    expect(tag().textContent!.trim()).toBe('合わせなし');
+    // 横軸が「距離」: 動作は選べない(灰色)。セクターを選んでいれば、解除はできる
+    $<HTMLButtonElement>('[data-act="xkind"][data-kind="dist"]').click();
+    expect(tag().textContent!.trim()).toBe('基準車の位置');
+    expect(tag().disabled).toBe(false);                              // 選べない理由を見られるように、札は開ける
+    expect($('#cmp-sync-note').hidden).toBe(false);
+    expect(modeBtn('all').disabled).toBe(true);
+    sector(0).click();
+    expect(tag().disabled).toBe(false);
+    expect(tag().classList.contains('muted')).toBe(true);
+    expect(modeBtn('all').disabled).toBe(true);
+    expect(rel().disabled).toBe(false);
+  });
+
+  it('比較基準の札: 今の基準を札に出し、メニューで選ぶと札の文字が変わってメニューが閉じる。別の札を開くと、開いていた方は閉じる', () => {
+    setupOne();
+    const base = () => $('#cmp-tool-base').textContent!.trim();
+    expect(base()).toBe('比較基準 基準車');
+    $<HTMLButtonElement>('#cmp-tool-base').click();
+    expect($('#cmp-sub-base').hidden).toBe(false);
+    $<HTMLButtonElement>('#cmp-sub-base [data-mode="all"]').click();
+    expect(base()).toBe('比較基準 全体ベスト');
+    expect($('#cmp-sub-base').hidden).toBe(true);
+    expect(session.getSetting('compare.miniBase', 'car')).toBe('all');
+    // 札の「入替」も、右の列の同じボタンと同じ動作
+    $<HTMLButtonElement>('#cmp-sync-tags [data-act="swap-graph"]').click();
+    expect($('#cmp-side').dataset.first).toBe('graph');
+  });
+
+  it('通過した区間は濃く、通過前は薄い。再生位置より前のセクターは全部濃く、後ろは全部薄い', () => {
+    setupOne();
+    const done = (k: number) => root.querySelectorAll(`#cmp-sectors .mini-cell[data-slot="A"][data-sk="${k}"] .mini-seg.done`).length;
+    const lap = lapOf('A');
+    const s0 = lap.sectorTimes[0] as number, s1 = lap.sectorTimes[1] as number;
+    seekTo(0);
+    expect(root.querySelectorAll('#cmp-sectors .mini-seg.done')).toHaveLength(0);      // 最初のセクターラインを通る前: 全部薄い
+    seekTo((s0 + s1) / 2);
+    expect(done(0)).toBeGreaterThanOrEqual(1);                                          // 途中: 通過した分だけ濃い
+    expect(done(0)).toBeLessThanOrEqual(4);
+    expect(done(1)).toBe(0);
+    seekTo(s1 + 0.5);
+    expect(done(0)).toBe(5);                                                            // 次のセクターに入ると、前のセクターは全部濃い
+    seekTo(lap.duration);
+    for (let k = 0; k < lap.sectorTimes.length; k++) expect(done(k)).toBe(5);           // ゴール後は全部濃い
+    seekTo(0);
+    expect(root.querySelectorAll('#cmp-sectors .mini-seg.done')).toHaveLength(0);      // 戻すと薄くなる
+  });
+
+  it.skipIf(!big)('2台: 追従が「先頭」のときは最速の車が基準(基準の行は色が付かない)。「A を追従」にすると A が基準になる', () => {
+    setupTwo();                                            // A = 2:26.5、B = 2:22.9(速い)
+    const slow = (s: string) => tones(s, 'slower'), fast = (s: string) => tones(s, 'faster');
+    expect(fast('B') + slow('B')).toBe(0);                 // 基準(最速の B)
+    expect(fast('A') + slow('A')).toBeGreaterThan(0);
+    expect(slow('A')).toBeGreaterThan(0);                  // 遅い A は、基準より遅い区間がある
+    follow('A');
+    expect(fast('A') + slow('A')).toBe(0);                 // 基準が A に変わる
+    expect(fast('B')).toBeGreaterThan(0);                  // 速い B は、A より速い区間がある
+    follow('leader');
+    expect(fast('B') + slow('B')).toBe(0);                 // 先頭追従(固定も)に戻すと、最速の B が基準
+  });
+
+  it.skipIf(!big)('2台: 自己ベストは、その走行データの「PB」の別名のラップ。付けると A の速い区間が紫になり、外すと戻る', () => {
+    setupTwo();
+    const log = session.resolveRef(session.assignment.A)!.log;
+    const slowest = log.laps.filter((l) => l.complete && l.number !== lapOf('A').number).reduce((a, b) => (b.duration > a.duration ? b : a));
+    expect(tones('A', 'pb')).toBe(0);
+    session.setLapAlias('big', slowest.number, 'PB');
+    expect(tones('A', 'pb')).toBeGreaterThan(0);           // A(2 周目)は、いちばん遅いラップより速い区間がある
+    session.setLapAlias('big', slowest.number, '');
+    expect(tones('A', 'pb')).toBe(0);
   });
 });

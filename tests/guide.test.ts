@@ -263,26 +263,12 @@ describe('はじめかた', () => {
   });
 });
 
-describe('比較画面から、サーキット(セクター)を編集して比較に戻る', () => {
+describe('サーキット(セクター)を編集したあとの比較画面', () => {
   beforeEach(() => {
     session.registerCircuit('オートポリス', cln, sci);
     session.addLog(parseOne(), 'u', 0);
     session.toggleAssignment('A', { logId: 'u', lap: 1 }, 0);
     nav('compare');
-  });
-  it('「セクターを追加・編集…」で登録済みのサーキットの編集画面が開き、終わると比較に戻る', async () => {
-    const btn = $<HTMLButtonElement>('#cmp-edit-circuit');
-    expect(btn.hidden).toBe(false);
-    btn.click();
-    expect($<HTMLElement>('#view-import').hidden).toBe(false);
-    expect($<HTMLElement>('.work-circuit').hidden).toBe(false);
-    expect($('#ce-title').textContent).toBe('サーキットの編集');
-    expect($<HTMLInputElement>('#ce-name').value).toBe('オートポリス');
-    expect($('#ce-draw-sector').classList.contains('pri')).toBe(true);        // 比較画面から来たときは「セクターを追加」が青
-    $<HTMLButtonElement>('#ce-save').click();
-    await flush();
-    expect($<HTMLElement>('#view-compare').hidden).toBe(false);
-    expect($<HTMLElement>('#view-import').hidden).toBe(true);
   });
   it('セクターを足して保存すると、比較画面のセクター表示も更新される(割り当ては残る)', async () => {
     const id = session.circuits[0].id;
