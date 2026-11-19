@@ -275,10 +275,10 @@ describe('サーキット(セクター)を編集したあとの比較画面', ()
     const c = session.circuits[0];
     session.setCircuitLines(id, c.control, []);
     await flush();
-    expect($('#cmp-sectors').textContent).toContain('セクター設定無し');
+    expect($('#cmp-sectors').textContent).toContain('全周');
     session.setCircuitLines(id, c.control, c.sectors.slice(0, 2));
     expect(session.assignment.A).not.toBeNull();
-    expect(root.querySelectorAll('#cmp-sectors [data-act="sector"]')).toHaveLength(2);
+    expect(root.querySelectorAll('#cmp-map-secs [data-act="sector"]')).toHaveLength(2);
   });
   it('データ管理から開いたサーキット編集は、終わっても比較には移らない', async () => {
     nav('import');

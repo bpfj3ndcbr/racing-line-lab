@@ -1,6 +1,6 @@
 import {
   type HeatRun as CoreRun, type Lap, type LapSeries, PlaybackEngine, SLOTS, type Slot,
-  MINI_COUNT, accelSeries, fastestLap, isInPassOrder, alignedSeries, buildLapSeries, miniIndexAt, miniSpeeds, miniTone, pickRuler, sectorRange, formatLapTime, heatColor, heatRuns, sampleSeries, sampleSeriesSmooth, speedColor, speedRange, speedRuns, timeAtDistance, escapeHtml as esc
+  MINI_COUNT, accelSeries, fastestLap, isInPassOrder, alignedSeries, buildLapSeries, miniIndexAt, miniSpeeds, miniTone, pickRuler, segmentRange, formatLapTime, heatColor, heatRuns, sampleSeries, sampleSeriesSmooth, speedColor, speedRange, speedRuns, timeAtDistance, escapeHtml as esc
 } from '../core';
 import type { LoadedLog, Session } from '../store/session';
 import { Prefs, RATE_CHOICES, ZOOM_CHOICES, type FollowV as Follow, type LabelV, type MapModeV as MapMode, type PrefKey, type SyncV as SyncMode } from '../store/prefs';
@@ -757,6 +757,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   }
 
   // ---------- ミニセクター表(案件 6): 行 = 車、列 = セクター。1 セクターは距離で 5 等分した区間 ----------
+  // 列は区間(ラインが n 本なら n+1 個。ラインが無ければ 1 周全体の 1 個)。S1 = スタート〜最初のライン(案件 84)
   interface MiniData { key: string; speeds: (number | null)[][]; ranges: ({ a: number; b: number } | null)[] }
   /** ラップごとの、セクター別・区間別の平均速度。ラップが作り直されるまで使い回す(再生中は計算しない) */
   const miniCache = new WeakMap<Lap, MiniData>();
@@ -765,7 +766,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
     const key = `${n}|${lap.duration}|${lap.sectorTimes.join(',')}`;
     let d = miniCache.get(lap);
     if (!d || d.key !== key) {
-      const ranges = Array.from({ length: n }, (_, k) => sectorRange(lap, k));
+      const ranges = Array.from({ length: n + 1 }, (_, j) => segmentRange(lap, j, n));
       d = { key, ranges, speeds: ranges.map((r) => (r ? miniSpeeds(series, r.a, r.b) : Array<number | null>(MINI_COUNT).fill(null))) };
       miniCache.set(lap, d);
     }
@@ -840,24 +841,31 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   };
   /** 右の列の「セクター」欄: 見出しのボタン(S1〜)と、車ごとの区間の色。基準の車の行は、自己ベストとの比較だけ */
   function renderMini() {
+    if (!ref()) { $('cmp-sectors').innerHTML = ''; return; }
     const n = ref()?.log.circuit?.sectors.length ?? 0;
-    if (!n) return;
+    const cols = n + 1;                                          // 区間の数
     const best = miniMode !== 'car';
     const base = best ? null : miniBase();
     const allBest = miniMode === 'all' ? allBestData(n) : null;
     const bd = base ? miniDataOf(base.lap, base.series, n) : null;
-    const head = '<span class="mini-corner"></span>' + Array.from({ length: n }, (_, i) => sectorBtn(i)).join('');
+    // 見出しは押せないラベル(移動は、地図の上のライン(S1〜Sn)のボタンで行う)
+    const headOf = (j: number) => {
+      const name = n === 0 ? '全周' : `S${j + 1}`;
+      const from = j === 0 ? 'スタート' : `ライン ${j}`, to = j === n ? 'エンド' : `ライン ${j + 1}`;
+      return `<span class="mini-head" title="${name}: ${from}〜${to}">${name}</span>`;
+    };
+    const head = '<span class="mini-corner"></span>' + Array.from({ length: cols }, (_, j) => headOf(j)).join('');
     // 行は A〜D の 4 つ(未割り当ては空の行)。スマホの縦画面では、左のカードと行がそろう(CSS)
     const rows = SLOTS.map((slot) => {
       const c = cars.find((x) => x.slot === slot);
-      if (!c) return `<span class="mini-name empty"></span>${'<span class="mini-cell empty"></span>'.repeat(n)}`;
+      if (!c) return `<span class="mini-name empty"></span>${'<span class="mini-cell empty"></span>'.repeat(cols)}`;
       const d = miniDataOf(c.lap, c.series, n);
       // 基準車: 基準の車(の行は比べない)と、自己ベスト(別名「PB」)。Run ベスト・全体ベスト: その最速ラップだけ
       const isBase = c === base;
       const ref = miniMode === 'all' ? allBest : miniMode === 'run' ? runBestDataOf(c, n) : isBase ? null : bd;
       const pb = best ? null : pbDataOf(c, n);
       const off = hidden.has(c.slot) ? ' off' : '';
-      const cells = Array.from({ length: n }, (_, k) => {
+      const cells = Array.from({ length: cols }, (_, k) => {
         const segs = Array.from({ length: MINI_COUNT }, (_, j) =>
           `<i class="mini-seg t-${miniTone(d.speeds[k][j], ref?.speeds[k]?.[j] ?? null, pb?.speeds[k]?.[j] ?? null)}" data-v="${d.speeds[k][j] === null ? '' : d.speeds[k][j]!.toFixed(1)}"></i>`).join('');
         return `<span class="mini-cell${off}" data-slot="${c.slot}" data-sk="${k}"${d.ranges[k] ? '' : ' data-none'}>${segs}</span>`;
@@ -865,14 +873,14 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
       return `<span class="mini-name${isBase ? ' is-base' : ''}${off}" style="color:${cssColor(c.slot)}"${isBase ? ' title="色分けの基準"' : ''}>${c.slot}</span>${cells}`;
     }).join('');
     renderBaseInfo();
-    $('cmp-sectors').innerHTML = `<div class="mini-tbl" style="--n:${n}">${head}${rows}</div>`;
+    $('cmp-sectors').innerHTML = `<div class="mini-tbl" style="--n:${cols}">${head}${rows}</div>`;
     miniDone.clear();
   }
   /** 車ごとの、セクター別の通過済みの区間の数(「2,0,5」)。変わったときだけ DOM に書く。通過前は薄く、通過後は濃く(CSS の .done) */
   const miniDone = new Map<Slot, string>();
   function paintMini(pos: { c: Car; t: number }[]) {
+    if (!ref()) return;
     const n = ref()?.log.circuit?.sectors.length ?? 0;
-    if (!n) return;
     for (const { c, t } of pos) {
       const d = miniDataOf(c.lap, c.series, n);
       const counts = d.ranges.map((r) => !r || t <= r.a ? 0 : t >= r.b ? MINI_COUNT : Math.max(0, miniIndexAt(c.series, r.a, r.b, t)));
@@ -889,13 +897,12 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   function renderSectors() {
     const n = ref()?.log.circuit?.sectors.length ?? 0;
     setSyncHidden(n === 0);
+    renderMini();                                                // セクター設定が無いときも、1 周全体の 1 列を出す(案件 84)
     if (n === 0) {
-      $('cmp-sectors').innerHTML = '<div class="sub no-sector">セクター設定無し</div>';
       $('cmp-map-secs').innerHTML = '';
       renderSyncStatus();
       return;
     }
-    renderMini();
     // 地図の上: スタート・エンドの縦線と、ボタンの間の線(今の走行位置の区間だけ薄く。案件 82)
     // 並び: スタート | 区間0 | S1 | 区間1 | S2 … | Sn | 区間n | エンド
     const seg = (j: number) => `<span class="sec-seg" data-seg="${j}" aria-hidden="true"></span>`;
@@ -1356,7 +1363,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
       aliasSig = aliasSigOf();
       renderCards(); syncCards(); updateFrame();
     }
-    if (visible && (ref()?.log.circuit?.sectors.length ?? 0) > 0) renderBaseInfo();     // Run・LAP の別名や、全体ベストの変化を反映する
+    if (visible && ref()) renderBaseInfo();     // Run・LAP の別名や、全体ベストの変化を反映する
     if (visible && pbSigOf() !== pbSig) {          // 別のラップに「PB」の別名が付いた・外れた(案件 6)
       pbSig = pbSigOf();
       renderMini(); updateFrame();
