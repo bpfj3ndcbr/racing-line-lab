@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
-import { buildLapSeries, distanceM, formatLapTime, miniSpeeds, parseVbo, sectorRange } from '../src/core';
+import { buildLapSeries, distanceM, formatLapTime, miniSpeeds, parseVbo, segmentRange } from '../src/core';
 import { MemoryStore } from '../src/io/storage';
 import { Session } from '../src/store/session';
 import { mountApp } from '../src/ui/app';
@@ -140,14 +140,13 @@ describe('地図をタップして再生・一時停止(案件 1)', () => {
 });
 
 describe('セクターボタンの動作の切り替え', () => {
-  it('セクターのボタンは、地図の上(#cmp-map-secs、狭い幅のときだけ見える)にも同じものが出て、押した状態もそろう(案件 1)', () => {
+  it('セクターのボタン(ライン S1〜Sn)は地図の上(#cmp-map-secs)に出る。表の見出しは押せないラベル(案件 84)', () => {
     setupOne();
-    const side = Array.from(root.querySelectorAll('#cmp-sectors [data-act="sector"]')).map((b) => b.textContent);
     const onMap = Array.from(root.querySelectorAll('#cmp-map-secs [data-act="sector"]')).map((b) => b.textContent);
-    expect(onMap).toEqual(side);
     expect(onMap.length).toBeGreaterThan(0);
+    expect(onMap[0]).toBe('S1');
+    expect(root.querySelectorAll('#cmp-sectors [data-act="sector"]')).toHaveLength(0);
     root.querySelector<HTMLButtonElement>('#cmp-map-secs [data-k="1"]')!.click();
-    expect(root.querySelector('#cmp-sectors [data-k="1"]')!.getAttribute('aria-pressed')).toBe('true');
     expect(root.querySelector('#cmp-map-secs [data-k="1"]')!.getAttribute('aria-pressed')).toBe('true');
   });
 
@@ -322,17 +321,27 @@ describe('セクター設定が無いとき', () => {
     goCompare();
   }
 
-  it('「セクター設定無し」と表示し、ボタンと動作の切り替えは出さない', () => {
+  it('1 周全体の「全周」を 1 列(5 つの区間)で出し、ボタンと動作の切り替えは出さない(案件 84)', () => {
     withoutSectors();
-    expect($('#cmp-sectors').textContent).toBe('セクター設定無し');
+    expect(Array.from($('#cmp-sectors').querySelectorAll('.mini-head')).map((h) => h.textContent)).toEqual(['全周']);
+    const cells = root.querySelectorAll('#cmp-sectors .mini-cell[data-slot="A"]');
+    expect(cells).toHaveLength(1);
+    expect(cells[0].querySelectorAll('.mini-seg')).toHaveLength(5);
+    expect(cells[0].hasAttribute('data-none')).toBe(false);
+    for (const g of Array.from(cells[0].querySelectorAll('.mini-seg'))) expect(Number(g.getAttribute('data-v'))).toBeGreaterThan(0);
     expect($('#cmp-sectors').querySelectorAll('button')).toHaveLength(0);
+    expect($('#cmp-map-secs').children).toHaveLength(0);
     expect($<HTMLElement>('#cmp-sync').hidden).toBe(true);
   });
 
-  it('セクターがあるときは、表示は出ない', () => {
+  it('セクターがあるときは、S1〜S(n+1) の見出しが並ぶ(n = ライン数。S1 = スタート〜最初のライン)', () => {
     setupOne();
-    expect($('#cmp-sectors').querySelector('.no-sector')).toBeNull();
-    expect($('#cmp-sectors').querySelectorAll('button')).toHaveLength(7);
+    const heads = Array.from($('#cmp-sectors').querySelectorAll('.mini-head'));
+    expect(heads).toHaveLength(8);
+    expect(heads.map((h) => h.textContent)).toEqual(['S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8']);
+    expect(heads[0].getAttribute('title')).toBe('S1: スタート〜ライン 1');
+    expect(heads[7].getAttribute('title')).toBe('S8: ライン 7〜エンド');
+    expect($('#cmp-map-secs').querySelectorAll('button')).toHaveLength(7);
     expect($<HTMLElement>('#cmp-sync').hidden).toBe(false);
   });
 });
@@ -365,7 +374,7 @@ describe('表記・外観の変更', () => {
 
   it('セクターボタンは小さいボタン用のクラスで描かれる', () => {
     setupOne();
-    expect($('#cmp-sectors button').classList.contains('sec')).toBe(true);
+    expect($('#cmp-map-secs button').classList.contains('sec')).toBe(true);
   });
 });
 
@@ -499,7 +508,7 @@ describe('右パネルは最小幅でも折りたたまれない', () => {
     expect($('.cmp').classList.contains('side-collapsed')).toBe(false);
     expect($<HTMLElement>('#cmp-cards').closest('[hidden]')).toBeNull();
     expect($<HTMLElement>('#cmp-sync').hidden).toBe(false);
-    expect($('#cmp-sectors').querySelectorAll('button')).toHaveLength(7);
+    expect($('#cmp-map-secs').querySelectorAll('button')).toHaveLength(7);
     expect(root.querySelector('#cmp-mapinfo')).toBeNull();                      // 地図の上の速度・時間差の表示は廃止
   });
 });
@@ -667,12 +676,12 @@ describe('ミニセクター表(案件 6): 「セクター」欄', () => {
     expect($<HTMLElement>('#cmp-sec-warn').hidden).toBe(true);
   });
 
-  it('車ごとの行に、セクターの数だけ並び、1 セクターは 5 つの区間。見出しはセクターボタン。比較する車が無いので色は付かない', () => {
+  it('車ごとの行に、区間の数(ライン数 + 1)だけ並び、1 区間は 5 つの小区間。見出しはラベル。比較する車が無いので色は付かない', () => {
     setupOne();
     const n = lapOf('A').sectorTimes.length;
     expect(n).toBeGreaterThan(0);
-    expect(root.querySelectorAll('#cmp-sectors .mini-tbl > [data-act="sector"]')).toHaveLength(n);
-    expect(cells('A')).toHaveLength(n);
+    expect(root.querySelectorAll('#cmp-sectors .mini-tbl > .mini-head')).toHaveLength(n + 1);
+    expect(cells('A')).toHaveLength(n + 1);
     for (const c of cells('A')) expect(c.querySelectorAll('.mini-seg')).toHaveLength(5);
     expect(tones('A', 'faster') + tones('A', 'slower') + tones('A', 'pb')).toBe(0);    // 基準の車(1 台だけ)・自己ベストの別名も無い
     expect(root.querySelector('#cmp-edit-circuit')).toBeNull();                          // 「セクターを追加・編集…」は無い
@@ -683,7 +692,7 @@ describe('ミニセクター表(案件 6): 「セクター」欄', () => {
     const n = lapOf('A').sectorTimes.length;
     expect(root.querySelectorAll('#cmp-sectors .mini-name')).toHaveLength(4);             // A〜D の 4 行
     expect(root.querySelectorAll('#cmp-sectors .mini-name.empty')).toHaveLength(3);        // B〜D は空
-    expect(root.querySelectorAll('#cmp-sectors .mini-cell.empty')).toHaveLength(3 * n);
+    expect(root.querySelectorAll('#cmp-sectors .mini-cell.empty')).toHaveLength(3 * (n + 1));
     expect(root.querySelectorAll('#cmp-sectors .mini-cell.empty .mini-seg')).toHaveLength(0);
   });
 
@@ -708,8 +717,9 @@ describe('ミニセクター表(案件 6): 「セクター」欄', () => {
     const expected = () => {
       const r = session.resolveRef(session.assignment.A)!;
       const ser = buildLapSeries(r.log.log, r.lap, r.log.offset);
-      return r.lap.sectorTimes.map((_, k) => {
-        const g = sectorRange(r.lap, k);
+      const n = r.lap.sectorTimes.length;
+      return Array.from({ length: n + 1 }, (_, k) => {
+        const g = segmentRange(r.lap, k, n);
         return g ? miniSpeeds(ser, g.a, g.b).map((v) => (v === null ? '' : v.toFixed(1))) : Array(5).fill('');
       });
     };
@@ -719,7 +729,7 @@ describe('ミニセクター表(案件 6): 「セクター」欄', () => {
       session.setCircuitLines(c.id, c.control, c.sectors.slice(a, b));
       await flush();
       $<HTMLButtonElement>('[data-act="nav"][data-view="compare"]').click();
-      expect(shown()).toHaveLength(b - a);
+      expect(shown()).toHaveLength(b - a + 1);
       expect(shown()).toEqual(expected());
     }
   });
@@ -855,15 +865,18 @@ describe('ミニセクター表(案件 6): 「セクター」欄', () => {
     const lap = lapOf('A');
     const s0 = lap.sectorTimes[0] as number, s1 = lap.sectorTimes[1] as number;
     seekTo(0);
-    expect(root.querySelectorAll('#cmp-sectors .mini-seg.done')).toHaveLength(0);      // 最初のセクターラインを通る前: 全部薄い
-    seekTo((s0 + s1) / 2);
-    expect(done(0)).toBeGreaterThanOrEqual(1);                                          // 途中: 通過した分だけ濃い
+    expect(root.querySelectorAll('#cmp-sectors .mini-seg.done')).toHaveLength(0);      // スタート位置: 全部薄い
+    seekTo(s0 / 2);
+    expect(done(0)).toBeGreaterThanOrEqual(1);                                          // スタート〜最初のライン(列 0)の途中: 通過した分だけ濃い
     expect(done(0)).toBeLessThanOrEqual(4);
     expect(done(1)).toBe(0);
-    seekTo(s1 + 0.5);
-    expect(done(0)).toBe(5);                                                            // 次のセクターに入ると、前のセクターは全部濃い
+    seekTo((s0 + s1) / 2);
+    expect(done(0)).toBe(5);                                                            // 次の区間に入ると、前の区間は全部濃い
+    expect(done(1)).toBeGreaterThanOrEqual(1);
+    expect(done(1)).toBeLessThanOrEqual(4);
+    expect(done(2)).toBe(0);
     seekTo(lap.duration);
-    for (let k = 0; k < lap.sectorTimes.length; k++) expect(done(k)).toBe(5);           // ゴール後は全部濃い
+    for (let k = 0; k <= lap.sectorTimes.length; k++) expect(done(k)).toBe(5);          // ゴール後は全部濃い(最後の区間はエンドまで)
     seekTo(0);
     expect(root.querySelectorAll('#cmp-sectors .mini-seg.done')).toHaveLength(0);      // 戻すと薄くなる
   });

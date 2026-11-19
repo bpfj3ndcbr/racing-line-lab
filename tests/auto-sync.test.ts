@@ -46,7 +46,7 @@ const topAuto = () => $<HTMLButtonElement>('#top-set [data-act="autosync"]');
 const status = () => ($<HTMLElement>('#cmp-sync-status').hidden ? '' : $('#cmp-sync-text').textContent!);
 const tau = () => Number($<HTMLInputElement>('#cmp-seek').value);
 const lapOf = (slot: 'A' | 'B') => session.resolveRef(session.assignment[slot])!.lap;
-const pressed = () => root.querySelector<HTMLElement>('#cmp-sectors [aria-pressed="true"]')?.dataset.k;
+const pressed = () => root.querySelector<HTMLElement>('#cmp-map-secs [aria-pressed="true"]')?.dataset.k;
 const seekTo = (sec: number) => { const e = $<HTMLInputElement>('#cmp-seek'); e.value = String(sec); e.dispatchEvent(new Event('input')); };
 
 /** 0.1 秒ずつコマを進める。until が真になったら止める(なれば true) */
@@ -155,7 +155,7 @@ describe('「自動」ボタン(案件 58)', () => {
 });
 
 describe('セクターを通ったときのボタンの点滅(案件 78)', () => {
-  const flashed = () => root.querySelector<HTMLElement>('#cmp-sectors .pass')?.dataset.k;
+  const flashed = () => root.querySelector<HTMLElement>('#cmp-map-secs .pass')?.dataset.k;
   const flashedOnMap = () => root.querySelector<HTMLElement>('#cmp-map-secs .pass')?.dataset.k;
 
   it.skipIf(!big)('「自動」がオフでも、先頭の車がセクターを通ると、そのボタンが点滅する(押された状態にはならず、時刻も動かない)', () => {

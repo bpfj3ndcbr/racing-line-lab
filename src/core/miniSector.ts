@@ -24,6 +24,18 @@ export function sectorRange(lap: Lap, k: number): { a: number; b: number } | nul
 }
 
 /**
+ * 区間 j(0〜n)の時間の範囲(ラップ開始からの秒)。ラインが n 本のとき、区間は n+1 個(案件 84)。
+ * 区間 0 はスタートから最初のラインまで、区間 j はライン j から次のラインまで、区間 n は最後のラインからエンド(ラップの終わり)まで。
+ * ラインが 0 本のときは、区間 0 が 1 周全体。通過が欠けている、または長さが 0 以下なら null。
+ */
+export function segmentRange(lap: Lap, j: number, n: number): { a: number; b: number } | null {
+  const a = j === 0 ? 0 : lap.sectorTimes[j - 1];
+  const b = j < n ? lap.sectorTimes[j] : lap.duration;
+  if (a === null || a === undefined || b === null || b === undefined || !(b > a)) return null;
+  return { a, b };
+}
+
+/**
  * 時間の区間 [a, b](ラップ開始からの秒)を、走行距離で n 等分したときの、区間ごとの平均速度(km/h)。
  * 区間の時間が 0 のとき(止まっている・サンプルが無い)は null。
  */

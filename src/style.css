@@ -485,8 +485,9 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .secs .btn.sec{min-height:24px;height:24px;min-width:30px;padding:0 6px;font-size:10px;justify-content:center}
 .secs .btn.sec[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-on);font-weight:700}
 /* ミニセクター表(案件 6): 行 = 車、列 = セクター(見出しはセクターボタン)。1 セクターは 5 つの区間 */
-.secs .mini-tbl{flex:1 1 100%;display:grid;grid-template-columns:auto repeat(var(--n),minmax(30px,1fr));gap:4px 6px;align-items:center;min-width:0}
+.secs .mini-tbl{flex:1 1 100%;display:grid;grid-template-columns:auto repeat(var(--n),minmax(20px,1fr));gap:4px;align-items:center;min-width:0}
 .mini-tbl .btn.sec{width:100%;min-width:0}
+.mini-head{display:flex;align-items:center;justify-content:center;height:24px;min-width:0;font-size:10px;font-weight:700;color:var(--muted);white-space:nowrap}   /* 区間の名前(押せないラベル。案件 84) */
 .mini-name{font-weight:700;font-size:11px}
 .mini-name.off,.mini-cell.off{opacity:.4}
 /* セクターの操作の札(案件 6): 地図の左上の札と同じ見た目で、今の設定を出し、押すと選択肢が開く。PC・縦画面で共通(横画面のスマホは上部バー)。
@@ -513,7 +514,6 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .mini-seg.t-slower{background:var(--mini-slow)}
 .mini-seg.t-pb{background:var(--mini-pb)}
 .mini-cell[data-none] .mini-seg{opacity:.2}
-.no-sector{color:var(--muted)}
 .sync-grp{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
 .sync-grp[hidden]{display:none}
 /* セクターの操作のまとまり(「先頭車両・全車一致・解除」「自動」「S1〜」)ごとに、左に細い縦線(案件 58) */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MINI_COUNT, fastestLap, miniSpeeds, miniTone, sectorRange } from '../src/core/miniSector';
+import { MINI_COUNT, fastestLap, miniSpeeds, miniTone, sectorRange, segmentRange } from '../src/core/miniSector';
 import type { LapSeries } from '../src/core/series';
 import type { Lap } from '../src/core/types';
 
@@ -64,6 +64,23 @@ describe('セクターの区間', () => {
     expect(sectorRange(lap, 0)).toEqual({ a: 0, b: 4 });
     expect(sectorRange(lap, 1)).toEqual({ a: 4, b: 7 });
     expect(sectorRange(lap, 2)).toEqual({ a: 7, b: 10 });
+  });
+
+  it('区間(案件 84): ライン n 本で n+1 個。スタート〜最初のライン、ライン間、最後のライン〜エンド', () => {
+    const lap = lapOf({ sectorTimes: [3, 6, 9], duration: 12 });
+    expect([0, 1, 2, 3].map((j) => segmentRange(lap, j, 3))).toEqual([
+      { a: 0, b: 3 }, { a: 3, b: 6 }, { a: 6, b: 9 }, { a: 9, b: 12 },
+    ]);
+  });
+
+  it('区間: ラインが無いときは、1 周全体の 1 区間', () => {
+    expect(segmentRange(lapOf({ sectorTimes: [], duration: 12 }), 0, 0)).toEqual({ a: 0, b: 12 });
+  });
+
+  it('区間: 通過が欠けている・長さが 0 以下なら null(前後の区間も成り立たない)', () => {
+    const lap = lapOf({ sectorTimes: [3, null, 9], duration: 12 });
+    expect([0, 1, 2, 3].map((j) => segmentRange(lap, j, 3))).toEqual([{ a: 0, b: 3 }, null, null, { a: 9, b: 12 }]);
+    expect(segmentRange(lapOf({ sectorTimes: [0, 5], duration: 10 }), 0, 2)).toBeNull();   // スタートとラインが同時
   });
 
   it('通過が欠けている・長さが 0 以下のセクターは null', () => {
