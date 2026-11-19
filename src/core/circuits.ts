@@ -16,6 +16,9 @@ export interface Circuit {
   sectors: GeoLine[];
 }
 
+/** 1 つのサーキットに登録できるセクターの最大数(比較画面のミニセクター表が、これ以上は小さくなりすぎて読めないため。案件 6) */
+export const MAX_SECTORS = 8;
+
 export interface CircuitMatch { circuit: Circuit; crossings: number }
 
 /**

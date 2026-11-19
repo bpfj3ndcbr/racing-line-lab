@@ -1,6 +1,6 @@
 import {
   type Circuit, type FixLine, type GeoLine, type LineCandidate, bearingDiff, findCrossings, fixSummary, fmtAngleDiff, formatJst, formatLapTime, lapTrack,
-  lineBearing, lineChanged, lineMid, lineMoveM, lineMovedTo, lineWithBearing, matchCircuit, orderSectors, rotateToward, roundLine,
+  MAX_SECTORS, lineBearing, lineChanged, lineMid, lineMoveM, lineMovedTo, lineWithBearing, matchCircuit, orderSectors, rotateToward, roundLine,
   sectorChanges, sectorPassTimes, shiftLine, trackNear, escapeHtml as esc
 } from '../core';
 import type { LoadedLog, Session } from '../store/session';
@@ -397,6 +397,12 @@ export function loadDialog(plan: LoadPlan, deps: LoadDialogDeps = {}, host: HTML
     function renderFixList() {
       if (!fixing) return;
       const { lines, sel } = fixing;
+      const drawBtn = fixEl.querySelector<HTMLButtonElement>('.ld-fix-draw');                          // セクターは最大 MAX_SECTORS 本まで
+      if (drawBtn) {
+        const full = lines.length - 1 >= MAX_SECTORS;
+        drawBtn.disabled = full && !fixing.drawing;
+        drawBtn.title = full ? `セクターは最大 ${MAX_SECTORS} 本までです。増やすときは、一覧の「×」で消してください` : '';
+      }
       const times = sectorPassTimes(fixing.o.log.log, lines[0].line, lines.slice(1).map((f) => f.line));
       const listEl = $f('.ld-fix-list');
       // 一覧のボタンで操作していたら(矢印キーで動かすなど)、描き直したあとも、選んでいる線のボタンにフォーカスを戻す

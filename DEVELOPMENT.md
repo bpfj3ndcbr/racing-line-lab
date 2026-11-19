@@ -105,6 +105,8 @@ npm run build        # 型チェック + ビルド(dist/)
 | `ui.prefs` | 設定タブの値と「記憶する」の選択 |
 | `ui.compare.mapMode` / `labels` / `zoom` / `follow` / `xKind` / `sync` / `rate` | 比較画面の「前回の状態」 |
 | `ui.compare.layout` | 比較画面の右パネルの幅・グラフの高さ(`v` が保存形式の版。形式を変えるときは版を上げる) |
+| `ui.compare.sectorsFirst` | スマホの縦画面で、セクターのエリアをグラフの上にするか(真偽値。初めは上) |
+| `ui.compare.miniBase` | ミニセクター表の比較基準(`car` = 基準車 / `run` = Runベスト / `all` = 全体ベスト) |
 | `ui.setAliases` / `ui.slotAliases` | 比較セットの別名 / カード(セットごとの A〜D)の別名 |
 | `ui.guideClosed` | はじめかたを閉じているか(「閉じる」を押したときだけ true。古い版の `ui.guideSeen` は、今は読まない) |
 | `ui.seenVersion` | 前回開いたアプリの版(更新された直後の知らせに使う) |

@@ -511,6 +511,32 @@ describe('保存し忘れの確認(案件 23)', () => {
   });
 });
 
+describe('セクターは最大 8 本まで(案件 6)', () => {
+  it('8 本あると「セクターを追加」は押せない。1 本消すと押せる。.sci で 9 本読み込むと、保存せず知らせる', async () => {
+    const base = parseSci(sci).map((x) => roundLine(x.line));
+    const eight = Array.from({ length: 8 }, (_, i) => base[i % base.length]);
+    session.registerCircuitLines('オートポリス', parseCln(cln)[0], eight);
+    click('#tab-list');
+    click('[data-act="edit-circuit"]');
+    expect($<HTMLButtonElement>('#ce-draw-sector').disabled).toBe(true);
+    expect($('#ce-draw-sector').title).toContain('最大 8 本');
+    click('[data-act="ce-del"][data-key="s7"]');
+    expect($<HTMLButtonElement>('#ce-draw-sector').disabled).toBe(false);
+    // .sci で 9 本読み込む → 一覧には入るが、注意が出て、保存はできない(前のセクターのまま)
+    const nine = formatSci(Array.from({ length: 9 }, (_, i) => base[i % base.length]));
+    const input = $<HTMLInputElement>('#ce-sci');
+    Object.defineProperty(input, 'files', { value: [{ name: 'x.sci', size: nine.length, text: async () => nine }], configurable: true });
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    await flush();
+    expect($('#ce-hint').hidden).toBe(false);
+    expect($('#ce-hint').textContent).toContain('最大 8 本');
+    click('#ce-save'); await flush();
+    expect($('#ce-msg').textContent).toContain('最大 8 本');
+    expect(session.circuits[0].sectors).toHaveLength(8);
+    expect($('#work').hidden).toBe(false);                          // 保存できないので、編集画面のまま
+  });
+});
+
 describe('登録・保存', () => {
   it('引いたラインで新規登録できる(.cln / .sci ファイルは不要)。表示位置も保存される', async () => {
     openNew();

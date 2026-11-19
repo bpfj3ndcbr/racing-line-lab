@@ -94,7 +94,6 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
     if (v === 'compare') {
       compare ??= mountCompareView(compareEl, session, {
         mapFactory, theme, onBack: () => navigate('import'), topSlot: root.querySelector<HTMLElement>('#top-set')!,
-        onEditCircuit: (id) => { navigate('import'); importApi?.editCircuit(id); },     // 編集が終わったら比較に戻る
       });
       compare.show();
       if (from !== 'compare') scrollToTabs();     // スマホの縦画面: タブを最上部に(案件 79)

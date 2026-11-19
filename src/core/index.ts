@@ -9,6 +9,7 @@ export * from './lineEdit';
 export * from './circuits';
 export * from './assign';
 export * from './sectors';
+export * from './miniSector';
 export * from './series';
 export * from './playback';
 export * from './heat';

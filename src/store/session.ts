@@ -1,6 +1,6 @@
 import {
   type Assignment, type Circuit, type GeoLine, type Lap, type LapRef, type LineCandidate, type MapView, type Offset, type Slot, type TrackLog, type TrimCut,
-  SLOTS, applyCuts, clearLog, closeLoop, detectLapRun, emptyAssignment, findCrossings, lineCandidate, matchCircuit, matchLap, nameExists, parseCln, parseSci, parseVbo,
+  MAX_SECTORS, SLOTS, applyCuts, clearLog, closeLoop, detectLapRun, emptyAssignment, findCrossings, lineCandidate, matchCircuit, matchLap, nameExists, parseCln, parseSci, parseVbo,
   roundLine, toggleAssign,
 } from '../core';
 import type { KeyValueStore } from '../io/storage';
@@ -665,7 +665,10 @@ export class Session {
     if (bad) return bad;
     const control = parseCln(clnText)[0];
     if (!control) return { ok: false, reason: 'invalid', message: '.cln からコントロールラインを読み取れませんでした。' };
-    return this.addCircuit(name.trim(), control, parseSci(sciText).map((x) => x.line), view, false);
+    const sectors = parseSci(sciText).map((x) => x.line);
+    const many = this.sectorLimitError(sectors.length);
+    if (many) return many;
+    return this.addCircuit(name.trim(), control, sectors, view, false);
   }
 
   /**
@@ -675,7 +678,14 @@ export class Session {
   registerCircuitLines(name: string, control: GeoLine, sectors: GeoLine[], opts: { view?: MapView; announce?: boolean } = {}): CircuitResult {
     const bad = this.circuitNameError(name);
     if (bad) return bad;
+    const many = this.sectorLimitError(sectors.length);
+    if (many) return many;
     return this.addCircuit(name.trim(), roundLine(control), sectors.map(roundLine), opts.view, opts.announce === true);
+  }
+
+  /** セクターが多すぎるときの結果(多すぎなければ null) */
+  private sectorLimitError(n: number): CircuitResult | null {
+    return n > MAX_SECTORS ? { ok: false, reason: 'invalid', message: `セクターは最大 ${MAX_SECTORS} 本までです(${n} 本あります)。多い分を減らしてください。` } : null;
   }
 
   private circuitNameError(name: string): CircuitResult | null {
@@ -712,6 +722,8 @@ export class Session {
   setCircuitLines(id: string, control: GeoLine, sectors: GeoLine[]): CircuitResult {
     const c = this.circuits.find((x) => x.id === id);
     if (!c) return { ok: false, reason: 'invalid', message: 'サーキットが見つかりません。' };
+    const many = this.sectorLimitError(sectors.length);
+    if (many) return many;
     const ctl = roundLine(control), secs = sectors.map(roundLine);
     const patch: Partial<Pick<Circuit, 'control' | 'sectors'>> = {};
     if (JSON.stringify(ctl) !== JSON.stringify(c.control)) patch.control = ctl;
@@ -743,6 +755,8 @@ export class Session {
     if (!c) return { ok: false, reason: 'invalid', message: 'サーキットが見つかりません。' };
     const sectors = parseSci(sciText).map((x) => x.line);
     if (!sectors.length) return { ok: false, reason: 'invalid', message: '.sci からセクターを読み取れませんでした。' };
+    const many = this.sectorLimitError(sectors.length);
+    if (many) return many;
     this.updateCircuit(id, { sectors });
     return { ok: true, message: `「${c.name}」のセクターを更新しました(${sectors.length} 本)。` };
   }

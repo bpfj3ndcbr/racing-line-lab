@@ -1,6 +1,6 @@
 import { gsiGeocode, type GeoHit, type Geocoder } from '../io/geocode';
 import {
-  type GeoLine, distanceM, formatCln, formatSci, metersPerDegree, parseCln, parseSci, roundLine, sectorPassTimes, shiftLine, escapeHtml as esc
+  type GeoLine, MAX_SECTORS, distanceM, formatCln, formatSci, metersPerDegree, parseCln, parseSci, roundLine, sectorPassTimes, shiftLine, escapeHtml as esc
 } from '../core';
 import type { LoadedLog, Session } from '../store/session';
 import { confirmDialog, duplicateNameAlert } from './dialog';
@@ -266,14 +266,18 @@ export function mountCircuitEditor(root: HTMLElement, session: Session, deps: Ci
     $('ce-draw-control').classList.toggle('pri', !control);
     $('ce-draw-sector').classList.toggle('pri', nudgeSector && !!control && !drawing);          // 計測ラインは必ず必要なので、まだ無いうちは青で案内する
     $('ce-draw-control').title = control ? '引き直すときは、一覧の計測ラインの「×」で消してください' : '';
+    const full = sectors.length >= MAX_SECTORS;                                                       // セクターは最大 MAX_SECTORS 本まで
+    $<HTMLButtonElement>('ce-draw-sector').disabled = full && drawing !== 'sector';
+    $('ce-draw-sector').title = full ? `セクターは最大 ${MAX_SECTORS} 本までです。増やすときは、一覧の「×」で消してください` : '';
     for (const kind of ['control', 'sector'] as const) {
       const b = $('ce-draw-' + kind);
       b.setAttribute('aria-pressed', String(drawing === kind));
       b.classList.toggle('on', drawing === kind);
     }
     const hint = $('ce-hint');
-    hint.hidden = !drawing && !draft;
-    hint.textContent = drawing
+    const over = sectors.length > MAX_SECTORS;
+    hint.hidden = !drawing && !draft && !over;
+    hint.textContent = over && !drawing && !draft ? `セクターが ${sectors.length} 本あります。最大 ${MAX_SECTORS} 本までなので、一覧の「×」で減らしてから保存してください` : drawing
       ? `地図の上で、${drawing === 'control' ? '計測ライン' : `S${sectors.length + 1}`} の始点から終点までドラッグしてください(拡大して引くと正確です)`
       : draft ? '仮のラインです。直したら「確定」を押してください(Enter でも確定)' : '';
   }
@@ -426,7 +430,8 @@ export function mountCircuitEditor(root: HTMLElement, session: Session, deps: Ci
       if (!r.ok && r.reason === 'duplicate') { await dupWarn(name); return; }
       if (!r.ok) { msg(r.message); return; }
     }
-    session.setCircuitLines(editId, control, sectors);
+    const saved = session.setCircuitLines(editId, control, sectors);
+    if (!saved.ok) { msg(saved.message); return; }
     if (view) session.setCircuitView(editId, view);
     deps.onDone();
   }
