@@ -740,12 +740,12 @@ describe('ミニセクター表(案件 6): 「セクター」欄', () => {
     expect(c2.querySelector('.lapno')!.textContent).toMatch(/^LAP \d+: $/);
   });
 
-  it('比較基準: 「Runベスト」は、自分の走行データの最速ラップと比べる(基準の車の行にも色が付く)。「基準車」に戻すと付かない。覚える', () => {
+  it('比較基準: 「Runベスト」は、自分の走行データの最速ラップと比べる(基準の車の行にも色が付く)。「追従車」に戻すと付かない。覚える', () => {
     setupOne();
     const t = (tone: string) => root.querySelectorAll(`#cmp-sectors .mini-cell[data-slot="A"] .t-${tone}`).length;
     const mode = (m: string) => $<HTMLButtonElement>(`#cmp-sync [data-act="minibase"][data-mode="${m}"]`);
     expect(mode('car').getAttribute('aria-pressed')).toBe('true');
-    expect(t('faster') + t('slower')).toBe(0);                    // 基準車(A だけ): 基準の行は色が付かない
+    expect(t('faster') + t('slower')).toBe(0);                    // 追従車(A だけ): 基準の行は色が付かない
     mode('run').click();
     expect(mode('run').getAttribute('aria-pressed')).toBe('true');
     expect(t('faster')).toBeGreaterThan(0);                         // A のラップは最速のラップ(同じ走行データの 1 周): 全区間が「速い」側
@@ -782,7 +782,7 @@ describe('ミニセクター表(案件 6): 「セクター」欄', () => {
     else expect(t('A', 'slower')).toBe(0);
   });
 
-  it('比較基準のラップの情報(スマホの縦画面でカードの上に出す 1 段): 基準車の Run・LAP(別名があれば別名)・タイム', () => {
+  it('比較基準のラップの情報(スマホの縦画面でカードの上に出す 1 段): 追従車の Run・LAP(別名があれば別名)・タイム', () => {
     setupOne();
     const info = $('#cmp-base-info');
     const lap = lapOf('A');
@@ -847,7 +847,7 @@ describe('ミニセクター表(案件 6): 「セクター」欄', () => {
   it('比較基準の札: 今の基準を札に出し、メニューで選ぶと札の文字が変わってメニューが閉じる。別の札を開くと、開いていた方は閉じる', () => {
     setupOne();
     const base = () => $('#cmp-tool-base').textContent!.trim();
-    expect(base()).toBe('比較基準 基準車');
+    expect(base()).toBe('比較基準 割当最速');                                 // 追従設定が「固定」なので、車の名前は「先頭」
     $<HTMLButtonElement>('#cmp-tool-base').click();
     expect($('#cmp-sub-base').hidden).toBe(false);
     $<HTMLButtonElement>('#cmp-sub-base [data-mode="all"]').click();
@@ -857,6 +857,19 @@ describe('ミニセクター表(案件 6): 「セクター」欄', () => {
     // 札の「入替」も、右の列の同じボタンと同じ動作
     $<HTMLButtonElement>('#cmp-sync-tags [data-act="swap-graph"]').click();
     expect($('#cmp-side').dataset.first).toBe('graph');
+  });
+
+  it('比較基準の車の名前: 追従車を選んでいるときは「追従車」、固定・先頭追従のときは「割当最速」', () => {
+    setupOne();
+    const base = () => $('#cmp-tool-base').textContent!.trim();
+    const carBtns = () => Array.from(root.querySelectorAll<HTMLElement>('[data-act="minibase"][data-mode="car"]')).map((b) => b.textContent);
+    expect(carBtns()).toEqual(['割当最速', '割当最速']);                            // 右の列と上部バー
+    $<HTMLButtonElement>('[data-act="follow"][data-follow="A"]').click();
+    expect(base()).toBe('比較基準 追従車');
+    expect(carBtns()).toEqual(['追従車', '追従車']);
+    $<HTMLButtonElement>('[data-act="follow"][data-follow="leader"]').click();
+    expect(base()).toBe('比較基準 割当最速');
+    expect(carBtns()).toEqual(['割当最速', '割当最速']);
   });
 
   it('通過した区間は濃く、通過前は薄い。再生位置より前のセクターは全部濃く、後ろは全部薄い', () => {

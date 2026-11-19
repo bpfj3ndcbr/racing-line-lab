@@ -150,7 +150,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
                   <span class="sync-part swap-part" data-no-top><button type="button" class="btn xs" data-act="swap-graph" aria-pressed="false"
                     title="セクターの表とグラフの上下を入れ替えます" aria-label="セクターの表とグラフの上下を入れ替え">入替</button></span>
                   <span class="sync-part base-part" data-no-top><span class="base-cap">比較基準:</span><span class="seg sm" role="group" aria-label="ミニセクターの比較基準">
-                    <button data-act="minibase" data-mode="car" aria-pressed="true" class="on" title="基準の車の区間と比べます(基準の車の行は色が付きません)">基準車</button>
+                    <button data-act="minibase" data-mode="car" aria-pressed="true" class="on" title="追従中の車の区間と比べます(追従車の行は色が付きません。追従していないときは、割り当てた車のうち最速の車)">追従車</button>
                     <button data-act="minibase" data-mode="run" aria-pressed="false" title="それぞれの車が、同じ走行データ(Run)の最速ラップの区間と比べます">Runベスト</button>
                     <button data-act="minibase" data-mode="all" aria-pressed="false" title="比較セットの全ての走行データの中で最速のラップの区間と、全ての車が比べます">全体ベスト</button>
                   </span></span>
@@ -170,7 +170,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
                   <div class="tool tg-base">
                     <button type="button" class="tool-btn" id="cmp-tool-base" data-act="menu-sub" data-sub="base" aria-haspopup="menu" aria-expanded="false" aria-controls="cmp-sub-base" title="ミニセクターの比較基準"><span data-now="base"></span></button>
                     <div class="ov-list tool-pop" id="cmp-sub-base" role="menu" aria-label="ミニセクターの比較基準" hidden>
-                      <button type="button" role="menuitemradio" data-act="minibase" data-mode="car" aria-checked="true" class="on" title="基準の車の区間と比べます(基準の車の行は色が付きません)">基準車</button>
+                      <button type="button" role="menuitemradio" data-act="minibase" data-mode="car" aria-checked="true" class="on" title="追従中の車の区間と比べます(追従車の行は色が付きません。追従していないときは、割り当てた車のうち最速の車)">追従車</button>
                       <button type="button" role="menuitemradio" data-act="minibase" data-mode="run" aria-checked="false" title="それぞれの車が、同じ走行データ(Run)の最速ラップの区間と比べます">Runベスト</button>
                       <button type="button" role="menuitemradio" data-act="minibase" data-mode="all" aria-checked="false" title="比較セットの全ての走行データの中で最速のラップの区間と、全ての車が比べます">全体ベスト</button>
                     </div>
@@ -274,7 +274,12 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   ];
   /** セクターボタンの動作の切り替え(右の列と上部バー)を、セクターが無いときは隠す */
   const setSyncHidden = (h: boolean) => findAll('.sync-grp').forEach((g) => { g.hidden = h; });
-  function syncMiniBase() { setPressed('[data-act="minibase"]', (b) => b.dataset.mode === miniMode); }
+  /** 比較基準の「車」の名前: 追従車を選んでいるときは「追従車」、固定・先頭追従のときは「割当最速」 */
+  const carName = () => (cars.some((c) => c.slot === follow) ? '追従車' : '割当最速');
+  function syncMiniBase() {
+    setPressed('[data-act="minibase"]', (b) => b.dataset.mode === miniMode);
+    root.querySelectorAll<HTMLElement>('[data-act="minibase"][data-mode="car"]').forEach((b) => { b.textContent = carName(); });
+  }
   /** 入れ替えボタンの状態と、右の列の並び(data-first。スマホの縦画面で CSS が使う) */
   function syncSwap() {
     $('cmp-side').dataset.first = sectorsFirst ? 'sectors' : 'graph';
@@ -614,6 +619,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
     updateFrame();
   }
   function syncFollowButtons() {
+    syncMiniBase();                                              // 追従設定が変わったら、比較基準の「車」の名前も変える
     root.querySelectorAll<HTMLButtonElement>('[data-act="follow"]').forEach((b) => {
       const f = b.dataset.follow!;
       const isSlot = (SLOTS as string[]).includes(f);
@@ -633,7 +639,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   const toolBtn = (k: SubKey) => $<HTMLButtonElement>(`cmp-tool-${k}`);
   const toolPop = (k: SubKey) => $(`cmp-sub-${k}`);
   let openSub: SubKey | null = null;
-  const BASE_TEXT: Record<'car' | 'run' | 'all', string> = { car: '基準車', run: 'Runベスト', all: '全体ベスト' };
+  const BASE_TEXT: Record<'run' | 'all', string> = { run: 'Runベスト', all: '全体ベスト' };
   const LINE_NAME: Record<MapMode, string> = { line: '走行ライン', speed: '速度', accel: '加減速', none: 'なし' };
   /** 札の文字(今の設定の名前)と、その説明(札の title) */
   function badgeOf(k: SubKey): { html: string; text: string } {
@@ -654,7 +660,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
       if (autoSync) return { html: `自動 ${mode}`, text: `セクターを通ったとき、${mode}で自動で合わせます` };
       return { html: '合わせなし', text: 'セクターを選ぶか「自動」をオンにすると、先頭車両・全車一致を選べます' };
     }
-    if (k === 'base') { const t = BASE_TEXT[miniMode]; return { html: `比較基準 ${t}`, text: `ミニセクターの比較基準: ${t}` }; }
+    if (k === 'base') { const t = miniMode === 'car' ? carName() : BASE_TEXT[miniMode]; return { html: `比較基準 ${t}`, text: `ミニセクターの比較基準: ${t}` }; }
     return { html: LABEL_TEXT[labelMode], text: `ラベル: ${LABEL_TEXT[labelMode]}` };
   }
   function syncMenuButtons() {
@@ -819,7 +825,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
     };
     if (miniMode === 'run') { title = '比較基準: ラップが入っている走行ログ(Run)のベスト'; html = '<span class="bi-chip">基準</span><span class="bi-note">LAPが入っている走行ログのベスト</span>'; }
     else if (miniMode === 'all') { const b = allBestLap(); if (b) html = one(b.log, b.lap, '比較基準(全体ベスト)'); }
-    else { const c = miniBase(); if (c) html = one(c.log, c.lap, '比較基準(基準車)'); }
+    else { const c = miniBase(); if (c) html = one(c.log, c.lap, `比較基準(${carName()})`); }
     if (box.dataset.k === html + title) return;                  // 変わっていなければ書かない
     box.dataset.k = html + title;
     box.innerHTML = html;
