@@ -3,19 +3,21 @@ import type { ImportPart } from './importParts';
 
 /**
  * 「データ管理」の上のタブ(案件 74)。幅が 768px 以上の画面(PC・タブレット)では、「サーキット」「走行ライン補正データ」
- * 「比較セット」を 1 本のタブで切り替えて、選んだ 1 つの節だけを出す。スマホの縦画面(768px 未満)は、今までの開閉の見出しのまま。
+ * 「基準設定」「比較セット」を 1 本のタブで切り替えて、選んだ 1 つの節だけを出す。スマホの縦画面(768px 未満)は、今までの開閉の見出しのまま。
  * タブの見た目は案件 67 のデザイン(CSS の .top-tab)。
  */
 
-export type TopTab = 'circuit' | 'offsets' | 'sets';
+export type TopTab = 'circuit' | 'offsets' | 'refs' | 'sets';
 
 /** タブにする幅(これより狭いときは、開閉の見出しのまま) */
 export const TOP_TAB_MEDIA = '(min-width: 768px)';
 
-const TABS: { key: TopTab; label: string; sec: string; badge?: string }[] = [
+const TABS: { key: TopTab; label: string; sec: string; badge?: string; gap?: boolean }[] = [
   { key: 'circuit', label: 'サーキット', sec: 'sec-circuit', badge: 'circuit-badge' },
-  { key: 'offsets', label: '走行ライン補正データ', sec: 'sec-offsets', badge: 'offsets-badge' },
   { key: 'sets', label: '比較セット', sec: 'sets-group' },
+  // おまけの機能は、必須の 2 つから少し離して右に並べる(スマホの縦画面の見出しは、今の並びのまま)
+  { key: 'offsets', label: '走行ライン補正データ', sec: 'sec-offsets', badge: 'offsets-badge', gap: true },
+  { key: 'refs', label: '基準設定', sec: 'sec-refs', badge: 'refs-badge' },
 ];
 
 /** タブの並び(幅が足りないときは隠す)。節の前に置く */
@@ -53,7 +55,7 @@ export function createTopTabs(root: HTMLElement): TopTabsPart {
     bar.innerHTML = TABS.map((t) => {
       const sel = t.key === tab;
       const badge = t.badge ? root.querySelector(`#${t.badge}`)?.textContent ?? '' : '';      // 見出しの印(「未登録」「補正なし」など)をタブに移す
-      return `<button type="button" role="tab" class="top-tab${sel ? ' on' : ''}" id="top-tab-${t.key}" aria-selected="${sel}" aria-controls="${t.sec}"` +
+      return `<button type="button" role="tab" class="top-tab${sel ? ' on' : ''}${t.gap ? ' gap' : ''}" id="top-tab-${t.key}" aria-selected="${sel}" aria-controls="${t.sec}"` +
         ` tabindex="${sel ? 0 : -1}" data-act="top-tab" data-tab="${t.key}" data-fk="top-tab-${t.key}">${t.label}${badge ? `<span class="badge">${esc(badge)}</span>` : ''}</button>`;
     }).join('');
   }
@@ -77,7 +79,7 @@ export function createTopTabs(root: HTMLElement): TopTabsPart {
     },
     handle(act, d) {
       if (act !== 'top-tab') return false;
-      tab = (TABS.find((t) => t.key === d.tab) ?? TABS[2]).key;
+      tab = (TABS.find((t) => t.key === d.tab) ?? TABS[1]).key;
       render();
       return true;
     },

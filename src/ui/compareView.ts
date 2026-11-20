@@ -1,8 +1,8 @@
 import {
   type HeatRun as CoreRun, type Lap, type LapSeries, PlaybackEngine, SLOTS, type Slot,
-  MINI_COUNT, accelSeries, fastestLap, isInPassOrder, alignedSeries, buildLapSeries, miniIndexAt, miniSpeeds, miniTone, pickRuler, segmentRange, formatLapTime, heatColor, heatRuns, sampleSeries, sampleSeriesSmooth, speedColor, speedRange, speedRuns, timeAtDistance, escapeHtml as esc
+  MINI_COUNT, accelSeries, isInPassOrder, alignedSeries, buildLapSeries, miniIndexAt, miniSpeeds, miniTone, pickRuler, segmentRange, formatLapTime, heatColor, heatRuns, sampleSeries, sampleSeriesSmooth, speedColor, speedRange, speedRuns, timeAtDistance, escapeHtml as esc
 } from '../core';
-import type { LoadedLog, Session } from '../store/session';
+import type { LoadedLog, RefLap, Session } from '../store/session';
 import { Prefs, RATE_CHOICES, ZOOM_CHOICES, type FollowV as Follow, type LabelV, type MapModeV as MapMode, type PrefKey, type SyncV as SyncMode } from '../store/prefs';
 import { SpeedGraph, ZOOM_MAX, type XKind } from './speedGraph';
 import { clamp, makeSplitter } from './splitter';
@@ -149,11 +149,6 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
                   </span></span>
                   <span class="sync-part swap-part" data-no-top><button type="button" class="btn xs" data-act="swap-graph" aria-pressed="false"
                     title="セクターの表とグラフの上下を入れ替えます" aria-label="セクターの表とグラフの上下を入れ替え">入替</button></span>
-                  <span class="sync-part base-part" data-no-top><span class="base-cap">比較基準:</span><span class="seg sm" role="group" aria-label="ミニセクターの比較基準">
-                    <button data-act="minibase" data-mode="car" aria-pressed="true" class="on" title="追従中の車の区間と比べます(追従車の行は色が付きません。追従していないときは、割り当てた車のうち最速の車)">追従車</button>
-                    <button data-act="minibase" data-mode="run" aria-pressed="false" title="それぞれの車が、同じ走行データ(Run)の最速ラップの区間と比べます">Runベスト</button>
-                    <button data-act="minibase" data-mode="all" aria-pressed="false" title="比較セットの全ての走行データの中で最速のラップの区間と、全ての車が比べます">全体ベスト</button>
-                  </span></span>
                 </div>
                 <div id="cmp-sync-tags" class="sync-grp sync-tags" aria-label="セクターの操作(スマホの縦画面)">
                   <div class="tool tg-sync">
@@ -170,9 +165,6 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
                   <div class="tool tg-base">
                     <button type="button" class="tool-btn" id="cmp-tool-base" data-act="menu-sub" data-sub="base" aria-haspopup="menu" aria-expanded="false" aria-controls="cmp-sub-base" title="ミニセクターの比較基準"><span data-now="base"></span></button>
                     <div class="ov-list tool-pop" id="cmp-sub-base" role="menu" aria-label="ミニセクターの比較基準" hidden>
-                      <button type="button" role="menuitemradio" data-act="minibase" data-mode="car" aria-checked="true" class="on" title="追従中の車の区間と比べます(追従車の行は色が付きません。追従していないときは、割り当てた車のうち最速の車)">追従車</button>
-                      <button type="button" role="menuitemradio" data-act="minibase" data-mode="run" aria-checked="false" title="それぞれの車が、同じ走行データ(Run)の最速ラップの区間と比べます">Runベスト</button>
-                      <button type="button" role="menuitemradio" data-act="minibase" data-mode="all" aria-checked="false" title="比較セットの全ての走行データの中で最速のラップの区間と、全ての車が比べます">全体ベスト</button>
                     </div>
                   </div>
                 </div>
@@ -228,10 +220,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   let syncMsg = '';
   // スマホの縦画面: セクターの表とグラフの上下(入れ替えボタン。CSS が data-first を見て並べる)。新しいキー compare.sectorsFirst に覚える
   let sectorsFirst = session.getSetting<boolean>('compare.sectorsFirst', true) !== false;   // 初めは、セクターのエリアが上
-  // ミニセクター表の比較基準: 'car' = 基準の車 / 'run' = それぞれの車の、同じ走行データ(Run)の最速ラップ / 'all' = 比較セット全体の最速ラップ。新しいキー compare.miniBase に覚える
-  type MiniMode = 'car' | 'run' | 'all';
-  const storedBase = session.getSetting<string>('compare.miniBase', 'car');
-  let miniMode: MiniMode = storedBase === 'all' ? 'all' : storedBase === 'run' || storedBase === 'best' ? 'run' : 'car';
+  // ミニセクター表の比較基準(案件 85): 'fastest' = 割り当てた車のうち最速 / 'card:A' = そのカード / 'ref:<id>' = 基準設定の走行。比較セットごとに、セッションが覚える(session.active.miniBase)
   let activeSector: number | null = null;      // 選んでいるセクター(どちらの動作でも)
   // セクター通過時の自動合わせ(案件 58): オンのとき、再生で基準の車がセクターを通ると、そのセクターのボタンを押したのと同じにする
   let autoSync = false;
@@ -274,12 +263,6 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   ];
   /** セクターボタンの動作の切り替え(右の列と上部バー)を、セクターが無いときは隠す */
   const setSyncHidden = (h: boolean) => findAll('.sync-grp').forEach((g) => { g.hidden = h; });
-  /** 比較基準の「車」の名前: 追従車を選んでいるときは「追従車」、固定・先頭追従のときは「割当最速」 */
-  const carName = () => (cars.some((c) => c.slot === follow) ? '追従車' : '割当最速');
-  function syncMiniBase() {
-    setPressed('[data-act="minibase"]', (b) => b.dataset.mode === miniMode);
-    root.querySelectorAll<HTMLElement>('[data-act="minibase"][data-mode="car"]').forEach((b) => { b.textContent = carName(); });
-  }
   /** 入れ替えボタンの状態と、右の列の並び(data-first。スマホの縦画面で CSS が使う) */
   function syncSwap() {
     $('cmp-side').dataset.first = sectorsFirst ? 'sectors' : 'graph';
@@ -355,7 +338,6 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   });
   applyLayout();
   syncSwap();
-  syncMiniBase();
 
   // ---------- データ ----------
   /** 上部バーに出すセクター動作のボタン(右の列の同じものから、上部バーに要らないもの(入替・比較基準)を除く) */
@@ -619,7 +601,6 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
     updateFrame();
   }
   function syncFollowButtons() {
-    syncMiniBase();                                              // 追従設定が変わったら、比較基準の「車」の名前も変える
     root.querySelectorAll<HTMLButtonElement>('[data-act="follow"]').forEach((b) => {
       const f = b.dataset.follow!;
       const isSlot = (SLOTS as string[]).includes(f);
@@ -639,7 +620,6 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   const toolBtn = (k: SubKey) => $<HTMLButtonElement>(`cmp-tool-${k}`);
   const toolPop = (k: SubKey) => $(`cmp-sub-${k}`);
   let openSub: SubKey | null = null;
-  const BASE_TEXT: Record<'run' | 'all', string> = { run: 'Runベスト', all: '全体ベスト' };
   const LINE_NAME: Record<MapMode, string> = { line: '走行ライン', speed: '速度', accel: '加減速', none: 'なし' };
   /** 札の文字(今の設定の名前)と、その説明(札の title) */
   function badgeOf(k: SubKey): { html: string; text: string } {
@@ -660,7 +640,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
       if (autoSync) return { html: `自動 ${mode}`, text: `セクターを通ったとき、${mode}で自動で合わせます` };
       return { html: '合わせなし', text: 'セクターを選ぶか「自動」をオンにすると、先頭車両・全車一致を選べます' };
     }
-    if (k === 'base') { const t = miniMode === 'car' ? carName() : BASE_TEXT[miniMode]; return { html: `比較基準 ${t}`, text: `ミニセクターの比較基準: ${t}` }; }
+    if (k === 'base') { const t = baseLabel(); return { html: `基準: ${esc(t)}`, text: `ミニセクターの比較基準: ${t}` }; }
     return { html: LABEL_TEXT[labelMode], text: `ラベル: ${LABEL_TEXT[labelMode]}` };
   }
   function syncMenuButtons() {
@@ -794,38 +774,26 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
     const lap = pbLapOf(c);
     return lap ? lapDataOf(c.log, lap, n) : null;
   }
-  /** Run ベスト: 車と同じ走行データの完了ラップのうち最速のもの */
-  function runBestDataOf(c: Car, n: number): MiniData | null {
-    const lap = fastestLap(c.log.laps);
-    return lap ? lapDataOf(c.log, lap, n) : null;
-  }
-  /** 全体ベスト: 表示中の比較セットの全ての走行データの完了ラップのうち最速のもの */
-  function allBestLap(): { log: LoadedLog; lap: Lap } | null {
-    let best: { log: LoadedLog; lap: Lap } | null = null;
-    for (const l of session.active.logs) {
-      const lap = fastestLap(l.laps);
-      if (lap && (!best || lap.duration < best.lap.duration)) best = { log: l, lap };
-    }
-    return best;
-  }
-  function allBestData(n: number): MiniData | null {
-    const b = allBestLap();
-    return b ? lapDataOf(b.log, b.lap, n) : null;
-  }
   /** スマホの縦画面で、カードの上に出す 1 段: 比較基準のラップの「Run X(別名)・LAP X(別名)・タイム」(CSS で、縦画面だけ出す) */
   function renderBaseInfo() {
     const box = $('cmp-base-info');
     let html = '', title = '';
-    const one = (log: LoadedLog, lap: Lap, who: string) => {
+    const one = (log: LoadedLog, lap: Lap, who: string, slot?: Slot) => {
       const run = session.runLabel(log);
       const lapName = session.lapAliasOf(log.id, lap.number).trim() || `LAP ${lap.number}`;
       const time = formatLapTime(lap.duration);
-      title = `${who}: ${run} ${lapName} ${time}`;
-      return `<span class="bi-chip">基準</span><span class="bi-run">${esc(run)}</span><span class="bi-lap">${esc(lapName)}</span><span class="bi-time num">${time}</span>`;
+      title = `${who}: ${slot ? slot + ' ' : ''}${run} ${lapName} ${time}`;
+      const icon = slot ? `<span class="chip s${slot.toLowerCase()} bi-icon" aria-hidden="true">${slot}</span>` : '';       // 基準がカードのときは、そのカードのアイコン(A〜D)
+      return `<span class="bi-chip">基準</span>${icon}<span class="bi-run">${esc(run)}</span><span class="bi-lap">${esc(lapName)}</span><span class="bi-time num">${time}</span>`;
     };
-    if (miniMode === 'run') { title = '比較基準: ラップが入っている走行ログ(Run)のベスト'; html = '<span class="bi-chip">基準</span><span class="bi-note">LAPが入っている走行ログのベスト</span>'; }
-    else if (miniMode === 'all') { const b = allBestLap(); if (b) html = one(b.log, b.lap, '比較基準(全体ベスト)'); }
-    else { const c = miniBase(); if (c) html = one(c.log, c.lap, `比較基準(${carName()})`); }
+    const sel = baseSel();
+    if (sel.kind === 'ref') {
+      const time = formatLapTime(sel.lap.duration);
+      const same = cars.find((c) => c.lap === sel.lap);              // 基準の走行と同じラップを割り当てたカードがあれば、そのアイコンも出す
+      const icon = same ? `<span class="chip s${same.slot.toLowerCase()} bi-icon" aria-hidden="true">${same.slot}</span>` : '';
+      title = `比較基準(${baseLabel()}${same ? ' = ' + same.slot : ''}): ${time}`;
+      html = `<span class="bi-chip">基準</span>${icon}<span class="bi-run">${esc(baseLabel())}</span><span class="bi-time num">${time}</span>`;
+    } else { const c = baseCar(); if (c) html = one(c.log, c.lap, `比較基準(${baseLabel()})`, c.slot); }
     if (box.dataset.k === html + title) return;                  // 変わっていなければ書かない
     box.dataset.k = html + title;
     box.innerHTML = html;
@@ -833,12 +801,53 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   }
   function pbSigOf(): string { return cars.map((c) => `${c.slot}:${pbLapOf(c)?.number ?? '-'}`).join('|'); }
   let pbSig = '';
-  /** 色分けの基準の車: 追従設定で選んでいる車。固定・先頭のときは、割り当てた車のうち最速のラップ */
-  function miniBase(): Car | null {
-    const picked = cars.find((c) => c.slot === follow);
-    if (picked) return picked;
+  /** 比較基準の選択(案件 85)。選んだカードが無い・基準の走行が使えないときは、割当最速として扱う */
+  type BaseSel = { kind: 'fastest' } | { kind: 'card'; slot: Slot } | { kind: 'ref'; ref: RefLap; log: LoadedLog; lap: Lap };
+  function baseSel(): BaseSel {
+    const v = session.active.miniBase;
+    if (v.startsWith('card:')) { const slot = v.slice(5) as Slot; if (cars.some((c) => c.slot === slot)) return { kind: 'card', slot }; }
+    if (v.startsWith('ref:')) {
+      const r = session.refsOf(circuitKey()).find((x) => x.id === v.slice(4));
+      const x = r ? session.resolveRefLap(r) : null;
+      if (r && x) return { kind: 'ref', ref: r, log: x.log, lap: x.lap };
+    }
+    return { kind: 'fastest' };
+  }
+  /** 比較基準の車(基準設定の走行を選んでいるときは null)。割当最速は、割り当てた車のうち最速のラップ */
+  function baseCar(): Car | null {
+    const sel = baseSel();
+    if (sel.kind === 'ref') return null;
+    if (sel.kind === 'card') return cars.find((c) => c.slot === sel.slot) ?? null;
     const pool = cars.some((c) => c.lap.complete) ? cars.filter((c) => c.lap.complete) : cars;
     return pool.reduce<Car | null>((b, c) => (!b || c.lap.duration < b.lap.duration ? c : b), null);
+  }
+  /** 札と一覧に出す、比較基準の名前 */
+  function baseLabel(): string {
+    const sel = baseSel();
+    if (sel.kind === 'ref') return session.refLabel(sel.ref);
+    if (sel.kind === 'card') return session.cardName(sel.slot);
+    return '割当最速';
+  }
+  /** 比較基準の選択肢(札のメニュー): 割当最速・基準設定の走行(そのサーキット分)・割り当てているカード */
+  function renderBaseMenu() {
+    const sel = baseSel();
+    const cur = sel.kind === 'card' ? `card:${sel.slot}` : sel.kind === 'ref' ? `ref:${sel.ref.id}` : 'fastest';
+    const item = (key: string, text: string, title: string) =>
+      `<button type="button" role="menuitemradio" data-act="minibase" data-key="${esc(key)}" aria-checked="${key === cur}"${key === cur ? ' class="on"' : ''} title="${esc(title)}">${esc(text)}</button>`;
+    const refs = session.refsOfByTime(circuitKey());
+    const parts = [item('fastest', '割当最速', '割り当てた車のうち、最速のラップの区間と比べます')];
+    if (refs.length) {
+      parts.push('<div class="menu-note">基準設定</div>');
+      for (const r of refs) {
+        const x = session.resolveRefLap(r);
+        parts.push(item(`ref:${r.id}`, `${session.refLabel(r)}${x ? '  ' + formatLapTime(x.lap.duration) : ''}`, '基準設定で登録した走行の区間と、全ての車が比べます'));
+      }
+    }
+    if (cars.length) {
+      parts.push('<div class="menu-note">カード</div>');
+      for (const c of cars) parts.push(item(`card:${c.slot}`, `${session.cardName(c.slot)}  ${formatLapTime(c.lap.duration)}`, `カード ${c.slot} の区間と、ほかの車が比べます(${c.slot} の行は青)`));
+    }
+    $('cmp-sub-base').innerHTML = parts.join('');
   }
   const sectorBtn = (i: number) => {
     const any = cars.some((c) => c.lap.sectorTimes[i] != null);
@@ -850,9 +859,10 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
     if (!ref()) { $('cmp-sectors').innerHTML = ''; return; }
     const n = ref()?.log.circuit?.sectors.length ?? 0;
     const cols = n + 1;                                          // 区間の数
-    const best = miniMode !== 'car';
-    const base = best ? null : miniBase();
-    const allBest = miniMode === 'all' ? allBestData(n) : null;
+    renderBaseMenu();
+    const sel = baseSel();
+    const base = baseCar();
+    const refD = sel.kind === 'ref' ? lapDataOf(sel.log, sel.lap, n) : null;
     const bd = base ? miniDataOf(base.lap, base.series, n) : null;
     // 見出しは押せないラベル(移動は、地図の上のライン(S1〜Sn)のボタンで行う)
     const headOf = (j: number) => {
@@ -866,22 +876,38 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
       const c = cars.find((x) => x.slot === slot);
       if (!c) return `<span class="mini-name empty"></span>${'<span class="mini-cell empty"></span>'.repeat(cols)}`;
       const d = miniDataOf(c.lap, c.series, n);
-      // 基準車: 基準の車(の行は比べない)と、自己ベスト(別名「PB」)。Run ベスト・全体ベスト: その最速ラップだけ
-      const isBase = c === base;
-      const ref = miniMode === 'all' ? allBest : miniMode === 'run' ? runBestDataOf(c, n) : isBase ? null : bd;
-      const pb = best ? null : pbDataOf(c, n);
+      // 基準の車(の行は比べず、青)と、自己ベスト(別名「PB」)。基準設定の走行は、全ての車が比べる(同じラップを割り当てた車は、基準の車と同じ青)
+      const isBase = c === base || (sel.kind === 'ref' && sel.lap === c.lap);
+      const ref = isBase ? null : sel.kind === 'ref' ? refD : bd;
+      const pb = pbDataOf(c, n);
+      const rivalAt = (me: Car, k: number, j: number): number | null => {
+        let m: number | null = null;
+        for (const o of cars) {
+          if (o === me) continue;
+          const v = miniDataOf(o.lap, o.series, n).speeds[k]?.[j] ?? null;
+          if (v !== null && (m === null || v > m)) m = v;
+        }
+        return m;
+      };
       const off = hidden.has(c.slot) ? ' off' : '';
       const cells = Array.from({ length: cols }, (_, k) => {
         const segs = Array.from({ length: MINI_COUNT }, (_, j) =>
-          `<i class="mini-seg t-${miniTone(d.speeds[k][j], ref?.speeds[k]?.[j] ?? null, pb?.speeds[k]?.[j] ?? null)}" data-v="${d.speeds[k][j] === null ? '' : d.speeds[k][j]!.toFixed(1)}"></i>`).join('');
+          `<i class="mini-seg t-${segTone(d.speeds[k][j], ref?.speeds[k]?.[j] ?? null, pb?.speeds[k]?.[j] ?? null, isBase, rivalAt(c, k, j))}" data-v="${d.speeds[k][j] === null ? '' : d.speeds[k][j]!.toFixed(1)}"></i>`).join('');
         return `<span class="mini-cell${off}" data-slot="${c.slot}" data-sk="${k}"${d.ranges[k] ? '' : ' data-none'}>${segs}</span>`;
       }).join('');
       return `<span class="mini-name${isBase ? ' is-base' : ''}${off}" style="color:${cssColor(c.slot)}"${isBase ? ' title="色分けの基準"' : ''}>${c.slot}</span>${cells}`;
     }).join('');
     renderBaseInfo();
+    syncMenuButtons();
     $('cmp-sectors').innerHTML = `<div class="mini-tbl" style="--n:${cols}">${head}${rows}</div>`;
     miniDone.clear();
   }
+  /** 色分け。基準の車の行は、速度があるのに色が付かない区間(比べる相手が無い)を青にする */
+  const segTone = (v: number | null, ref: number | null, pb: number | null, isBase: boolean, rival: number | null) => {
+    const t = miniTone(v, ref, pb);
+    if (t !== 'none' || !isBase || v === null) return t;
+    return rival !== null && rival > v ? 'baseslow' : 'base';       // 基準の行: ほかのカードに速い区間があればオレンジ、無ければ青
+  };
   /** 車ごとの、セクター別の通過済みの区間の数(「2,0,5」)。変わったときだけ DOM に書く。通過前は薄く、通過後は濃く(CSS の .done) */
   const miniDone = new Map<Slot, string>();
   function paintMini(pos: { c: Car; t: number }[]) {
@@ -1275,11 +1301,8 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
       case 'toggle-car': toggleCar(d.slot as Slot); break;
       case 'sector': pressSector(Number(d.k)); break;
       case 'minibase':
-        miniMode = d.mode === 'run' ? 'run' : d.mode === 'all' ? 'all' : 'car';
-        session.setSetting('compare.miniBase', miniMode);
-        syncMiniBase();
-        syncMenuButtons(); setSub(null);
-        renderMini(); updateFrame();
+        setSub(null);
+        session.setMiniBase(d.key ?? 'fastest');                 // 購読が、表の作り直しと札の更新をする
         break;
       case 'swap-graph': sectorsFirst = !sectorsFirst; session.setSetting('compare.sectorsFirst', sectorsFirst); syncSwap(); break;
       case 'syncmode':
@@ -1362,6 +1385,8 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
     const a = session.assignment[s];
     return session.slotAliasOf(session.activeIndex, s) + '~' + (a ? session.runAliasOf(a.logId) : '');
   }).join('|');
+  const baseSigOf = () => session.active.miniBase + '|' + session.refsOf(circuitKey()).map((r) => `${r.id}:${r.name}:${r.lap}`).join(',');
+  let baseSig = baseSigOf();
   session.subscribe(() => {
     renderSetSelect();
     if (visible && signature() !== sig) { sig = signature(); aliasSig = aliasSigOf(); rebuild(); return; }
@@ -1369,7 +1394,11 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
       aliasSig = aliasSigOf();
       renderCards(); syncCards(); updateFrame();
     }
-    if (visible && ref()) renderBaseInfo();     // Run・LAP の別名や、全体ベストの変化を反映する
+    if (visible && baseSigOf() !== baseSig) {       // 比較基準を選び直した・基準設定が変わった(案件 85)
+      baseSig = baseSigOf();
+      renderMini(); updateFrame();
+    }
+    if (visible && ref()) renderBaseInfo();     // Run・LAP の別名の変化を反映する
     if (visible && pbSigOf() !== pbSig) {          // 別のラップに「PB」の別名が付いた・外れた(案件 6)
       pbSig = pbSigOf();
       renderMini(); updateFrame();
@@ -1417,6 +1446,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
       if (now !== sig) { sig = now; rebuild(); }
       else {
         if (aliasSigOf() !== aliasSig) { aliasSig = aliasSigOf(); renderCards(); syncCards(); }   // 別の画面で付けたカード名を反映する
+        if (baseSigOf() !== baseSig) { baseSig = baseSigOf(); renderMini(); }                         // 別の画面で設定した基準(基準設定・カードの選び直し)を反映する
         if (cars.length) { ensureMap(); pushMap(); updateFrame(); }
       }
       if (cars.length) map?.invalidate();

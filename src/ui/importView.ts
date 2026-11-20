@@ -9,6 +9,7 @@ import { hasExt } from './fileKind';
 import { CIRCUITS_HTML, createCircuits } from './importCircuits';
 import { createGuide } from './importGuide';
 import { OFFSETS_HTML, createOffsets } from './importOffsets';
+import { REFS_HTML, createRefs } from './importRefs';
 import type { ImportActions, ImportPart } from './importParts';
 import { SETS_HTML, createSets } from './importSets';
 import { createSlots } from './importSlots';
@@ -57,6 +58,7 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
     <div id="work" class="work" hidden></div>
     <div class="body" id="import-body">${TOP_TABS_HTML}${CIRCUITS_HTML}
 ${OFFSETS_HTML}
+${REFS_HTML}
 ${SETS_HTML}
     </div>
     <input id="vbo-input" type="file" multiple accept=".vbo" hidden>
@@ -86,11 +88,12 @@ ${SETS_HTML}
   const guide = createGuide($('guide'), session, actions, $('guide-mini'));
   const circuits = createCircuits(root, session, actions);
   const offsets = createOffsets(root, session);
+  const refs = createRefs(root, session);
   const sets = createSets(root, session, actions);
   const top = createTopTabs(root);              // 幅が広いときの、「サーキット」「走行ライン補正データ」「比較セット」のタブ(案件 74)
   /** 比較セット set を見せる(タブのときは「比較セット」のタブに切り替えてから) */
   const showSet = (set: number) => { top.show('sets'); sets.scrollToSet(set); };
-  const parts: ImportPart[] = [slots, guide, top, circuits, offsets, sets];
+  const parts: ImportPart[] = [slots, guide, top, circuits, offsets, refs, sets];
 
   function render() {
     const focusKey = (document.activeElement as HTMLElement | null)?.dataset?.fk;
@@ -98,6 +101,7 @@ ${SETS_HTML}
     guide.render();
     circuits.render();
     offsets.render();
+    refs.render();
     sets.render();
     top.render();
     if (focusKey) {
@@ -161,6 +165,7 @@ ${SETS_HTML}
   root.addEventListener('change', async (e) => {
     const t = e.target as HTMLElement;
     sets.onChange(t);
+    refs.onChange(t);
     await circuits.onChange(t);
     await offsets.onChange(t);
     if (t.id === 'vbo-input') {

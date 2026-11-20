@@ -14,7 +14,7 @@ const NAME = '20260913140139_UTC.vbo', PATH = '/data/a.vbo';
 const file = { name: NAME, size: vbo.length, text: async () => vbo } as unknown as File;
 
 const prefsOf = (w: WorkSet) => ({
-  circuitId: w.selectedCircuitId, sort: w.sort, showSectors: w.showSectors, sectorMode: w.sectorMode, assignment: w.assignment,
+  circuitId: w.selectedCircuitId, sort: w.sort, showSectors: w.showSectors, sectorMode: w.sectorMode, assignment: w.assignment, miniBase: w.miniBase,
 });
 
 /** 比較セット 2 の設定を、すべて初期値と違う値にしたセッション */
@@ -29,17 +29,18 @@ async function original(store: MemoryStore): Promise<Session> {
   s.toggleSectors(1);
   s.setSectorMode('cumulative', 1);
   s.toggleAssignment('B', { logId: s.sets[1].logs[0].id, lap: 1 }, 1);
+  s.setMiniBase('card:B', 1);
   return s;
 }
 
 describe('比較セットの設定は、2 つの復元のどちらでも同じように戻る(案件 38)', () => {
-  it('サーキットの指定・並べ替え・セクターの表示・区間 / 通過・割り当て', async () => {
+  it('サーキットの指定・並べ替え・セクターの表示・区間 / 通過・割り当て・比較基準', async () => {
     const store = new MemoryStore();
     const s1 = await original(store);
     const want = prefsOf(s1.sets[1]);
     expect(want).toEqual({
       circuitId: s1.circuits[1].id, sort: { key: 'time', dir: -1 }, showSectors: true, sectorMode: 'cumulative',
-      assignment: { A: null, B: { logId: s1.sets[1].logs[0].id, lap: 1 }, C: null, D: null },
+      assignment: { A: null, B: { logId: s1.sets[1].logs[0].id, lap: 1 }, C: null, D: null }, miniBase: 'card:B',
     });
     const resume = JSON.parse(JSON.stringify(s1.resumeState()));
 
