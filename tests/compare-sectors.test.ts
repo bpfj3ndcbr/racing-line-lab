@@ -740,60 +740,91 @@ describe('ミニセクター表(案件 6): 「セクター」欄', () => {
     expect(c2.querySelector('.lapno')!.textContent).toMatch(/^LAP \d+: $/);
   });
 
-  it('比較基準: 「Runベスト」は、自分の走行データの最速ラップと比べる(基準の車の行にも色が付く)。「追従車」に戻すと付かない。覚える', () => {
+  const pick = (key: string) => $<HTMLButtonElement>(`#cmp-sub-base [data-key="${key}"]`).click();
+  const baseTag = () => $('#cmp-tool-base').textContent!.trim();
+
+  it('比較基準: 初めは「割当最速」。最速の車の行は比べる相手が無いので青(基準にしたカードの行も青)。選びは比較セットごとに覚える', () => {
     setupOne();
-    const t = (tone: string) => root.querySelectorAll(`#cmp-sectors .mini-cell[data-slot="A"] .t-${tone}`).length;
-    const mode = (m: string) => $<HTMLButtonElement>(`#cmp-sync [data-act="minibase"][data-mode="${m}"]`);
-    expect(mode('car').getAttribute('aria-pressed')).toBe('true');
-    expect(t('faster') + t('slower')).toBe(0);                    // 追従車(A だけ): 基準の行は色が付かない
-    mode('run').click();
-    expect(mode('run').getAttribute('aria-pressed')).toBe('true');
-    expect(t('faster')).toBeGreaterThan(0);                         // A のラップは最速のラップ(同じ走行データの 1 周): 全区間が「速い」側
-    expect(t('slower')).toBe(0);
-    expect(session.getSetting('compare.miniBase', 'car')).toBe('run');
-    mode('car').click();
-    expect(t('faster') + t('slower')).toBe(0);
-    expect(session.getSetting('compare.miniBase', 'run')).toBe('car');
+    expect(session.active.miniBase).toBe('fastest');
+    expect(baseTag()).toBe('基準: 割当最速');
+    expect(tones('A', 'base')).toBeGreaterThan(0);
+    expect(tones('A', 'faster') + tones('A', 'slower')).toBe(0);
+    pick('card:A');
+    expect(session.active.miniBase).toBe('card:A');
+    expect(baseTag()).toBe('基準: A');
+    expect(tones('A', 'base')).toBeGreaterThan(0);
+    expect(session.sets[1].miniBase).toBe('fastest');                       // ほかの比較セットは変わらない
   });
 
-  it('比較基準「全体ベスト」: 比較セット全体の最速ラップと比べる(1 本のログなら Run ベストと同じ)。覚える', () => {
+  it('比較基準: 基準設定の走行を選ぶと、基準のカードは無く、全ての車がその走行と比べる(同じラップを割り当てたカードは青)', () => {
     setupOne();
-    const t = (tone: string) => root.querySelectorAll(`#cmp-sectors .mini-cell[data-slot="A"] .t-${tone}`).length;
-    $<HTMLButtonElement>('#cmp-sync [data-act="minibase"][data-mode="all"]').click();
-    expect(t('faster')).toBeGreaterThan(0);
-    expect(t('slower')).toBe(0);
-    expect(session.getSetting('compare.miniBase', 'car')).toBe('all');
+    session.addRef('u', 1);
+    const r = session.refsOf(session.logs[0].circuit!.id)[0];
+    expect($('#cmp-sub-base').textContent).toContain('基準設定');
+    pick(`ref:${r.id}`);
+    expect(baseTag()).toBe(`基準: ${session.refLabel(r)}`);
+    expect(tones('A', 'base')).toBeGreaterThan(0);                           // A のラップが基準の走行そのもの
+    session.renameRef(r.id, 'CR');
+    expect(baseTag()).toBe('基準: CR');                                       // 表示名の変更が札に出る
+    expect($('#cmp-sub-base').textContent).toContain('CR');
   });
 
-  it.skipIf(!big)('比較基準「全体ベスト」: ほかのログに速いラップがあれば、遅い車は黄色の区間が出る', () => {
-    setupTwo();                                                     // A = big の 2 周目(2:26.5)、B = u の 1 周(2:22.9、速い)
-    const t = (s: string, tone: string) => root.querySelectorAll(`#cmp-sectors .mini-cell[data-slot="${s}"] .t-${tone}`).length;
-    $<HTMLButtonElement>('#cmp-sync [data-act="minibase"][data-mode="all"]').click();
-    expect(t('A', 'slower')).toBeGreaterThan(0);
-  });
-
-  it.skipIf(!big)('比較基準「Runベスト」: 最速ラップより遅い車は、遅い区間が黄色になる', () => {
-    setupTwo();                                                     // A = big の 2 周目(最速ではない)
-    $<HTMLButtonElement>('#cmp-sync [data-act="minibase"][data-mode="run"]').click();
-    const t = (s: string, tone: string) => root.querySelectorAll(`#cmp-sectors .mini-cell[data-slot="${s}"] .t-${tone}`).length;
+  it.skipIf(!big)('比較基準: 基準設定の走行より遅い車は、遅い区間が黄色になる(基準の走行は、カードに割り当てていなくてもよい)', () => {
+    setupTwo();                                                              // A = big の 2 周目、B = u の 1 周(速い)
     const log = session.resolveRef(session.assignment.A)!.log;
-    const fastest = log.laps.filter((l) => l.complete).reduce((a, b) => (b.duration < a.duration ? b : a));
-    if (fastest.number !== lapOf('A').number) expect(t('A', 'slower')).toBeGreaterThan(0);
-    else expect(t('A', 'slower')).toBe(0);
+    const slowest = log.laps.filter((l) => l.complete).reduce((a, b) => (b.duration > a.duration ? b : a));
+    session.addRef('big', slowest.number);
+    const r = session.refsOf(log.circuit!.id).find((x) => x.logId === 'big')!;
+    pick(`ref:${r.id}`);
+    expect(tones('B', 'faster')).toBeGreaterThan(0);                         // 速い B は、いちばん遅いラップより速い区間がある
+    expect(tones('A', 'base') + tones('B', 'base')).toBe(0);                 // 基準のカードは無い(A も基準のラップではない)
   });
 
-  it('比較基準のラップの情報(スマホの縦画面でカードの上に出す 1 段): 追従車の Run・LAP(別名があれば別名)・タイム', () => {
+  it('別の画面(データ管理)で基準を設定してから比較画面に移っても、基準のメニューに出る', () => {
+    session.addLog(utc(), 'u');
+    session.toggleAssignment('A', { logId: 'u', lap: 1 });
+    $<HTMLButtonElement>('[data-act="nav"][data-view="compare"]').click();
+    $<HTMLButtonElement>('[data-act="nav"][data-view="import"]').click();
+    session.addRef('u', 1);
+    const r = session.refsOf(session.logs[0].circuit!.id)[0];
+    session.renameRef(r.id, 'CR');
+    $<HTMLButtonElement>('[data-act="nav"][data-view="compare"]').click();
+    expect($('#cmp-sub-base').textContent).toContain('CR');
+  });
+
+  it('比較基準のラップの情報(スマホの縦画面でカードの上に出す 1 段): 割当最速・基準設定の走行', () => {
     setupOne();
     const info = $('#cmp-base-info');
     const lap = lapOf('A');
-    expect(info.textContent).toBe(`基準Run 1LAP ${lap.number}${formatLapTime(lap.duration)}`);
+    expect(info.textContent).toBe(`基準ARun 1LAP ${lap.number}${formatLapTime(lap.duration)}`);          // 基準がカードのときは、そのカードのアイコン(A)も出る
     session.setLapAlias('u', lap.number, 'ベスト周');
     session.setRunAlias('u', '朝');
-    expect(info.textContent).toBe(`基準朝ベスト周${formatLapTime(lap.duration)}`);
-    $<HTMLButtonElement>('#cmp-sync [data-act="minibase"][data-mode="run"]').click();
-    expect(info.textContent).toBe('基準LAPが入っている走行ログのベスト');
-    $<HTMLButtonElement>('#cmp-sync [data-act="minibase"][data-mode="all"]').click();
-    expect(info.textContent).toContain('朝');                       // 全体ベストのラップ(1 本のログなので、その最速ラップ)
+    expect(info.textContent).toBe(`基準A朝ベスト周${formatLapTime(lap.duration)}`);
+    expect(info.querySelector('.bi-icon')!.textContent).toBe('A');
+    session.addRef('u', lap.number);
+    const r = session.refsOf(session.logs[0].circuit!.id)[0];
+    session.renameRef(r.id, 'CR');
+    pick(`ref:${r.id}`);
+    expect(info.textContent).toBe(`基準ACR${formatLapTime(lap.duration)}`);
+    expect(info.querySelector('.bi-icon')!.textContent).toBe('A');       // 基準の走行と同じラップを割り当てたカード(A)のアイコンが出る
+    session.toggleAssignment('A', { logId: 'u', lap: lap.number });
+    session.toggleAssignment('B', { logId: 'u', lap: lap.number });
+    session.setMiniBase(`ref:${r.id}`);
+    expect(info.querySelector('.bi-icon')!.textContent).toBe('B');
+  });
+
+  it('選んでいた基準が使えなくなったら、割当最速に戻して知らせる(カードの割り当てを外した・基準の走行ログを外した)', () => {
+    setupOne();
+    pick('card:A');
+    session.toggleAssignment('A', { logId: 'u', lap: 1 });                   // A の割り当てを外す
+    expect(session.sets[0].miniBase).toBe('fastest');
+    expect(session.message).toContain('割当最速に戻しました');
+    session.toggleAssignment('A', { logId: 'u', lap: 1 });
+    session.addRef('u', 1);
+    const r = session.refsOf(session.logs[0].circuit!.id)[0];
+    pick(`ref:${r.id}`);
+    session.removeRef(r.id);
+    expect(session.sets[0].miniBase).toBe('fastest');
   });
 
   it('セクター合わせの札: 状態で表示と有効・無効が変わる(時間: 合わせなし → S1 全車一致 → 自動。距離: 基準車の位置)', () => {
@@ -846,30 +877,16 @@ describe('ミニセクター表(案件 6): 「セクター」欄', () => {
 
   it('比較基準の札: 今の基準を札に出し、メニューで選ぶと札の文字が変わってメニューが閉じる。別の札を開くと、開いていた方は閉じる', () => {
     setupOne();
-    const base = () => $('#cmp-tool-base').textContent!.trim();
-    expect(base()).toBe('比較基準 割当最速');                                 // 追従設定が「固定」なので、車の名前は「先頭」
+    expect(baseTag()).toBe('基準: 割当最速');
     $<HTMLButtonElement>('#cmp-tool-base').click();
     expect($('#cmp-sub-base').hidden).toBe(false);
-    $<HTMLButtonElement>('#cmp-sub-base [data-mode="all"]').click();
-    expect(base()).toBe('比較基準 全体ベスト');
+    expect(Array.from(root.querySelectorAll('#cmp-sub-base [data-act="minibase"]')).map((b) => (b as HTMLElement).dataset.key)).toEqual(['fastest', 'card:A']);
+    $<HTMLButtonElement>('#cmp-sub-base [data-key="card:A"]').click();
+    expect(baseTag()).toBe('基準: A');
     expect($('#cmp-sub-base').hidden).toBe(true);
-    expect(session.getSetting('compare.miniBase', 'car')).toBe('all');
     // 札の「入替」も、右の列の同じボタンと同じ動作
     $<HTMLButtonElement>('#cmp-sync-tags [data-act="swap-graph"]').click();
     expect($('#cmp-side').dataset.first).toBe('graph');
-  });
-
-  it('比較基準の車の名前: 追従車を選んでいるときは「追従車」、固定・先頭追従のときは「割当最速」', () => {
-    setupOne();
-    const base = () => $('#cmp-tool-base').textContent!.trim();
-    const carBtns = () => Array.from(root.querySelectorAll<HTMLElement>('[data-act="minibase"][data-mode="car"]')).map((b) => b.textContent);
-    expect(carBtns()).toEqual(['割当最速', '割当最速']);                            // 右の列と上部バー
-    $<HTMLButtonElement>('[data-act="follow"][data-follow="A"]').click();
-    expect(base()).toBe('比較基準 追従車');
-    expect(carBtns()).toEqual(['追従車', '追従車']);
-    $<HTMLButtonElement>('[data-act="follow"][data-follow="leader"]').click();
-    expect(base()).toBe('比較基準 割当最速');
-    expect(carBtns()).toEqual(['割当最速', '割当最速']);
   });
 
   it('通過した区間は濃く、通過前は薄い。再生位置より前のセクターは全部濃く、後ろは全部薄い', () => {
@@ -894,17 +911,29 @@ describe('ミニセクター表(案件 6): 「セクター」欄', () => {
     expect(root.querySelectorAll('#cmp-sectors .mini-seg.done')).toHaveLength(0);      // 戻すと薄くなる
   });
 
-  it.skipIf(!big)('2台: 追従が「先頭」のときは最速の車が基準(基準の行は色が付かない)。「A を追従」にすると A が基準になる', () => {
+  it.skipIf(!big)('2台: 割当最速のときは最速の車が基準(基準の行は青)。カード A を基準にすると A が基準になる(追従設定は基準に関係しない)', () => {
     setupTwo();                                            // A = 2:26.5、B = 2:22.9(速い)
     const slow = (s: string) => tones(s, 'slower'), fast = (s: string) => tones(s, 'faster');
     expect(fast('B') + slow('B')).toBe(0);                 // 基準(最速の B)
-    expect(fast('A') + slow('A')).toBeGreaterThan(0);
+    expect(tones('B', 'base')).toBeGreaterThan(0);
     expect(slow('A')).toBeGreaterThan(0);                  // 遅い A は、基準より遅い区間がある
     follow('A');
+    expect(tones('B', 'base')).toBeGreaterThan(0);         // 追従を変えても、基準は変わらない
+    pick('card:A');
     expect(fast('A') + slow('A')).toBe(0);                 // 基準が A に変わる
+    expect(tones('A', 'base')).toBeGreaterThan(0);
     expect(fast('B')).toBeGreaterThan(0);                  // 速い B は、A より速い区間がある
-    follow('leader');
-    expect(fast('B') + slow('B')).toBe(0);                 // 先頭追従(固定も)に戻すと、最速の B が基準
+    pick('fastest');
+    expect(fast('B') + slow('B')).toBe(0);                 // 割当最速に戻すと、最速の B が基準
+  });
+
+  it.skipIf(!big)('2台: 基準にしたカードの行は、ほかのカードより速い区間は青・遅い区間はオレンジ', () => {
+    setupTwo();                                            // A = 2:26.5、B = 2:22.9(速い)
+    pick('card:A');
+    expect(tones('A', 'baseslow')).toBeGreaterThan(0);      // 遅い A は、B のほうが速い区間がオレンジ
+    pick('card:B');
+    expect(tones('B', 'base')).toBeGreaterThan(0);          // 速い B は、ほとんど青
+    expect(tones('B', 'base')).toBeGreaterThan(tones('B', 'baseslow'));
   });
 
   it.skipIf(!big)('2台: 自己ベストは、その走行データの「PB」の別名のラップ。付けると A の速い区間が紫になり、外すと戻る', () => {

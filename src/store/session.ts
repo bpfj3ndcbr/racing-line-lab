@@ -71,8 +71,15 @@ export class WorkSet {
   showSectors = false;
   /** 'split' = 区間タイム、'cumulative' = ラップ開始からの通過時刻 */
   sectorMode: 'split' | 'cumulative' = 'split';
+  /** ミニセクター表の比較基準(案件 85): 'fastest' = 割当最速 / 'card:A'〜'card:D' = そのカード / 'ref:<id>' = 基準設定の走行 */
+  miniBase = 'fastest';
   nextNo = 1;
 }
+
+/** 基準設定で登録した走行(案件 85): サーキットごとに、読み込み済みの走行ログのラップを基準にする。保存は ui.refs */
+export interface RefLap { id: string; circuitId: string; logId: string; lap: number; name: string }
+/** 基準の表示名の長さの上限(文字数) */
+export const REF_NAME_MAX = 8;
 
 /**
  * 比較セットの設定(割り当て・サーキットの指定・並べ替え・セクターの表示・区間 / 通過)の保存の形。
@@ -81,7 +88,7 @@ export class WorkSet {
  */
 export interface SetPrefs {
   assignment?: Partial<Record<Slot, LapRef | null>>; circuitId?: string | null;
-  sort?: SortState; showSectors?: boolean; sectorMode?: 'split' | 'cumulative';
+  sort?: SortState; showSectors?: boolean; sectorMode?: 'split' | 'cumulative'; miniBase?: string;
 }
 
 /** 読んだ走行ログ(まだ追加していない)。known = どこかのセットに読み込み済み(取り込み範囲は当てはめ済み) */
@@ -239,8 +246,72 @@ export class Session {
     return () => this.listeners.delete(fn);
   }
   private emit() {
-    if (!this.restoring) this.saveLastSession();
+    if (!this.restoring) { this.fixMiniBase(); this.saveLastSession(); }
     this.notify();
+  }
+  /** 選んでいる比較基準が使えなくなったセット(カードの割り当てを外した・基準の走行が無い・別のサーキット)は、割当最速に戻す。表示中のセットだけ知らせる */
+  private fixMiniBase() {
+    this.sets.forEach((w, i) => {
+      const v = w.miniBase;
+      if (v === 'fastest') return;
+      const slot = v.startsWith('card:') ? (v.slice(5) as Slot) : null;
+      const rid = v.startsWith('ref:') ? v.slice(4) : null;
+      const ok = slot ? SLOTS.includes(slot) && !!w.assignment[slot]
+        : rid ? this.refsOf(this.setCircuitId(w)).some((r) => r.id === rid) : false;
+      if (ok) return;
+      w.miniBase = 'fastest';
+      if (i === this.activeIndex) this.tell('比較の基準が無くなったので、割当最速に戻しました。');
+    });
+  }
+  private setCircuitId(w: WorkSet): string { return w.logs.find((l) => l.circuit)?.circuit?.id ?? ''; }
+  setMiniBase(v: string, set?: number): void { this.ws(set).miniBase = v; this.emit(); }
+
+  // ---------- 基準設定(案件 85) ----------
+  private refsAll(): RefLap[] {
+    const a = this.getSetting<unknown>('refs', []);
+    return Array.isArray(a) ? a.filter((r): r is RefLap => !!r && typeof r.id === 'string' && typeof r.circuitId === 'string'
+      && typeof r.logId === 'string' && Number.isInteger(r.lap) && typeof r.name === 'string') : [];
+  }
+  /** どの比較セットに入っていても、読み込み済みの走行ログを id で探す */
+  logById(id: string): LoadedLog | undefined {
+    for (const w of this.sets) { const l = w.logs.find((x) => x.id === id); if (l) return l; }
+    return undefined;
+  }
+  /** 基準の走行のラップ(走行ログが読み込まれていて、そのラップがあるとき) */
+  resolveRefLap(r: RefLap): { log: LoadedLog; lap: Lap } | null {
+    const log = this.logById(r.logId);
+    const lap = log?.laps.find((x) => x.number === r.lap);
+    return log && lap ? { log, lap } : null;
+  }
+  /** そのサーキットの基準(今使えるものだけ。登録した順) */
+  refsOf(circuitId: string): RefLap[] { return this.refsAll().filter((r) => r.circuitId === circuitId && this.resolveRefLap(r)); }
+  /** そのサーキットの基準を、ラップタイムの速い順に並べたもの(基準 1 = いちばん速い基準) */
+  refsOfByTime(circuitId: string): RefLap[] {
+    const t = (r: RefLap) => this.resolveRefLap(r)?.lap.duration ?? Infinity;
+    return this.refsOf(circuitId).sort((a, b) => t(a) - t(b));
+  }
+  refAt(logId: string, lap: number): RefLap | undefined { return this.refsAll().find((r) => r.logId === logId && r.lap === lap); }
+  /** 基準の表示名(名前が無ければ「Run X LAP n」) */
+  refLabel(r: RefLap): string {
+    if (r.name.trim()) return r.name.trim();
+    const x = this.resolveRefLap(r);
+    return x ? `${this.runLabel(x.log)} ${this.lapAliasOf(x.log.id, x.lap.number).trim() || `LAP ${x.lap.number}`}` : '基準';
+  }
+  addRef(logId: string, lap: number): void {
+    const log = this.logById(logId);
+    const circuitId = log?.circuit?.id;
+    if (!log || !circuitId || !log.laps.some((l) => l.number === lap) || this.refAt(logId, lap)) return;
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    this.setSetting('refs', [...this.refsAll(), { id, circuitId, logId, lap, name: '' }]);
+    this.emit();
+  }
+  renameRef(id: string, name: string): void {
+    this.setSetting('refs', this.refsAll().map((r) => (r.id === id ? { ...r, name: name.trim().slice(0, REF_NAME_MAX) } : r)));
+    this.emit();
+  }
+  removeRef(id: string): void {
+    this.setSetting('refs', this.refsAll().filter((r) => r.id !== id));
+    this.emit();
   }
   private notify() { this.listeners.forEach((f) => f()); }
 
@@ -326,7 +397,7 @@ export class Session {
 
   /** 比較セットの設定の保存の形(SetPrefs)。前回の状態と一時保存で共通 */
   private setPrefsOf(w: WorkSet): SetPrefs {
-    return { assignment: w.assignment, circuitId: w.selectedCircuitId, sort: w.sort, showSectors: w.showSectors, sectorMode: w.sectorMode };
+    return { assignment: w.assignment, circuitId: w.selectedCircuitId, sort: w.sort, showSectors: w.showSectors, sectorMode: w.sectorMode, miniBase: w.miniBase };
   }
   /** 保存した比較セットの設定を戻す(割り当て以外)。登録に無いサーキット・形の合わない値は戻さない。走行ログを入れる前に呼ぶ */
   private applySetPrefs(w: WorkSet, sv: SetPrefs) {
@@ -334,6 +405,7 @@ export class Session {
     if (sv.sort && (sv.sort.key === 'lap' || sv.sort.key === 'time') && (sv.sort.dir === 1 || sv.sort.dir === -1)) w.sort = sv.sort;
     w.showSectors = sv.showSectors === true;
     w.sectorMode = sv.sectorMode === 'cumulative' ? 'cumulative' : 'split';
+    w.miniBase = typeof sv.miniBase === 'string' ? sv.miniBase : 'fastest';          // 使えない値は、emit のときに割当最速へ戻る
   }
   /** 保存した割り当てを戻す(そのラップが今もあるものだけ)。走行ログを入れたあとに呼ぶ */
   private applyAssignment(w: WorkSet, si: number, saved: SetPrefs['assignment']) {
@@ -519,7 +591,14 @@ export class Session {
     const w = this.ws(set);
     w.logs = w.logs.filter((l) => l.id !== id);
     w.assignment = clearLog(w.assignment, id);
-    if (!this.sets.some((x) => x.logs.some((l) => l.id === id))) { this.paths.delete(id); this.logHooks?.removed(id); }
+    if (!this.sets.some((x) => x.logs.some((l) => l.id === id))) {
+      this.paths.delete(id); this.logHooks?.removed(id);
+      const all = this.refsAll();
+      if (all.some((r) => r.logId === id)) {                      // 基準にしていた走行ログを外したら、基準も外す(案件 85)
+        this.setSetting('refs', all.filter((r) => r.logId !== id));
+        this.tell('基準にしていた走行ログを外したので、基準からも外しました。');
+      }
+    }
     this.resolveSet(w);                                           // 比較セットのサーキットが変わることがある
     this.emit();
   }

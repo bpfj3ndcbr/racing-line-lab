@@ -50,7 +50,7 @@
   /* 地図の下のセクターの線(案件 82): 通常の区間は濃い青、今の走行位置の区間は薄い青。透明にしない */
   --seg-off: #1757a6; --seg-on: #9cc5f2;
   /* ミニセクター表の区間の色(案件 6): 基準より速い / 遅い / 自己ベストより速い / 比べられない */
-  --mini-fast: #00b82e; --mini-slow: #ffd400; --mini-pb: #8e44ad; --mini-none: #9aa4ab;
+  --mini-fast: #00b82e; --mini-slow: #ffd400; --mini-pb: #8e44ad; --mini-base: #1f6feb; --mini-baseslow: #ff7a00; --mini-none: #9aa4ab;
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
@@ -91,7 +91,7 @@
   --menu-line: #11808f; --menu-line-on: #ffffff;
   --menu-label: #b8620a; --menu-label-on: #ffffff;
   --seg-off: #1757a6; --seg-on: #9cc5f2;
-  --mini-fast: #3fbf7a; --mini-slow: #f0c419; --mini-pb: #b97ae0; --mini-none: #6c767e;
+  --mini-fast: #3fbf7a; --mini-slow: #f0c419; --mini-pb: #b97ae0; --mini-base: #58a6ff; --mini-baseslow: #ff9f43; --mini-none: #6c767e;
 }
 
 /* ==========================================================================
@@ -513,6 +513,8 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .mini-seg.t-faster{background:var(--mini-fast)}
 .mini-seg.t-slower{background:var(--mini-slow)}
 .mini-seg.t-pb{background:var(--mini-pb)}
+.mini-seg.t-base{background:var(--mini-base)}
+.mini-seg.t-baseslow{background:var(--mini-baseslow)}              /* 基準の車の行(比べる相手が無い区間) */
 .mini-cell[data-none] .mini-seg{opacity:.2}
 .sync-grp{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
 .sync-grp[hidden]{display:none}
@@ -794,8 +796,8 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .body.tabbed{gap:0}
 .tabbed .top-off{display:none}
 .tabbed>.top-tabs{border:0;border-bottom:1px solid var(--accent);border-radius:0;background:transparent}   /* タブのエリアに枠は付けない。背景は、裏(ページ)と同じ */
-.tabbed #sec-circuit,.tabbed #sec-offsets,.tabbed #sets-group{border-top:0;border-radius:0 0 var(--r-l) var(--r-l)}
-.tabbed #sec-circuit>.sec-h,.tabbed #sec-offsets>.sec-h{display:none}   /* 見出しはタブに置き換わる */
+.tabbed #sec-circuit,.tabbed #sec-offsets,.tabbed #sec-refs,.tabbed #sets-group{border-top:0;border-radius:0 0 var(--r-l) var(--r-l)}
+.tabbed #sec-circuit>.sec-h,.tabbed #sec-offsets>.sec-h,.tabbed #sec-refs>.sec-h{display:none}   /* 見出しはタブに置き換わる */
 .tabbed #sets-group>.sets-group-h{border-radius:0}
 .tabbed #sets-group>.sets-group-h h2{display:none}
 /* 比較セットの「使用するサーキット」とボタン: 小さめにして、幅があれば 1 列に並べる */
@@ -1397,6 +1399,7 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
     box-sizing:border-box;padding:0 2px;background:var(--surface);border-bottom:1px solid var(--accent);border-left:2px solid var(--accent);border-right:2px solid var(--accent)}   /* 白地(暗い表示は面の色)に、下線と両端の縦線 */
   .base-info>*{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .base-info .bi-run,.base-info .bi-lap{flex:0 1 auto}
+  .base-info .bi-icon{width:14px;height:14px;font-size:9px;margin:0 1px}   /* 基準のカードのアイコン(A〜D) */
   .base-info .bi-time{flex:none;margin-left:auto}   /* タイムだけ右寄せ */
   /* 「基準」の丸囲み。長い説明(Run ベストのとき)は 2 行まで */
   .base-info .bi-chip{flex:none;overflow:visible;padding:1px 4px;border:1.5px solid var(--accent);border-radius:999px;color:var(--accent);font-size:9px;line-height:1.1}
@@ -1435,3 +1438,45 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
   .cmp-ctl .seg.sm button{padding:0 6px}
   .scroll-grip{width:40px}
 }
+
+/* 基準設定(案件 85)。走行ログごとに閉じた 1 行。開くとラップの行(基準にするボタンは、スマホの幅では下の段) */
+.refs-list{display:flex;flex-direction:column;gap:14px}
+.refs-circuit{display:flex;flex-direction:column;padding:8px;border:2px solid var(--border-strong);border-radius:var(--r-l);background:var(--surface)}
+.refs-circuit:nth-of-type(even){background:var(--surface-2)}   /* サーキットが変わるたびに、背景を交互にする(ゼブラ) */
+.refs-cname{display:flex;align-items:baseline;gap:10px;padding:6px 10px;font-size:13px;font-weight:700;cursor:pointer;list-style:none;background:var(--sec-head);border:1px solid var(--border-strong);border-left:4px solid var(--accent);border-radius:var(--r-m)}
+.refs-cname::-webkit-details-marker{display:none}
+.refs-cname::before{content:'▾';font-size:11px}
+.refs-circuit:not([open])>.refs-cname::before{content:'▸'}
+.refs-ccount{font-weight:400;font-size:11px;color:var(--muted)}
+.refs-row{display:grid;grid-template-columns:minmax(0,1fr) 72px 34px 62px;align-items:center;gap:2px 6px;padding:5px 6px;font-size:13px}
+.refs-head{color:var(--muted);font-size:12px}
+.refs-file>summary{cursor:pointer;list-style:none;padding-top:7px;padding-bottom:7px;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r-m);font-weight:700}
+.refs-file>summary .rc-time,.refs-file>summary .rc-rank,.refs-file>summary .rc-diff{font-weight:400}
+.refs-file{margin-top:6px;border-top:0}
+.refs-file>summary::-webkit-details-marker{display:none}
+.refs-file>summary .rc-name::before{content:'▸ '}
+.refs-file[open]>summary .rc-name::before{content:'▾ '}
+.refs-lap{border-top:1px dotted var(--border)}
+.refs-lap .rc-name{padding-left:16px;color:var(--muted)}
+.refs-lap.is-ref{background:color-mix(in srgb,var(--accent) 10%,var(--surface))}
+.refs-lap.is-best,.refs-lap.is-best .rc-name{color:var(--danger);font-weight:700}   /* その走行ログのベストのラップ(赤) */
+.refs-lap .rc-act{grid-column:1 / -1;display:flex;align-items:center;gap:6px;padding-left:16px}
+.rc-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rc-time,.rc-rank,.rc-diff{text-align:right;white-space:nowrap}
+.refs-run{font-weight:700}
+.refs-fn{color:var(--muted);font-size:12px}
+.refs-chip{margin-left:6px;padding:0 6px;border:1px solid var(--accent);border-radius:999px;color:var(--accent);font-size:11px;white-space:nowrap}
+.refs-lap.is-ref .refs-chip{background:var(--accent);color:var(--accent-on,#fff)}
+.refs-set{height:22px;padding:0 10px;border:1px solid var(--accent);border-radius:999px;background:transparent;color:var(--accent);font:inherit;font-size:11px;font-weight:700;white-space:nowrap;cursor:pointer}
+.refs-set:hover{background:color-mix(in srgb,var(--accent) 14%,transparent)}
+.refs-name{width:11em;max-width:60%;height:24px;font-size:12px}
+.refs-del{margin-left:6px;flex:none}
+.refs-ok{flex:none}
+.refs-lap .btn{height:22px;min-height:22px;padding:0 10px;font-size:11px}
+@media (min-width:768px){
+  .refs-row{grid-template-columns:minmax(0,1fr) 72px 34px 62px 250px}
+  .refs-lap .rc-act{grid-column:auto;padding-left:0;justify-content:flex-end}
+}
+
+/* 上のタブ: おまけの機能(走行ライン補正データ・基準設定)は、必須の 2 つ(サーキット・比較セット)から少し離して右側に置く */
+.top-tab.gap{margin-left:28px}

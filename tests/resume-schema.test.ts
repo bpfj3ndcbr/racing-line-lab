@@ -28,7 +28,7 @@ type SetEntry = ResumeState['sets'][number];
 /** 小さな状態の項目 */
 const STATE: Record<keyof ResumeState, true> = { v: true, active: true, sets: true };
 const SET_ENTRY: Record<keyof SetEntry, true> = {
-  logs: true, nextNo: true, assignment: true, circuitId: true, sort: true, showSectors: true, sectorMode: true,
+  logs: true, nextNo: true, assignment: true, circuitId: true, sort: true, showSectors: true, sectorMode: true, miniBase: true,
 };
 const SET_LOG: Record<keyof SetEntry['logs'][number], true> = { id: true, no: true };
 const LAP_REF: Record<keyof LapRef, true> = { logId: true, lap: true };

@@ -31,14 +31,17 @@ const $ = <T extends HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
 const bar = () => $('#top-tabs');
 const tab = (k: string) => $<HTMLButtonElement>(`#top-tab-${k}`);
 const sec = (id: string) => $(`#${id}`);
-const shown = () => ['sec-circuit', 'sec-offsets', 'sets-group'].filter((id) => !sec(id).classList.contains('top-off'));
+const shown = () => ['sec-circuit', 'sec-offsets', 'sec-refs', 'sets-group'].filter((id) => !sec(id).classList.contains('top-off'));
 
 describe('データ管理の上のタブ(案件 74): 幅が広いとき', () => {
-  it('「サーキット」「走行ライン補正データ」「比較セット」のタブが出て、初めは「比較セット」だけを出す', () => {
+  it('「サーキット」「比較セット」「走行ライン補正データ」「基準設定」のタブが出て(おまけの 2 つは右へ離す)、初めは「比較セット」だけを出す', () => {
     boot(true);
     expect(bar().hidden).toBe(false);
     expect($('#import-body').classList.contains('tabbed')).toBe(true);
-    expect(Array.from(bar().querySelectorAll('[role="tab"]')).map((b) => b.firstChild?.textContent)).toEqual(['サーキット', '走行ライン補正データ', '比較セット']);
+    expect(Array.from(bar().querySelectorAll('[role="tab"]')).map((b) => b.firstChild?.textContent)).toEqual(['サーキット', '比較セット', '走行ライン補正データ', '基準設定']);
+    expect(tab('offsets').classList.contains('gap')).toBe(true);
+    expect(tab('refs').classList.contains('gap')).toBe(false);
+    expect(tab('circuit').classList.contains('gap') || tab('sets').classList.contains('gap')).toBe(false);
     expect(tab('sets').getAttribute('aria-selected')).toBe('true');
     expect(shown()).toEqual(['sets-group']);
   });
@@ -67,10 +70,14 @@ describe('データ管理の上のタブ(案件 74): 幅が広いとき', () => 
     boot(true);
     const key = (k: string) => tab(document.activeElement?.id.replace('top-tab-', '') ?? 'sets').dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
     tab('sets').focus();
-    key('ArrowRight');                         // 比較セット → サーキット(端から回る)
+    key('ArrowRight');                         // 比較セット → 走行ライン補正データ
+    expect(shown()).toEqual(['sec-offsets']);
+    key('ArrowRight');
+    expect(shown()).toEqual(['sec-refs']);
+    key('ArrowRight');                         // 端から回る
     expect(shown()).toEqual(['sec-circuit']);
     key('End');
-    expect(shown()).toEqual(['sets-group']);
+    expect(shown()).toEqual(['sec-refs']);
     key('ArrowLeft');
     expect(shown()).toEqual(['sec-offsets']);
     key('Home');
@@ -102,7 +109,7 @@ describe('データ管理の上のタブ(案件 74): 幅が狭いとき(スマ�
     boot(false);
     expect(bar().hidden).toBe(true);
     expect($('#import-body').classList.contains('tabbed')).toBe(false);
-    expect(shown()).toEqual(['sec-circuit', 'sec-offsets', 'sets-group']);
+    expect(shown()).toEqual(['sec-circuit', 'sec-offsets', 'sec-refs', 'sets-group']);
     expect(bar().children).toHaveLength(0);
   });
 
@@ -112,6 +119,6 @@ describe('データ管理の上のタブ(案件 74): 幅が狭いとき(スマ�
     const store = new MemoryStore();
     mountApp(root, new Session(store), new ThemeController(store), () => new FakeMap());
     expect(bar().hidden).toBe(true);
-    expect(shown()).toEqual(['sec-circuit', 'sec-offsets', 'sets-group']);
+    expect(shown()).toEqual(['sec-circuit', 'sec-offsets', 'sec-refs', 'sets-group']);
   });
 });
