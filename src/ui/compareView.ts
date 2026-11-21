@@ -985,7 +985,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   }
 
   // ---------- ミニセクター表の上のドラッグ(案件 90・横向きのスマホのセクタータブ) ----------
-  // 指の速さで再生の進み方を決める(core/scrub.ts)。ドラッグ中は再生を止め、指を離したとき、もとが再生中なら、もとの速さで続ける。
+  // 指の速さで再生の進み方を決める(固定の速さ。core/scrub.ts)。ドラッグ中は再生を止め、指を離したとき、もとが再生中なら、もとの速さで続ける。
   // タップでは動かない(3px を超えて動いたら、ドラッグとみなす)
   let scrub: { id: number; vel: ScrubVelocity; wasPlaying: boolean; moving: boolean; raf: number } | null = null;
   function scrubFrame() {
@@ -997,10 +997,8 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   root.addEventListener('pointerdown', (e) => {
     const el = (e.target as HTMLElement).closest<HTMLElement>('.mini-stage');
     if (!el || scrub || engine.duration <= 0) return;
-    const w = el.getBoundingClientRect().width;
-    if (w <= 0) return;
     try { el.setPointerCapture(e.pointerId); } catch { /* 無視 */ }
-    const vel = new ScrubVelocity(w, engine.duration);            // 幅 = ラップ 1 周分の時間(1×)
+    const vel = new ScrubVelocity();                              // 速さは固定(1× = 150px/秒。core/scrub.ts)
     vel.press(e.clientX, performance.now());
     scrub = { id: e.pointerId, vel, wasPlaying: engine.playing, moving: false, raf: 0 };
   });
