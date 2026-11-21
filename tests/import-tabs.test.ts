@@ -34,14 +34,15 @@ const sec = (id: string) => $(`#${id}`);
 const shown = () => ['sec-circuit', 'sec-offsets', 'sec-refs', 'sets-group'].filter((id) => !sec(id).classList.contains('top-off'));
 
 describe('データ管理の上のタブ(案件 74): 幅が広いとき', () => {
-  it('「サーキット」「比較セット」「走行ライン補正データ」「基準設定」のタブが出て(おまけの 2 つは右へ離す)、初めは「比較セット」だけを出す', () => {
+  it('「サーキット」「比較セット」「走行ライン補正データ」「ミニセクターの基準LAP設定」のタブが出て(基本設定・拡張機能設定の 2 組に分ける)、初めは「比較セット」だけを出す', () => {
     boot(true);
     expect(bar().hidden).toBe(false);
     expect($('#import-body').classList.contains('tabbed')).toBe(true);
-    expect(Array.from(bar().querySelectorAll('[role="tab"]')).map((b) => b.firstChild?.textContent)).toEqual(['サーキット', '比較セット', '走行ライン補正データ', '基準設定']);
-    expect(tab('offsets').classList.contains('gap')).toBe(true);
-    expect(tab('refs').classList.contains('gap')).toBe(false);
-    expect(tab('circuit').classList.contains('gap') || tab('sets').classList.contains('gap')).toBe(false);
+    expect(Array.from(bar().querySelectorAll('[role="tab"]')).map((b) => b.firstChild?.textContent)).toEqual(['サーキット', '比較セット', 'ミニセクターの基準LAP設定', '走行ライン補正データ']);
+    const groups = Array.from(bar().querySelectorAll('.top-grp'));      // 組ごとに見出し(水平線つき)とタブ(案件 86)
+    expect(groups.map((g) => g.querySelector('.top-grp-h')!.textContent)).toEqual(['基本設定', '拡張機能設定']);
+    expect(groups.map((g) => Array.from(g.querySelectorAll('[role="tab"]')).map((b) => (b as HTMLElement).dataset.tab))).toEqual([['circuit', 'sets'], ['refs', 'offsets']]);
+    expect($('#top-mode').hidden).toBe(true);
     expect(tab('sets').getAttribute('aria-selected')).toBe('true');
     expect(shown()).toEqual(['sets-group']);
   });
@@ -70,16 +71,16 @@ describe('データ管理の上のタブ(案件 74): 幅が広いとき', () => 
     boot(true);
     const key = (k: string) => tab(document.activeElement?.id.replace('top-tab-', '') ?? 'sets').dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
     tab('sets').focus();
-    key('ArrowRight');                         // 比較セット → 走行ライン補正データ
-    expect(shown()).toEqual(['sec-offsets']);
-    key('ArrowRight');
+    key('ArrowRight');                         // 比較セット → ミニセクターの基準LAP設定
     expect(shown()).toEqual(['sec-refs']);
+    key('ArrowRight');
+    expect(shown()).toEqual(['sec-offsets']);
     key('ArrowRight');                         // 端から回る
     expect(shown()).toEqual(['sec-circuit']);
     key('End');
-    expect(shown()).toEqual(['sec-refs']);
-    key('ArrowLeft');
     expect(shown()).toEqual(['sec-offsets']);
+    key('ArrowLeft');
+    expect(shown()).toEqual(['sec-refs']);
     key('Home');
     expect(shown()).toEqual(['sec-circuit']);
     // サーキットの中のタブ(登録済み / ファイル / 地図)は、変わらない
@@ -111,6 +112,33 @@ describe('データ管理の上のタブ(案件 74): 幅が狭いとき(スマ�
     expect($('#import-body').classList.contains('tabbed')).toBe(false);
     expect(shown()).toEqual(['sec-circuit', 'sec-offsets', 'sec-refs', 'sets-group']);
     expect(bar().children).toHaveLength(0);
+  });
+
+  it('切り替えスライド(案件 86): 初めは基本設定(サーキット・比較セット)。拡張機能設定にすると、補正データと基準LAP設定に替わる', () => {
+    boot(false);
+    const mode = $('#top-mode');
+    const hidden = () => ['sec-circuit', 'sec-offsets', 'sec-refs', 'sets-group'].filter((id) => sec(id).classList.contains('mode-off'));
+    expect(mode.hidden).toBe(false);
+    expect(Array.from(mode.querySelectorAll('button')).map((b) => b.textContent)).toEqual(['基本設定', '拡張機能設定']);
+    expect(hidden()).toEqual(['sec-offsets', 'sec-refs']);
+    mode.querySelector<HTMLButtonElement>('[data-mode="ext"]')!.click();
+    expect($('#top-mode').dataset.mode).toBe('ext');
+    expect($('#top-mode').querySelector('[data-mode="ext"]')!.getAttribute('aria-pressed')).toBe('true');
+    expect(hidden()).toEqual(['sec-circuit', 'sets-group']);
+    $('#top-mode').querySelector<HTMLButtonElement>('[data-mode="basic"]')!.click();
+    expect(hidden()).toEqual(['sec-offsets', 'sec-refs']);
+  });
+
+  it('比較セットは折りたたみにできる(案件 86)。初めは開いていて、見出しの矢印で閉じる・開く', () => {
+    boot(false);
+    const g = $('#sets-group'), b = $<HTMLButtonElement>('.sets-fold');
+    expect(g.classList.contains('folded')).toBe(false);
+    expect(b.getAttribute('aria-expanded')).toBe('true');
+    b.click();
+    expect(g.classList.contains('folded')).toBe(true);
+    expect(b.getAttribute('aria-expanded')).toBe('false');
+    b.click();
+    expect(g.classList.contains('folded')).toBe(false);
   });
 
   it('matchMedia が無い環境でも、開閉の見出しのまま', () => {

@@ -140,7 +140,7 @@ describe('読み込み画面', () => {
 describe('レイアウトとセクター表示', () => {
   it('「サーキット」「比較セット」のグループ見出しがあり、登録項目は前者に入る', () => {
     const h = Array.from(root.querySelectorAll('h2')).map((e) => e.textContent);
-    expect(h).toEqual(['サーキット', '走行ライン補正データ管理', '基準設定', '比較セット', '比較セット1', '比較セット2', '比較セット3', '比較セット4', '比較セット5']);
+    expect(h).toEqual(['サーキット', 'ミニセクターの基準LAP設定', '走行ライン補正データ管理', '比較セット', '比較セット1', '比較セット2', '比較セット3', '比較セット4', '比較セット5']);
     const group = root.querySelector('#sets-group')!;                                   // 比較セット1〜5は 1 つの枠にまとめる(案件 27)
     expect(Array.from(group.querySelectorAll('.set-sec')).map((e) => e.id)).toEqual(['sec-set-0', 'sec-set-1', 'sec-set-2', 'sec-set-3', 'sec-set-4']);
     const circuitSec = root.querySelector('#sec-circuit')!;

@@ -90,6 +90,54 @@ describe('「基準設定」の節', () => {
   }
   const q = <T extends HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
 
+  it('基準にしたラップに「基準 N」、カードを割り当てたラップに「(A)」〜の札(同じ大きさ)。ミニセクター表の基準にしている走行には「(基準表示中)」(案件 86)', async () => {
+    const s = await boot();
+    const log = s.sets[0].logs[0];
+    const lap = log.laps.find((x) => x.complete)!.number;
+    expect(root.querySelector('.refs-using')).toBeNull();
+    expect(root.querySelector('.refs-cd')).toBeNull();
+    s.toggleAssignment('A', { logId: log.id, lap });
+    const row = () => q(`.refs-lap:nth-of-type(${lap})`);
+    const chips = () => Array.from(root.querySelectorAll('.refs-lap .refs-pc .refs-chip, .refs-lap .refs-pc .refs-cd')).map((c) => c.textContent);       // 基準 N の札と、カードの丸(A〜D)
+    expect(chips()).toEqual(['A']);
+    expect(root.querySelector('.refs-cd')!.classList.contains('sa')).toBe(true);      // カードの丸と同じ色の class
+    s.addRef(log.id, lap);
+    expect(chips()).toEqual(['基準1', 'A']);
+    expect(root.querySelector('.refs-using')).toBeNull();                      // 基準にしただけでは出ない(割当最速のまま)
+    s.setMiniBase(`ref:${s.refsOf(circuitOf(s))[0].id}`);
+    expect(q('.refs-lap .refs-using').textContent).toBe('基準表示中');
+    expect(q('.refs-file > summary .refs-using')).not.toBeNull();             // 走行ログのタイトル部の上にも出る
+    expect(Array.from(root.querySelectorAll('.refs-file > summary .refs-tags .refs-chip')).map((c) => c.textContent)).toEqual(['基準表示中', '基準1']);
+    expect(row()).not.toBeNull();
+    s.setMiniBase('fastest');
+    expect(root.querySelector('.refs-using')).toBeNull();
+  });
+
+  it('スマホの縦画面の行(案件 86): 先頭に「編集」。札は LAP 名の上。「編集」で、基準にする・解除・表示名の段が開閉する(描き直しても開いたまま)', async () => {
+    const s = await boot();
+    const log = s.sets[0].logs[0];
+    const lap = log.laps.find((x) => x.complete)!.number;
+    s.toggleAssignment('A', { logId: log.id, lap });
+    s.addRef(log.id, lap);
+    s.setMiniBase(`ref:${s.refsOfByTime(circuitOf(s))[0].id}`);
+    const row = () => root.querySelector<HTMLElement>(`.refs-lap[data-ekey="${log.id}#${lap}"]`)!;
+    const name = () => row().querySelector('.rc-name')!;
+    expect(name().querySelector<HTMLElement>('.refs-edit')!.textContent).toBe('編集');
+    expect(name().firstElementChild!.classList.contains('refs-pc')).toBe(true);        // PC 幅の並びは、そのまま残している
+    expect(Array.from(name().querySelectorAll('.refs-ltags > *')).map((c) => c.textContent)).toEqual(['基準表示中', '基準1', 'A']);
+    expect(name().querySelector('.refs-ln')!.textContent).toBe(`LAP ${lap}`);
+    expect(row().classList.contains('editing')).toBe(false);
+    row().querySelector<HTMLButtonElement>('.refs-edit')!.click();
+    expect(row().classList.contains('editing')).toBe(true);
+    expect(row().querySelector('.rc-act .refs-del')).not.toBeNull();                    // 下の段: 解除・表示名・確定(「閉じる」は無く、「編集」をもう一度押すと閉じる)
+    expect(row().querySelector('.refs-close')).toBeNull();
+    expect(row().querySelector('.rc-act .refs-name')).not.toBeNull();
+    s.renameRef(s.refsOfByTime(circuitOf(s))[0].id, 'CR');                              // 描き直されても、開いたまま
+    expect(row().classList.contains('editing')).toBe(true);
+    row().querySelector<HTMLButtonElement>('.refs-edit')!.click();
+    expect(row().classList.contains('editing')).toBe(false);
+  });
+
   it('走行ログごとに閉じた 1 行(最速ラップ)で出る。開くとラップごとに「基準にする」。押すと基準になり、表示名を入れられる', async () => {
     const s = await boot();
     expect(q('#refs-badge').textContent).toBe('基準なし');
