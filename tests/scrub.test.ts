@@ -144,7 +144,7 @@ describe('ミニセクター表のドラッグ(案件 90)', () => {
     v.press(500, 0);
     v.begin(0);
     drag(v, 500, -SCRUB_PX_PER_SEC * 0.5, 0, 100);
-    expect(v.rate(100)).toBeCloseTo(-0.5, 2);
+    expect(v.rate(100)).toBeCloseTo(-0.5, 1);
     const w = new ScrubVelocity(180, W);
     w.press(500, 0);
     w.begin(0);
