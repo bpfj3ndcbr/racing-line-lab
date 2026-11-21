@@ -15,6 +15,8 @@ function available(): boolean {
 
 /** 画面から切り替えてもらうときの合図(sw.ts が受け取って skipWaiting する) */
 export const SKIP_WAITING = 'rll-skip-waiting';
+/** 待機中の版に、その版の番号を聞く(案件 88)。返事は、一緒に渡した port に { version } で届く */
+export const GET_VERSION = 'rll-get-version';
 
 export type UpdateCheck = 'latest' | 'waiting' | 'failed';
 
@@ -27,6 +29,7 @@ export class UpdateWatcher {
   private reg: ServiceWorkerRegistration | null = null;
   private isWaiting = false;
   private applying = false;
+  private ver: string | null = null;
   private listeners = new Set<() => void>();
 
   constructor(private sw: ServiceWorkerContainer, private reload: () => void = () => window.location.reload()) {
@@ -37,7 +40,23 @@ export class UpdateWatcher {
   /** 新しい版が待機中か(今の版の次の版が取得済み) */
   get waiting(): boolean { return this.isWaiting; }
   subscribe(fn: () => void): () => void { this.listeners.add(fn); return () => { this.listeners.delete(fn); }; }
-  private set(v: boolean) { if (this.isWaiting === v) return; this.isWaiting = v; this.listeners.forEach((f) => f()); }
+  /** 待機中の新しい版の番号(まだ聞けていない・聞けないときは null。案件 88) */
+  get waitingVersion(): string | null { return this.isWaiting ? this.ver : null; }
+  private set(v: boolean) {
+    if (this.isWaiting === v) return;
+    this.isWaiting = v; this.listeners.forEach((f) => f());
+    if (v) this.askVersion(this.reg?.waiting);
+  }
+  /** 待機中の版に番号を聞く。返事が来たら画面に知らせる(古い版には聞けないので、番号なしのまま) */
+  private askVersion(w: ServiceWorker | null | undefined): void {
+    if (!w || typeof MessageChannel === 'undefined') return;
+    const ch = new MessageChannel();
+    ch.port1.onmessage = (e: MessageEvent) => {
+      const v = (e.data as { version?: unknown } | null)?.version;
+      if (typeof v === 'string' && v !== this.ver) { this.ver = v; this.listeners.forEach((f) => f()); }
+    };
+    try { w.postMessage({ type: GET_VERSION }, [ch.port2]); } catch { /* 聞けなくても「新しい版があります」は出す */ }
+  }
 
   /** 登録できたら呼ぶ。すでに待機中の版があるか、これから取得される版を見張る */
   attach(reg: ServiceWorkerRegistration): void {

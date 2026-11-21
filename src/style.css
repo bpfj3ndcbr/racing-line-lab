@@ -1328,7 +1328,10 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
   .cmp-side{width:var(--side-w);overflow:hidden;border-top:0;border-left:1px solid var(--border-strong)}
   /* 右の列: カードは常時表示。その下に「セクター」「グラフ」のタブ。選んだ方だけを出す(案件 63) */
   .cmp-side .side-upper,.side-upper-in{display:contents}
-  .cmp-side .sync-tags.sync-grp:not([hidden]){display:none}      /* 横向きのスマホは、上部バーにセクターの操作がある */
+  .cmp-side .sync-tags.sync-grp:not([hidden]){order:2}            /* セクターの操作の札は、「セクター」タブのミニセクター表の下に出す(案件 88)。縦画面と同じ札 */
+  .cmp-side #cmp-sync-status{order:1}
+  .cmp-side .sync-tags .tool-pop{top:calc(100% + 6px);bottom:auto}   /* 札のメニューは下に開く(上に開くと、スクロールの上端で切れる) */
+  .cmp-side .sync-tags .tg-swap{display:none}                    /* 入替(セクターとグラフの上下)は、横向きではタブで切り替えるので出さない */
   .cmp-side .sec-h-row{display:none}                              /* 「セクター」タブの中の「セクター」の見出しは、タブの名前と同じなので出さない */
   .cmp-cards{order:1;flex:none;padding:6px 8px}
   .side-tabs{display:flex;order:2;flex:none;gap:4px;padding:4px 8px 0;border-bottom:1px solid var(--accent)}

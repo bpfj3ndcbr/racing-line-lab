@@ -34,7 +34,7 @@ function swPlugin(): Plugin {
       for (const f of ['index.html', ...list]) hash.update(f).update(readFileSync(join(outDir, f)));
       await build({
         configFile: false, logLevel: 'warn',
-        define: { __PRECACHE__: JSON.stringify(['./', ...list]), __CACHE_VERSION__: JSON.stringify(hash.digest('hex').slice(0, 12)) },
+        define: { __PRECACHE__: JSON.stringify(['./', ...list]), __APP_VERSION__: JSON.stringify(pkg.version), __CACHE_VERSION__: JSON.stringify(hash.digest('hex').slice(0, 12)) },
         build: {
           outDir, emptyOutDir: false, copyPublicDir: false,
           lib: { entry: 'src/sw/sw.ts', formats: ['iife'], name: 'rllSw', fileName: () => 'sw.js' },

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { SKIP_WAITING, UpdateWatcher } from '../src/io/pwa';
+import { GET_VERSION, SKIP_WAITING, UpdateWatcher } from '../src/io/pwa';
 import { MemoryResumeStore } from '../src/io/resume';
 import { MemoryStore } from '../src/io/storage';
 import { Session } from '../src/store/session';
@@ -11,7 +11,10 @@ import { FakeMap } from './helpers';
 // アプリの更新(案件 50)。service worker の代わりに、動きだけ似せた偽物で確かめる
 
 class Ev { private l: Record<string, (() => void)[]> = {}; addEventListener(t: string, f: () => void) { (this.l[t] ??= []).push(f); } emit(t: string) { (this.l[t] ?? []).forEach((f) => f()); } }
-class FakeWorker extends Ev { sent: unknown[] = []; constructor(public state = 'installing') { super(); } postMessage(m: unknown) { this.sent.push(m); } set(s: string) { this.state = s; this.emit('statechange'); } }
+class FakeWorker extends Ev {
+  sent: unknown[] = []; version: string | null = null;
+  constructor(public state = 'installing') { super(); }
+  postMessage(m: unknown, transfer?: MessagePort[]) { this.sent.push(m); if ((m as { type?: string }).type === GET_VERSION && this.version) transfer?.[0]?.postMessage({ version: this.version }); } set(s: string) { this.state = s; this.emit('statechange'); } }
 class FakeReg extends Ev {
   waiting: FakeWorker | null = null; installing: FakeWorker | null = null; failUpdate = false; onUpdate: (() => void) | null = null;
   async update() { if (this.failUpdate) throw new TypeError('offline'); this.onUpdate?.(); }
@@ -70,7 +73,7 @@ describe('UpdateWatcher', () => {
     t.sw.emit('controllerchange');
     expect(t.reloaded()).toBe(0);
     t.w.apply();
-    expect(w.sent).toEqual([{ type: SKIP_WAITING }]);
+    expect(w.sent).toEqual([{ type: GET_VERSION }, { type: SKIP_WAITING }]);
     expect(t.reloaded()).toBe(0);
     t.sw.emit('controllerchange');
     expect(t.reloaded()).toBe(1);
@@ -140,7 +143,18 @@ describe('画面の知らせ', () => {
     const w = new FakeWorker(); t.reg.installing = w; t.reg.emit('updatefound'); t.reg.waiting = w; w.set('installed');
     expect(btn().textContent).toBe('更新する');
     btn().click();
-    expect(w.sent).toEqual([{ type: SKIP_WAITING }]);
+    expect(w.sent).toEqual([{ type: GET_VERSION }, { type: SKIP_WAITING }]);
+  });
+
+  it('設定の「新しい版」: 待機中の版が番号を返したら「新しい版 ○.○.○ があります(今の版は …)」と出す。返さなければ番号なし(案件 88)', async () => {
+    const t = setup(); t.attach();
+    boot(t.w);
+    const text = () => document.querySelector('#view-settings .swl[role="status"]')?.textContent ?? '';
+    const w = new FakeWorker(); w.version = '9.9.9'; t.reg.installing = w; t.reg.emit('updatefound'); t.reg.waiting = w; w.set('installed');
+    expect(text()).toBe('新しい版があります');
+    await new Promise((r) => setTimeout(r, 20));
+    expect(t.w.waitingVersion).toBe('9.9.9');
+    expect(text()).toBe(`新しい版 9.9.9 があります(今の版は ${__APP_VERSION__})`);
   });
 
   it('更新の確認が使えない環境(デスクトップ版・開発中)では、ボタンは押せない', () => {
