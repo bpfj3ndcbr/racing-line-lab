@@ -22,7 +22,7 @@ export const SCRUB_MAX_FRAME_MS = 100;
 /** この距離(px)を超えて動いたら、ドラッグとみなす(タップは何もしない) */
 export const SCRUB_START_PX = 3;
 /** ドラッグの最初のこの時間(ms)は、速さを検知しても、SCRUB_WARMUP_RATE 以下にする(乱雑に触ったとき、一気に進まないように) */
-export const SCRUB_WARMUP_MS = 150;
+export const SCRUB_WARMUP_MS = 10;
 export const SCRUB_WARMUP_RATE = 1;
 
 /**

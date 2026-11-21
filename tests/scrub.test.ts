@@ -132,24 +132,26 @@ describe('ミニセクター表のドラッグ(案件 90)', () => {
     const v = new ScrubVelocity(180, W);
     v.press(0, 0);
     v.begin(0);                                           // 3px を超えた時点で、ドラッグとみなす
-    drag(v, 0, SCRUB_FULL_PX * 2, 0, SCRUB_WARMUP_MS - 20);   // 最初から全力
-    expect(v.rate(SCRUB_WARMUP_MS - 20)).toBeCloseTo(SCRUB_WARMUP_RATE, 6);
-    expect(v.rate(SCRUB_WARMUP_MS - 20)).toBeLessThan(scrubMagnitude(SCRUB_FULL_PX * 2, 180, W));
-    drag(v, v['lastX'] as number, SCRUB_FULL_PX * 2, SCRUB_WARMUP_MS - 20, 400);
-    expect(v.rate(SCRUB_WARMUP_MS + 380)).toBeGreaterThan(50);   // 最初の一瞬が過ぎたら、速さのとおり
+    const early = SCRUB_WARMUP_MS - 1;
+    const x = drag(v, 0, SCRUB_FULL_PX * 2, 0, early, 1);     // 最初から全力
+    expect(v.rate(early)).toBeCloseTo(SCRUB_WARMUP_RATE, 6);
+    expect(v.rate(early)).toBeLessThan(scrubMagnitude(SCRUB_FULL_PX * 2, 180, W));
+    drag(v, x, SCRUB_FULL_PX * 2, early, 400);
+    expect(v.rate(early + 400)).toBeGreaterThan(50);      // 最初の一瞬が過ぎたら、速さのとおり
   });
 
   it('最初の一瞬でも、遅い動き(1× 以下)はそのまま。戻る方向も同じ', () => {
+    const early = SCRUB_WARMUP_MS - 1;
     const v = new ScrubVelocity(180, W);
     v.press(500, 0);
     v.begin(0);
-    drag(v, 500, -SCRUB_PX_PER_SEC * 0.5, 0, 100);
-    expect(v.rate(100)).toBeCloseTo(-0.5, 1);
+    drag(v, 500, -SCRUB_PX_PER_SEC * 0.5, 0, early, 1);
+    expect(v.rate(early)).toBeCloseTo(-0.5, 1);
     const w = new ScrubVelocity(180, W);
     w.press(500, 0);
     w.begin(0);
-    drag(w, 500, -SCRUB_FULL_PX * 2, 0, 100);
-    expect(w.rate(100)).toBeCloseTo(-SCRUB_WARMUP_RATE, 6);
+    drag(w, 500, -SCRUB_FULL_PX * 2, 0, early, 1);
+    expect(w.rate(early)).toBeCloseTo(-SCRUB_WARMUP_RATE, 6);
   });
 
   it('幅が分からないとき(0)は、固定のゲインのまま', () => {
