@@ -664,12 +664,25 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
     if (tb.disabled && openSub === 'sync') setSub(null);
   }
   /** 札を開く・閉じる。一度に開くのは 1 つ(null で全部閉じる) */
+  let menuScrollLock: (() => void) | null = null;
   function setSub(k: SubKey | null) {
     const was = openSub;
     openSub = k;
     for (const s of SUBS) {
       toolPop(s).hidden = s !== k;
       toolBtn(s).setAttribute('aria-expanded', String(s === k));
+    }
+    // スマホ横画面(案件 88): 札のメニューは右の列のスクロールの中に開く。メニューの上端を領域の上端に合わせ、それより上(ミニセクター表など)へはスクロールさせない
+    menuScrollLock?.(); menuScrollLock = null;
+    if (k === 'sync' || k === 'base') {
+      const pop = toolPop(k), box = pop.closest<HTMLElement>('.sec-block');
+      if (box && getComputedStyle(box).overflowY === 'auto') {
+        pop.scrollIntoView?.({ block: 'start' });
+        const min = box.scrollTop;
+        const hold = () => { if (box.scrollTop < min) box.scrollTop = min; };
+        box.addEventListener('scroll', hold);
+        menuScrollLock = () => box.removeEventListener('scroll', hold);
+      }
     }
     if (k && !was) document.addEventListener('pointerdown', onOutside, true);
     if (!k && was) document.removeEventListener('pointerdown', onOutside, true);
