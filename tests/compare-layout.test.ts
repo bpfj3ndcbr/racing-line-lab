@@ -114,7 +114,8 @@ describe('スマホの横向き(案件 46)', () => {
     expect(b).toMatch(/\.top\{flex-wrap:nowrap;[^}]*height:40px/);
     expect(b).toContain('.cmp-main{flex-direction:row}');
     expect(b).toMatch(/\.cmp\{height:calc\(100dvh - var\(--top-h\)\)|\.cmp\{[^}]*height:calc\(100dvh - var\(--top-h\)\);min-height:0\}/);
-    expect(b).toMatch(/\.cmp-cards\{display:grid;grid-template-columns:1fr 1fr/);
+    expect(b).toMatch(/\.cmp-cards\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);   // 列は文字に合わせて広がらない。幅は compareView の sideNeedW が右の列を広げて確保する(案件 89)
+    expect(b).toMatch(/\.cmp-cards \.card \.c3:has\(\.c3-gap:not\(\[hidden\]\)\)::after\{content:"000km\/h \/ \+00\.00s"/);   // 横軸が「時間」のカードは、いちばん長い形の分の幅を空ける
     expect(b).toContain('.graph-bar button{white-space:nowrap}');      // 幅が足りなくても、ボタンの文字を縦に折り返さない
     expect(b).toContain('.g-ruler{display:none}');                   // 拡大中の下のスクロールバーは出さない(グラフをなぞって動かす)
     expect(b).toMatch(/\.graph-bar\{flex-wrap:nowrap/);             // 「全体」が出ても 1 行

@@ -65,6 +65,8 @@ interface Layout { v: number; sideW: number; graphH: number }
 const DEFAULT_LAYOUT: Layout = { v: LAYOUT_VERSION, sideW: 300, graphH: 300 };
 /** 右パネルの幅の範囲(最小 220px はこれ以上狭められない) */
 const SIDE_MIN = 220, SIDE_MAX = 560, MAP_MIN_W = 240;
+/** スマホの横画面(style.css の横向きの @media と同じ条件) */
+const PHONE_LANDSCAPE = '(orientation:landscape) and (max-height:500px)';
 /** 地図を動かしたあと、前回の表示位置として覚えるまでの待ち(動き続けている間は覚えない) */
 const VIEW_SAVE_MS = 400;
 /** 速度グラフの高さの下限(これより低いと文字が読めない)、境界線の太さ、上の部分の高さが測れないときの値 */
@@ -294,9 +296,27 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   const graphMax = () => Math.max(GRAPH_MIN_H, columnH() - SPLITTER_H - upperNeed() - 2);
   const graphNow = () => clamp(layout.graphH, GRAPH_MIN_H, graphMax());
 
+  /**
+   * スマホの横画面(案件 89): カードの 2 列が文字を省略せずに収まる、右の列の幅。横軸が「時間」のカードは
+   * 「146km/h / +5.92s」のように長くなるので、列が足りないときは、保存した幅より広げる(地図が狭くなる)。それ以外の画面は 0
+   */
+  let sideNeed = 0;
+  function sideNeedW(): number {
+    if (typeof window.matchMedia !== 'function' || !window.matchMedia(PHONE_LANDSCAPE).matches) return 0;
+    const c = $('cmp-cards'), grid = c.style.gridTemplateColumns, width = c.style.width;
+    c.style.gridTemplateColumns = 'repeat(2,max-content)'; c.style.width = 'max-content';   // 文字なりの幅を測る
+    const n = c.offsetWidth, cards = Array.from(c.children) as HTMLElement[];
+    const widest = Math.max(0, ...cards.map((e) => e.offsetWidth));
+    const around = n - (cards[0]?.offsetWidth ?? 0) - (cards[1]?.offsetWidth ?? 0);   // 2 列のすきまと左右の余白
+    c.style.gridTemplateColumns = grid; c.style.width = width;
+    return n ? Math.ceil(widest * 2 + around) + 2 : 0;   // 実際の 2 列は同じ幅(いちばん広いカードに合わせる)。+ 境界線の分
+  }
+  let sideNow = layout.sideW;                           // 画面に出している右の列の幅(カードのために広げた分を含む)
   function applyLayout() {
     layout.sideW = clamp(layout.sideW, SIDE_MIN, sideMax());
-    cmpEl.style.setProperty('--side-w', `${layout.sideW}px`);
+    sideNeed = sideNeedW();
+    sideNow = clamp(Math.max(layout.sideW, sideNeed), SIDE_MIN, sideMax());
+    cmpEl.style.setProperty('--side-w', `${sideNow}px`);
     cmpEl.style.setProperty('--graph-h', `${graphNow()}px`);
     setSyncHidden((ref()?.log.circuit?.sectors.length ?? 0) === 0);
     $('cmp-sync-status').hidden = !anchor && !syncMsg;
@@ -305,9 +325,9 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   const saveLayout = () => session.setSetting('compare.layout', { ...layout });
   const sideSplit = makeSplitter({
     el: $('cmp-sp-v'), axis: 'x', dir: -1, initial: DEFAULT_LAYOUT.sideW,
-    get: () => layout.sideW,
+    get: () => sideNow,
     set: (v) => { layout.sideW = v; applyLayout(); },
-    min: () => SIDE_MIN, max: sideMax,
+    min: () => Math.min(Math.max(SIDE_MIN, sideNeed), sideMax()), max: sideMax,
     fromPointer: (x) => $('cmp-main').getBoundingClientRect().right - x,
     commit: saveLayout,
     valueText: (v) => `右パネルの幅 ${v}px`,
@@ -710,6 +730,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
         <span class="c2 num"><span class="lapno">LAP ${c.lap.number}: </span>${formatLapTime(c.lap.duration)}</span>
         <span class="c3 num"><span data-live="speed-${k}">-</span><span class="c3-gap"${xKind === 'dist' ? ' hidden' : ''}> / <span data-live="gap-${k}">-</span></span></span></span></button>`;
     }).join('');
+    applyLayout();                                        // カードの文字が変わったので、右の列の幅を測り直す(案件 89)
   }
 
   function syncCards() {
@@ -1215,7 +1236,9 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
         gapText.set(c.slot, g);
       }
     }
-    root.querySelectorAll<HTMLElement>('.c3-gap').forEach((e) => { if (e.hidden !== (xKind === 'dist')) e.hidden = xKind === 'dist'; });
+    let gapChanged = false;
+    root.querySelectorAll<HTMLElement>('.c3-gap').forEach((e) => { if (e.hidden !== (xKind === 'dist')) { e.hidden = xKind === 'dist'; gapChanged = true; } });
+    if (gapChanged) applyLayout();                        // 横軸を切り替えると、カードの文字の長さが変わる(案件 89)
     // 地図の車(引き出し線の先に「速度kph/タイム差」。基準の車は速度だけ)
     map?.setCars(onMap.map(({ c, s }) => ({
       slot: c.slot, lat: s.lat, lon: s.lon, heading: s.heading,
