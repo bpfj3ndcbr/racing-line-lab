@@ -4,8 +4,8 @@
  * 指を止めると止まる。画面には出さない。
  */
 
-/** 1× になる指の速さ(画面の px/秒) */
-export const SCRUB_PX_PER_SEC = 150;
+/** 1× になる指の速さ(画面の px/秒)。速く動かしたとき 8× に届く程度 */
+export const SCRUB_PX_PER_SEC = 15;
 /** 早送りの上限(倍) */
 export const SCRUB_MAX_RATE = 8;
 /** この時間(ms)、指が動かなければ、再生は止まる */

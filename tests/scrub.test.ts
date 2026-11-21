@@ -12,7 +12,7 @@ function drag(v: ScrubVelocity, from: number, pxPerSec: number, startMs: number,
 }
 
 describe('ミニセクター表のドラッグ(案件 90)', () => {
-  it('固定の速さ(150px/秒)で動かすと、1× になる', () => {
+  it('固定の速さ(SCRUB_PX_PER_SEC)で動かすと、1× になる', () => {
     const v = new ScrubVelocity();
     v.press(0, 0);
     drag(v, 0, SCRUB_PX_PER_SEC, 0, 2000);
@@ -22,10 +22,10 @@ describe('ミニセクター表のドラッグ(案件 90)', () => {
   it('遅く動かすと 1× より遅く、速く動かすと速く進む(速さに比例する)', () => {
     const slow = new ScrubVelocity();
     slow.press(0, 0);
-    drag(slow, 0, 15, 0, 2000);
+    drag(slow, 0, SCRUB_PX_PER_SEC * 0.1, 0, 2000);
     const fast = new ScrubVelocity();
     fast.press(0, 0);
-    drag(fast, 0, 600, 0, 2000);
+    drag(fast, 0, SCRUB_PX_PER_SEC * 4, 0, 2000);
     expect(slow.rate(2000)).toBeCloseTo(0.1, 2);
     expect(fast.rate(2000)).toBeCloseTo(4, 2);
   });
@@ -33,7 +33,7 @@ describe('ミニセクター表のドラッグ(案件 90)', () => {
   it('早送りは上限(8×)で止まる', () => {
     const v = new ScrubVelocity();
     v.press(0, 0);
-    drag(v, 0, 3000, 0, 2000);
+    drag(v, 0, SCRUB_PX_PER_SEC * 20, 0, 2000);
     expect(v.rate(2000)).toBe(SCRUB_MAX_RATE);
   });
 
@@ -61,7 +61,7 @@ describe('ミニセクター表のドラッグ(案件 90)', () => {
   it('指を止めると、再生は止まる', () => {
     const v = new ScrubVelocity();
     v.press(0, 0);
-    const x = drag(v, 0, 300, 0, 500);
+    const x = drag(v, 0, SCRUB_PX_PER_SEC * 2, 0, 500);
     expect(v.advance(500)).toBeGreaterThan(0);
     expect(v.advance(500 + SCRUB_STALE_MS + 1)).toBe(0);
     expect(v.advance(2000)).toBe(0);
@@ -87,11 +87,11 @@ describe('ミニセクター表のドラッグ(案件 90)', () => {
   it('一度に進む量は、上限(MAX_FRAME_MS)までに抑える', () => {
     const v = new ScrubVelocity();
     v.press(0, 0);
-    drag(v, 0, 150, 0, 500);
+    drag(v, 0, SCRUB_PX_PER_SEC, 0, 500);
     const big = v.advance(500 + 1000);
     const cap = new ScrubVelocity();
     cap.press(0, 0);
-    drag(cap, 0, 150, 0, 500);
+    drag(cap, 0, SCRUB_PX_PER_SEC, 0, 500);
     expect(big).toBeCloseTo(cap.advance(500 + SCRUB_MAX_FRAME_MS), 6);
   });
 });
