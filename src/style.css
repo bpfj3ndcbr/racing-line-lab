@@ -518,6 +518,7 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .mini-seg.t-base{background:var(--mini-base)}
 .mini-seg.t-baseslow{background:var(--mini-baseslow)}              /* 基準の車の行(比べる相手が無い区間) */
 .mini-cell[data-none] .mini-seg{opacity:.2}
+.mini-stage{display:none}                                                                       /* ドラッグのステージ(案件 90)。横向きのセクタータブでだけ出す(下の @media) */
 .sync-grp{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
 .sync-grp[hidden]{display:none}
 /* セクターの操作のまとまり(「先頭車両・全車一致・解除」「自動」「S1〜」)ごとに、左に細い縦線(案件 58) */
@@ -1441,6 +1442,11 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
   .mini-corner,.mini-name{display:none}
   .mini-cell.empty{display:block}
   .mini-cell{height:12px;align-self:center;gap:1px}
+}
+/* ミニセクター表の上のドラッグのステージ(案件 90)。横向きのセクタータブでだけ出す。表の上を全部おおい、縦の動きは使わない */
+@media (orientation:landscape) and (max-height:500px){
+  .secs .mini-tbl{position:relative}
+  .cmp-side[data-tab="sectors"] .mini-stage{display:block;position:absolute;inset:0;z-index:1;touch-action:none;cursor:ew-resize}
 }
 @media (max-width:420px) and (orientation:portrait){
   .cmp-ctl{gap:4px}                      /* 狭い幅でも、4 つのボタン・再生速度・つまみが 1 行に入るように */

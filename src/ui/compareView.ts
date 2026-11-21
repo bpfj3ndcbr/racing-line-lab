@@ -5,6 +5,7 @@ import {
 import type { LoadedLog, RefLap, Session } from '../store/session';
 import { Prefs, RATE_CHOICES, ZOOM_CHOICES, type FollowV as Follow, type LabelV, type MapModeV as MapMode, type PrefKey, type SyncV as SyncMode } from '../store/prefs';
 import { SpeedGraph, ZOOM_MAX, type XKind } from './speedGraph';
+import { ScrubVelocity } from '../core/scrub';
 import { clamp, makeSplitter } from './splitter';
 import { isTypingTarget, modalOpen } from './nudge';
 import type { HeatRun, MapFactory, TrackMap } from './mapTypes';
@@ -934,7 +935,8 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
     }).join('');
     renderBaseInfo();
     syncMenuButtons();
-    $('cmp-sectors').innerHTML = `<div class="mini-tbl" style="--n:${cols}">${head}${rows}</div>`;
+    // 末尾のステージ: 表の上を全部おおう透明な面(横向きのスマホのセクタータブで、ドラッグして再生位置を動かす。案件 90)
+    $('cmp-sectors').innerHTML = `<div class="mini-tbl" style="--n:${cols}">${head}${rows}<span class="mini-stage" aria-hidden="true"></span></div>`;
     miniDone.clear();
   }
   /** 色分け。基準の車の行は、速度があるのに色が付かない区間(比べる相手が無い)を青にする */
@@ -981,6 +983,44 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
     syncModeUi();
     renderSyncStatus();
   }
+
+  // ---------- ミニセクター表の上のドラッグ(案件 90・横向きのスマホのセクタータブ) ----------
+  // 指の速さで再生の進み方を決める(固定の速さ。core/scrub.ts)。ドラッグ中は再生を止め、指を離したとき、もとが再生中なら、もとの速さで続ける。
+  // タップでは動かない(3px を超えて動いたら、ドラッグとみなす)
+  let scrub: { id: number; vel: ScrubVelocity; wasPlaying: boolean; moving: boolean; raf: number } | null = null;
+  function scrubFrame() {
+    if (!scrub) return;
+    const dt = scrub.vel.advance(performance.now());
+    if (dt !== 0) engine.seek(engine.t + dt);                    // seek は 0 〜 ラップの長さに収める
+    scrub.raf = requestAnimationFrame(scrubFrame);
+  }
+  root.addEventListener('pointerdown', (e) => {
+    const el = (e.target as HTMLElement).closest<HTMLElement>('.mini-stage');
+    if (!el || scrub || engine.duration <= 0) return;
+    try { el.setPointerCapture(e.pointerId); } catch { /* 無視 */ }
+    const vel = new ScrubVelocity(engine.duration, el.getBoundingClientRect().width);   // 速さの決め方は core/scrub.ts(遅いところは固定、速いところは表の幅 = コース全体)
+    vel.press(e.clientX, performance.now());
+    scrub = { id: e.pointerId, vel, wasPlaying: engine.playing, moving: false, raf: 0 };
+  });
+  root.addEventListener('pointermove', (e) => {
+    const s = scrub;
+    if (!s || e.pointerId !== s.id) return;
+    s.vel.move(e.clientX, performance.now());
+    if (s.moving || !s.vel.isDrag(e.clientX)) return;
+    s.moving = true;
+    s.vel.begin(performance.now());                              // 最初の一瞬は、速く動かしても、ゆっくりだけ進める(乱雑に触っても一気に進まない)
+    if (engine.playing) engine.pause();                          // ドラッグ中は、指の動きで再生位置を動かす
+    if (typeof requestAnimationFrame === 'function') s.raf = requestAnimationFrame(scrubFrame);
+  });
+  const endScrub = (e: PointerEvent) => {
+    const s = scrub;
+    if (!s || e.pointerId !== s.id) return;
+    scrub = null;
+    if (s.raf && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(s.raf);
+    if (s.moving && s.wasPlaying && engine.t < engine.duration - 1e-9) engine.play();   // もとが再生中なら、もとの速さで続ける
+  };
+  root.addEventListener('pointerup', endScrub);
+  root.addEventListener('pointercancel', endScrub);
 
   /** ボタンの動作の切り替え表示と、その説明 */
   function syncModeUi() {
