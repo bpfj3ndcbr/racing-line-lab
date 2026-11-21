@@ -1341,8 +1341,10 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
   .side-graph{order:3;flex:1 1 0;height:auto;border-bottom:0;border-top:0}
   .cmp-side[data-tab="graph"] .sec-block,.cmp-side[data-tab="sectors"] .side-graph{display:none}
   .cmp-side>.splitter{display:none}
-  .cmp-cards{display:grid;grid-template-columns:1fr 1fr;gap:4px}
-  .cmp-cards .card{min-height:40px;padding:2px 6px;gap:6px}
+  .cmp-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}   /* 列の幅は右の列の幅を等分する。文字に合わせて広がらない(広げるのは compareView の sideNeedW。案件 89) */
+  .cmp-cards .card{min-height:40px;padding:2px 6px;gap:6px;min-width:0}
+  /* 横軸が「時間」のカードの 3 行目(速度 / タイム差)は、数字が変わっても幅が動かないよう、いちばん長い形の分を空けておく */
+  .cmp-cards .card .c3:has(.c3-gap:not([hidden]))::after{content:"000km/h / +00.00s";display:block;height:0;overflow:hidden;visibility:hidden}
   .cmp-cards .card .chip{width:20px;height:20px;font-size:11px}
   .cmp-cards .card-body>*{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}   /* 右の列を狭くしても、カードの文字は折り返さない */
   .cmp-ctl{padding:4px 8px;gap:4px}
