@@ -18,6 +18,8 @@ const sw = self as unknown as ServiceWorkerGlobalScope;
 declare const __PRECACHE__: string[];
 /** アプリのファイルの組み合わせごとの印。変わると、新しい版として入れ直す */
 declare const __CACHE_VERSION__: string;
+/** アプリの版の番号(package.json)。設定の「新しい版 ○.○.○ があります」に使う(案件 88) */
+declare const __APP_VERSION__: string;
 
 const APP_CACHE = `rll-app-${__CACHE_VERSION__}`;
 const APP_PREFIX = 'rll-app-';
@@ -41,6 +43,7 @@ const loadAreas = () => areas ??= caches.open(TILE_META_CACHE)
 sw.addEventListener('message', (e) => {
   const type = (e.data as { type?: string } | null)?.type;
   if (type === 'rll-areas') areas = null;
+  else if (type === 'rll-get-version') e.ports[0]?.postMessage({ version: __APP_VERSION__ });   // 設定の「新しい版 ○.○.○」(案件 88)
   else if (type === 'rll-skip-waiting') void sw.skipWaiting();      // 設定の「更新する」(案件 50): 待機中の新しい版に今すぐ代わる
 });
 

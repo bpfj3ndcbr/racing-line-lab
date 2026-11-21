@@ -173,7 +173,7 @@ export function mountSettingsView(root: HTMLElement, prefs: Prefs, onChange: (ke
         }
         if (r.kind === 'update') {
           const label = updates?.waiting ? '更新する' : updBusy ? '確認中…' : '更新を確認する';
-          const text = !updates ? '(インストールした Web 版のみ)' : updates.waiting ? '新しい版があります' : updMsg;
+          const text = !updates ? '(インストールした Web 版のみ)' : updates.waiting ? (updates.waitingVersion ? `新しい版 ${esc(updates.waitingVersion)} があります(今の版は ${__APP_VERSION__})` : '新しい版があります') : updMsg;
           return `<div class="srow"><div class="sname">${r.name}</div><div class="sctl"><button type="button" class="btn${updates?.waiting ? ' pri' : ''}" data-update${updates && !updBusy ? '' : ' disabled'}>${label}</button>`
             + `<span class="swl" role="status">${text}</span></div><div class="srem"></div>${r.hint ? `<div class="shint">${r.hint}</div>` : ''}</div>`;
         }
