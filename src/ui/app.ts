@@ -10,6 +10,7 @@ import { logoSvg } from './logo';
 import { bindToast, mountToast } from './toast';
 import { showAbout } from './aboutView';
 import { mountHelpView } from './helpView';
+import { createFooter } from './footer';
 import { applyAnalytics } from '../io/analytics';
 import { openResumeStore, type ResumeStore } from '../io/resume';
 import { openNativeTileStore, openTileStore, type TileStore } from '../io/tileStore';
@@ -84,7 +85,7 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
     if (v === 'import' && current !== 'import') importApi?.closeSets();     // ほかのタブから戻ったら、比較セットはすべて閉じる(案件 26)
     const from = current;
     current = v;
-    if (v === 'help' && !helpEl.firstChild) mountHelpView(helpEl);     // 開いたときに 1 回だけ作る
+    if (v === 'help' && !helpEl.firstChild) { mountHelpView(helpEl); helpEl.append(createFooter()); }     // 開いたときに 1 回だけ作る
     if (v === 'settings' && from !== 'settings') settingsApi?.refresh();        // 地図の保存の容量を数え直す
     helpEl.hidden = v !== 'help';
     importEl.hidden = v !== 'import';
@@ -215,6 +216,7 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
   }
 
   importApi = mountImportView(importEl, session, { onCompare: () => void leaveTo('compare'), onWorkChange: renderNav, mapFactory, theme, zoom: () => prefs.get('zoom').value as number });
+  importEl.append(createFooter());
   session.subscribe(renderTop);
   // 画面の下の通知(案件 53): 読み込みの失敗・結果などの案内と、読み込み中の案内
   const syncToast = bindToast(mountToast(root), session);

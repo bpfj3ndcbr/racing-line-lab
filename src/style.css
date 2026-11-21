@@ -1527,3 +1527,6 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .sets-group.folded>.sets-group-h{border-bottom:0;border-radius:calc(var(--r-l) - 1px)}
 .tabbed .sets-fold{display:none}
 .tabbed .sets-group.folded>:not(.sets-group-h){display:revert!important}
+
+/* 各画面(使い方・データ管理・設定)の最下部のフッター(案件 87) */
+.app-foot{padding:18px 16px 22px;text-align:center;color:var(--muted);font-size:11px}

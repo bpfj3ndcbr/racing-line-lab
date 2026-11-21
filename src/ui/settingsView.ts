@@ -1,3 +1,4 @@
+import { footerHtml } from './footer';
 import { Prefs, RATE_CHOICES, SPEED_RANGE, ZOOM_CHOICES, type PrefKey, type PrefValues, type StartPos } from '../store/prefs';
 import { type Circuit, type SaveArea, type TileId, tileInRect, escapeHtml as esc } from '../core';
 import type { MapAreas } from '../store/mapAreas';
@@ -228,7 +229,7 @@ export function mountSettingsView(root: HTMLElement, prefs: Prefs, onChange: (ke
       }).join('')}</section>`).join('')}
       <div class="btn-row reset-row"><button type="button" class="btn" data-reset>${resetArmed ? 'もう一度押すと、すべて初期値に戻します' : 'すべて初期値に戻す'}</button>
       <button type="button" class="btn danger wipe-btn" data-wipe>${wipeArmed ? 'もう一度押すと、アプリを初期状態に戻します' : 'アプリを初期状態に戻す'}</button></div>
-    </div>`;
+    </div>${footerHtml()}`;
   }
 
   const setVal = (key: PrefKey, raw: string) => {
