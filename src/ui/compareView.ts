@@ -1,8 +1,10 @@
 import {
-  type HeatRun as CoreRun, type Lap, type LapSeries, PlaybackEngine, SLOTS, type Slot,
+  type HeatRun as CoreRun, type Lap, type LapSeries, type MiniSplit, PlaybackEngine, SLOTS, type Slot,
   MINI_COUNT, accelSeries, isInPassOrder, alignedSeries, buildLapSeries, miniIndexAt, miniSpeeds, miniTone, pickRuler, segmentRange, formatLapTime, heatColor, heatRuns, sampleSeries, sampleSeriesSmooth, speedColor, speedRange, speedRuns, timeAtDistance, escapeHtml as esc
 } from '../core';
 import type { LoadedLog, RefLap, Session } from '../store/session';
+import { alertDialog } from './dialog';
+import { INFO_ICON } from './icons';
 import { Prefs, RATE_CHOICES, ZOOM_CHOICES, type FollowV as Follow, type LabelV, type MapModeV as MapMode, type PrefKey, type SyncV as SyncMode } from '../store/prefs';
 import { SpeedGraph, ZOOM_MAX, type XKind } from './speedGraph';
 import { ScrubVelocity } from '../core/scrub';
@@ -153,23 +155,37 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
                   <span class="sync-part swap-part" data-no-top><button type="button" class="btn xs" data-act="swap-graph" aria-pressed="false"
                     title="セクターの表とグラフの上下を入れ替えます" aria-label="セクターの表とグラフの上下を入れ替え">入替</button></span>
                 </div>
-                <div id="cmp-sync-tags" class="sync-grp sync-tags" aria-label="セクターの操作(スマホの縦画面)">
-                  <div class="tool tg-sync">
-                    <button type="button" class="tool-btn" id="cmp-tool-sync" data-act="menu-sub" data-sub="sync" aria-haspopup="menu" aria-expanded="false" aria-controls="cmp-sub-sync" title="セクターボタンの動作"><span data-now="sync"></span></button>
-                    <div class="ov-list tool-pop" id="cmp-sub-sync" role="menu" aria-label="セクターボタンの動作" hidden>
-                      <button type="button" role="menuitemradio" data-act="syncmode" data-mode="leader" aria-checked="false">先頭車両</button>
-                      <button type="button" role="menuitemradio" data-act="syncmode" data-mode="all" aria-checked="true" class="on">全車一致</button>
-                      <button type="button" data-act="sync-release" disabled title="選んでいるセクターを解除して、通常の表示に戻します(自動もオフにします)">解除</button>
-                      <div class="menu-note" id="cmp-sync-note" hidden>先頭車両・全車一致は、横軸が「時間」のときだけ選べます(今は「距離」)</div>
+                <div id="cmp-sync-tags" class="sync-grp sync-tags" aria-label="セクターの操作(スマホの縦画面・横画面)">
+                  <div class="tg-grps">
+                  <div class="tg-grp tg-grp-sec">
+                    <div class="tg-title">セクター</div>
+                    <div class="tg-row">
+                      <div class="tool tg-sync">
+                        <button type="button" class="tool-btn" id="cmp-tool-sync" data-act="menu-sub" data-sub="sync" aria-haspopup="menu" aria-expanded="false" aria-controls="cmp-sub-sync" title="セクターボタンの動作"><span data-now="sync"></span></button>
+                        <div class="ov-list tool-pop" id="cmp-sub-sync" role="menu" aria-label="セクターボタンの動作" hidden>
+                          <button type="button" role="menuitemradio" data-act="syncmode" data-mode="leader" aria-checked="false">先頭車両</button>
+                          <button type="button" role="menuitemradio" data-act="syncmode" data-mode="all" aria-checked="true" class="on">全車一致</button>
+                          <button type="button" data-act="sync-release" disabled title="選んでいるセクターを解除して、通常の表示に戻します(自動もオフにします)">解除</button>
+                          <div class="menu-note" id="cmp-sync-note" hidden>先頭車両・全車一致は、横軸が「時間」のときだけ選べます(今は「距離」)</div>
+                        </div>
+                      </div>
+                      <div class="tool tg-auto"><button type="button" class="tool-btn" data-act="autosync" aria-pressed="false" title="セクター通過時の自動合わせ">自動</button></div>
+                      <div class="tool tg-swap"><button type="button" class="tool-btn" data-act="swap-graph" aria-pressed="false" title="セクターの表とグラフの上下を入れ替えます">入替</button></div>
                     </div>
                   </div>
-                  <div class="tool tg-auto"><button type="button" class="tool-btn" data-act="autosync" aria-pressed="false" title="セクター通過時の自動合わせ">自動</button></div>
-                  <div class="tool tg-swap"><button type="button" class="tool-btn" data-act="swap-graph" aria-pressed="false" title="セクターの表とグラフの上下を入れ替えます">入替</button></div>
-                  <div class="tool tg-base">
-                    <button type="button" class="tool-btn" id="cmp-tool-base" data-act="menu-sub" data-sub="base" aria-haspopup="menu" aria-expanded="false" aria-controls="cmp-sub-base" title="ミニセクターの比較基準"><span data-now="base"></span></button>
-                    <div class="ov-list tool-pop" id="cmp-sub-base" role="menu" aria-label="ミニセクターの比較基準" hidden>
+                  <div class="tg-grp tg-grp-seg">
+                    <div class="tg-title">セグメント</div>
+                    <div class="tg-row">
+                      <div class="tool tg-base">
+                        <button type="button" class="tool-btn" id="cmp-tool-base" data-act="menu-sub" data-sub="base" aria-haspopup="menu" aria-expanded="false" aria-controls="cmp-sub-base" title="ミニセクターの比較基準"><span data-now="base"></span></button>
+                        <div class="ov-list tool-pop" id="cmp-sub-base" role="menu" aria-label="ミニセクターの比較基準" hidden>
+                        </div>
+                      </div>
+                      <div class="tool tg-split"><button type="button" class="tool-btn" data-act="minisplit" title="ミニセクターの区切り方">距離分割</button></div>
                     </div>
                   </div>
+                  </div>
+                  <p class="mini-note"><button type="button" class="mini-info" data-act="mini-info" aria-haspopup="dialog" aria-label="ミニセクターの誤差について" title="ミニセクターの誤差について">${INFO_ICON}</button><span>ミニセクターの誤差について</span></p>
                 </div>
                 <div id="cmp-sectors" class="secs"></div>
                 <div id="cmp-sync-status" class="sub sync-status" role="status" hidden>
@@ -224,6 +240,8 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   // スマホの縦画面: セクターの表とグラフの上下(入れ替えボタン。CSS が data-first を見て並べる)。新しいキー compare.sectorsFirst に覚える
   let sectorsFirst = session.getSetting<boolean>('compare.sectorsFirst', true) !== false;   // 初めは、セクターのエリアが上
   // ミニセクター表の比較基準(案件 85): 'fastest' = 割り当てた車のうち最速 / 'card:A' = そのカード / 'ref:<id>' = 基準設定の走行。比較セットごとに、セッションが覚える(session.active.miniBase)
+  // ミニセクターの区切り方(案件 91): 'dist' = 距離分割(初期値)/ 'time' = 時間分割。新しいキー compare.miniSplit に覚える(全体で 1 つ)
+  let miniSplit: MiniSplit = session.getSetting<string>('compare.miniSplit', 'dist') === 'time' ? 'time' : 'dist';
   let activeSector: number | null = null;      // 選んでいるセクター(どちらの動作でも)
   // セクター通過時の自動合わせ(案件 58): オンのとき、再生で基準の車がセクターを通ると、そのセクターのボタンを押したのと同じにする
   let autoSync = false;
@@ -265,11 +283,35 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
     ...(deps.topSlot ? deps.topSlot.querySelectorAll<HTMLElement>(sel) : []),
   ];
   /** セクターボタンの動作の切り替え(右の列と上部バー)を、セクターが無いときは隠す */
-  const setSyncHidden = (h: boolean) => findAll('.sync-grp').forEach((g) => { g.hidden = h; });
+  const setSyncHidden = (h: boolean) => findAll('.sync-grp').forEach((g) => {
+    const grps = g.querySelector<HTMLElement>('.tg-grps');       // 札の欄(案件 91)は、中の札の組だけ隠す(下の注記は、セクターが無くても表に付く)
+    if (grps) grps.hidden = h; else g.hidden = h;
+  });
   /** 入れ替えボタンの状態と、右の列の並び(data-first。スマホの縦画面で CSS が使う) */
   function syncSwap() {
     $('cmp-side').dataset.first = sectorsFirst ? 'sectors' : 'graph';
     findAll('[data-act="swap-graph"]').forEach((b) => { b.classList.toggle('on', sectorsFirst); b.setAttribute('aria-pressed', String(sectorsFirst)); });
+  }
+  /** ミニセクターの区切り方の札(案件 91): 今の名前を出す。押すと、距離分割 / 時間分割を切り替える */
+  const SPLIT_NAME: Record<MiniSplit, string> = { dist: '距離分割', time: '時間分割' };
+  const SPLIT_TEXT: Record<MiniSplit, string> = {
+    dist: 'ミニセクターの区切り方: 距離分割(各区間を、走った距離で 5 等分)。押すと時間分割にします',
+    time: 'ミニセクターの区切り方: 時間分割(各区間を、かかった時間で 5 等分)。押すと距離分割にします',
+  };
+  function syncSplitUi() {
+    findAll('[data-act="minisplit"]').forEach((b) => {
+      b.textContent = SPLIT_NAME[miniSplit];
+      b.title = SPLIT_TEXT[miniSplit];
+      b.setAttribute('aria-label', SPLIT_TEXT[miniSplit]);
+    });
+  }
+  function setMiniSplit(v: MiniSplit) {
+    if (v === miniSplit) return;
+    miniSplit = v;
+    session.setSetting('compare.miniSplit', v);
+    syncSplitUi();
+    renderMini();                                                // 区間の速さと色分けを計算し直す(通過済みの表示は、次のコマで描き直す)
+    updateFrame();
   }
   const setPressed = (sel: string, match: (b: HTMLElement) => boolean) =>
     findAll(sel).forEach((b) => {
@@ -310,7 +352,33 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
     const widest = Math.max(0, ...cards.map((e) => e.offsetWidth));
     const around = n - (cards[0]?.offsetWidth ?? 0) - (cards[1]?.offsetWidth ?? 0);   // 2 列のすきまと左右の余白
     c.style.gridTemplateColumns = grid; c.style.width = width;
-    return n ? Math.ceil(widest * 2 + around) + 2 : 0;   // 実際の 2 列は同じ幅(いちばん広いカードに合わせる)。+ 境界線の分
+    const cardsNeed = n ? Math.ceil(widest * 2 + around) + 2 : 0;   // 実際の 2 列は同じ幅(いちばん広いカードに合わせる)。+ 境界線の分
+    // 札の「セクター」「セグメント」の 2 組が 1 段に収まる幅(案件 91)。左右の余白 16px と境界線の分を足す
+    // 「セクター」タブを開いていないときは、札が表示されず測れないので、写しを画面の外に置いて測る
+    const g = root.querySelector<HTMLElement>('.tg-grps');
+    let tagsNeed = 0;
+    if (g && !g.hidden) {
+      const holder = document.createElement('div');
+      holder.className = 'sync-tags';
+      holder.style.cssText = 'position:absolute;visibility:hidden;pointer-events:none;left:0;top:0;display:block';
+      const probe = g.cloneNode(true) as HTMLElement;
+      probe.querySelectorAll('[id]').forEach((e) => e.removeAttribute('id'));
+      probe.style.cssText = 'flex-wrap:nowrap;width:max-content';
+      holder.appendChild(probe);
+      $('cmp-side').appendChild(holder);
+      tagsNeed = probe.offsetWidth ? probe.offsetWidth + 16 + 2 : 0;
+      holder.remove();
+    }
+    return Math.max(cardsNeed, tagsNeed);
+  }
+  /** 札(セクター・セグメントの 2 組)の文字が変わったら、右の列の幅を測り直す(スマホの横画面で、札が 2 段にならないように。案件 91) */
+  let tagsSig = '';
+  function fitSide() {
+    const g = root.querySelector<HTMLElement>('.tg-grps');
+    const sig = g ? g.textContent + (g.hidden ? '|h' : '') : '';
+    if (sig === tagsSig) return;
+    tagsSig = sig;
+    applyLayout();
   }
   let sideNow = layout.sideW;                           // 画面に出している右の列の幅(カードのために広げた分を含む)
   function applyLayout() {
@@ -672,6 +740,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
       toolBtn(k).title = b.text;
       toolBtn(k).setAttribute('aria-label', b.text);
     }
+    fitSide();
     // セクター合わせの札: 動作を選べるのは、「時間」で、セクターを選んでいるか「自動」がオンのとき。解除はセクターを選んでいるか「自動」がオンのとき。
     // 中身が全部使えないときは、札も押せない
     const releasable = activeSector !== null || autoSync;
@@ -784,11 +853,11 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   const miniCache = new WeakMap<Lap, MiniData>();
   function miniDataOf(lap: Lap, series: LapSeries, n: number): MiniData {
     // 同じラップでも、セクターの通過時刻やラップの長さが変わったら計算し直す(キーで見分ける)
-    const key = `${n}|${lap.duration}|${lap.sectorTimes.join(',')}`;
+    const key = `${n}|${miniSplit}|${lap.duration}|${lap.sectorTimes.join(',')}`;
     let d = miniCache.get(lap);
     if (!d || d.key !== key) {
       const ranges = Array.from({ length: n + 1 }, (_, j) => segmentRange(lap, j, n));
-      d = { key, ranges, speeds: ranges.map((r) => (r ? miniSpeeds(series, r.a, r.b) : Array<number | null>(MINI_COUNT).fill(null))) };
+      d = { key, ranges, speeds: ranges.map((r) => (r ? miniSpeeds(series, r.a, r.b, MINI_COUNT, miniSplit) : Array<number | null>(MINI_COUNT).fill(null))) };
       miniCache.set(lap, d);
     }
     return d;
@@ -952,7 +1021,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
     const n = ref()?.log.circuit?.sectors.length ?? 0;
     for (const { c, t } of pos) {
       const d = miniDataOf(c.lap, c.series, n);
-      const counts = d.ranges.map((r) => !r || t <= r.a ? 0 : t >= r.b ? MINI_COUNT : Math.max(0, miniIndexAt(c.series, r.a, r.b, t)));
+      const counts = d.ranges.map((r) => !r || t <= r.a ? 0 : t >= r.b ? MINI_COUNT : Math.max(0, miniIndexAt(c.series, r.a, r.b, t, MINI_COUNT, miniSplit)));
       const key = counts.join(',');
       if (miniDone.get(c.slot) === key) continue;
       miniDone.set(c.slot, key);
@@ -1044,6 +1113,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
       b.classList.toggle('on', autoSync);
       b.setAttribute('aria-pressed', String(autoSync));
     });
+    fitSide();                                                   // 「自動 先頭」のように文字が長くなる
   }
   function setAutoSync(on: boolean) {
     autoSync = on; autoSkip = null;
@@ -1381,6 +1451,10 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
         setSub(null);
         session.setMiniBase(d.key ?? 'fastest');                 // 購読が、表の作り直しと札の更新をする
         break;
+      case 'mini-info':
+        void alertDialog({ title: 'ミニセクターの誤差について', detail: 'ミニセクターはGPSの位置・距離からセクター間を5分割して求めているため誤差があります。走り方やGPSの誤差で「距離分割」「時間分割」それぞれ違いが出ます。ラップを比べる目安としてご覧ください。', ok: '閉じる' });
+        break;
+      case 'minisplit': setMiniSplit(miniSplit === 'dist' ? 'time' : 'dist'); break;
       case 'swap-graph': sectorsFirst = !sectorsFirst; session.setSetting('compare.sectorsFirst', sectorsFirst); syncSwap(); break;
       case 'syncmode':
         syncMode = d.mode as SyncMode;
@@ -1484,6 +1558,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
 
   setChecked('[data-act="mapmode"]', (b) => b.dataset.mode === mapMode);
   setPressed('[data-act="xkind"]', (b) => b.dataset.kind === xKind);
+  syncSplitUi();
   engine.setRate(prefs.initial('rate'));
   setPressed('[data-act="rate"]', (b) => Number(b.dataset.rate) === engine.rate);
   graph.setYRange(prefs.yMin, prefs.yMax);

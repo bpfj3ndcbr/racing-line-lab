@@ -48,6 +48,7 @@
   --menu-follow: #1f6fd1; --menu-follow-on: #ffffff;
   --menu-line: #0f7c8c; --menu-line-on: #ffffff;
   --menu-label: #c46a00; --menu-label-on: #ffffff;
+  --menu-split: #2e7d4f; --menu-split-on: #ffffff;
   /* 地図の下のセクターの線(案件 82): 通常の区間は濃い青、今の走行位置の区間は薄い青。透明にしない */
   --seg-off: #1757a6; --seg-on: #9cc5f2;
   /* ミニセクター表の区間の色(案件 6): 基準より速い / 遅い / 自己ベストより速い / 比べられない */
@@ -92,6 +93,7 @@
   --menu-follow: #2b78c9; --menu-follow-on: #ffffff;
   --menu-line: #11808f; --menu-line-on: #ffffff;
   --menu-label: #b8620a; --menu-label-on: #ffffff;
+  --menu-split: #3a8f5f; --menu-split-on: #ffffff;
   --seg-off: #1757a6; --seg-on: #9cc5f2;
   --mini-fast: #3fbf7a; --mini-slow: #f0c419; --mini-pb: #b97ae0; --mini-base: #58a6ff; --mini-baseslow: #ff9f43; --mini-none: #6c767e;
 }
@@ -411,6 +413,7 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .tg-auto{--mc:var(--menu-line);--mc-on:var(--menu-line-on)}
 .tg-swap{--mc:#5f6b73;--mc-on:#fff}
 .tg-base{--mc:var(--menu-label);--mc-on:var(--menu-label-on)}
+.tg-split{--mc:var(--menu-split);--mc-on:var(--menu-split-on)}
 .tool{position:relative}
 .tool-btn{height:20px;min-height:20px;padding:0 9px;border-radius:999px;border:0;background:color-mix(in srgb,var(--mc) 72%,transparent);color:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;line-height:1;white-space:nowrap;cursor:pointer}
 .tool-btn [data-now]{display:inline-flex;align-items:center}
@@ -495,14 +498,24 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 /* セクターの操作の札(案件 6): 地図の左上の札と同じ見た目で、今の設定を出し、押すと選択肢が開く。PC・縦画面で共通(横画面のスマホは上部バー)。
    区切りのボタンの行(#cmp-sync)は画面には出さない(動作は札から呼ぶ。上部バーはそれを写して使う) */
 #cmp-sync{display:none}
-.sync-tags.sync-grp:not([hidden]){display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.sync-tags.sync-grp{display:flex;flex-direction:column;align-items:stretch;gap:6px;min-width:0}   /* 左寄せ(.sync-grp の中央寄せを打ち消す) */
+.tg-grps{display:flex;flex-wrap:wrap;align-items:flex-end;gap:6px 12px}
+.tg-grps[hidden]{display:none}
+/* 札を 2 つの組に分ける(案件 91): 「セクター」(合わせ方)と「セグメント」(ミニセクターの基準・区切り方)。見出しの下に灰色の水平線 */
+.tg-grp{display:flex;flex-direction:column;gap:3px;min-width:0}
+.tg-grp-seg{margin-left:auto}
+.tg-title{padding:0 2px 1px;border-bottom:1px solid var(--border-strong);font-size:10px;font-weight:700;line-height:1.3;color:var(--muted)}
+.tg-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.mini-note{display:flex;align-items:center;gap:6px;margin:2px 0 0;font-size:10px;line-height:1.4;color:var(--muted)}   /* 札の下の注記: 誤差があること。先頭の ⓘ を押すと説明(案件 91) */
+.mini-info{flex:none;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;min-height:18px;padding:0;border:1px solid var(--btn-border);border-radius:50%;
+  color:var(--text);background:linear-gradient(var(--btn-top),var(--btn-bottom));box-shadow:var(--btn-shadow);cursor:pointer}   /* 丸い案内ボタン */
+.mini-info .ico{width:9px;height:9px;margin:0}
 .sync-tags .tool-btn{height:24px;min-height:24px;padding:0 10px;font-size:10px}
 .sync-tags .tg-auto .tool-btn.on,.sync-tags .tg-sync .tool-btn.on{background:var(--mc);box-shadow:0 0 0 2px var(--surface),0 0 0 3px var(--mc)}
 .sync-tags .tool-btn.muted{background:color-mix(in srgb,#8a949c 80%,transparent)}   /* 今は動作を選べない(灰色) */
 .sync-tags .tool-btn:disabled{opacity:.7;cursor:default}
 .tool-pop .menu-note{max-width:200px;padding:4px 10px;font-size:10px;line-height:1.4;color:var(--muted);white-space:normal}
 .tool-pop .menu-note[hidden]{display:none}
-.sync-tags .tg-base{margin-left:auto}
 .sync-tags .tool-pop{top:auto;bottom:calc(100% + 6px)}   /* 右の列の上の部分は、はみ出した所が隠れるので、PC では上に開く(縦画面は下。下の @media) */
 .sync-tags .tg-base .tool-pop{left:auto;right:0}
 .base-info{display:none}   /* 比較基準のラップの情報は、スマホの縦画面(下の @media)でだけ */
@@ -1417,7 +1430,7 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
   .cmp-side[data-first="sectors"] .base-info{grid-row:1}
   #cmp-sectors{grid-column:2;grid-row:2}
   .cmp-side .sec-h-row{display:none}
-  .sync-tags.sync-grp:not([hidden]){flex-wrap:nowrap;grid-column:1 / -1;grid-row:3}
+  .sync-tags.sync-grp:not([hidden]){grid-column:1 / -1;grid-row:3}
   #cmp-sync-status{grid-column:1 / -1;grid-row:4}
   .cmp-set{grid-column:1 / -1;grid-row:5}
   /* セクターのエリアを上に */

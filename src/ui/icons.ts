@@ -1,0 +1,2 @@
+/** ⓘ アイコン(線画。文字色に合わせる)。About ボタンと、ミニセクターの注記の案内ボタンで同じものを使う */
+export const INFO_ICON = '<svg class="ico" width="11" height="11" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 7.2v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="4.9" r=".95" fill="currentColor"/></svg>';
