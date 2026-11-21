@@ -1442,8 +1442,11 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
   .mini-corner,.mini-name{display:none}
   .mini-cell.empty{display:block}
   .mini-cell{height:12px;align-self:center;gap:1px}
+}
+/* ミニセクター表の上のドラッグのステージ(案件 90)。横向きのセクタータブでだけ出す。表の上を全部おおい、縦の動きは使わない */
+@media (orientation:landscape) and (max-height:500px){
   .secs .mini-tbl{position:relative}
-  .cmp-side[data-tab="sectors"] .mini-stage{display:block;position:absolute;inset:0;z-index:1;touch-action:none;cursor:ew-resize}   /* 表の上を全部おおう。縦の動きは使わない(案件 90) */
+  .cmp-side[data-tab="sectors"] .mini-stage{display:block;position:absolute;inset:0;z-index:1;touch-action:none;cursor:ew-resize}
 }
 @media (max-width:420px) and (orientation:portrait){
   .cmp-ctl{gap:4px}                      /* 狭い幅でも、4 つのボタン・再生速度・つまみが 1 行に入るように */
