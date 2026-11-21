@@ -43,7 +43,7 @@ function setHtml(i: number): string {
 /** 比較セットのまとまり(見出しと、並べ方の切り替え、タブ、比較セット 1〜5) */
 export const SETS_HTML = `
       <section class="sets-group" id="sets-group" aria-labelledby="h-sets">
-        <div class="sets-group-h"><h2 id="h-sets">比較セット</h2><span class="sets-group-sub"></span><span class="grow"></span>
+        <div class="sets-group-h"><button type="button" class="sets-fold" data-act="sets-fold" data-fk="sets-fold" aria-expanded="true" title="比較セットを折りたたみます"><span class="chev" aria-hidden="true"></span></button><h2 id="h-sets">比較セット</h2><span class="sets-group-sub"></span><span class="grow"></span>
           <span class="seg tiny sets-view" role="group" aria-label="比較セットの並べ方">
             <button data-act="sets-view" data-view="tabs" title="比較セットをタブで切り替えて、1 つずつ表示します">タブ</button><button data-act="sets-view" data-view="list" title="比較セットを縦に並べ、見出しを押して開閉します">一覧</button></span></div>
         <div class="sets-tabs" role="tablist" aria-label="比較セット" hidden></div>
@@ -532,6 +532,13 @@ export function createSets(root: HTMLElement, session: Session, actions: ImportA
         case 'assign': session.toggleAssignment(d.slot as Slot, { logId: d.log!, lap: Number(d.lap) }, set); return true;
         case 'remove': session.removeLog(d.log!, set); return true;
         case 'correct': actions.openWork('correct', d.log!, set); return true;
+        case 'sets-fold': {
+          const f = groupEl.classList.toggle('folded');
+          const b = groupEl.querySelector<HTMLElement>('.sets-fold')!;
+          b.setAttribute('aria-expanded', String(!f));
+          b.title = f ? '比較セットを開きます' : '比較セットを折りたたみます';
+          return true;
+        }
         case 'sets-view': setView(d.view as SetsView); return true;
         case 'set-tab': switchTab(Number(d.set)); return true;
         case 'set-active': if (session.canShow(Number(d.set))) session.setActive(Number(d.set)); return true;

@@ -57,8 +57,8 @@ export function mountImportView(root: HTMLElement, session: Session, opts: Impor
     <div id="guide-mini" class="guide-mini"></div>
     <div id="work" class="work" hidden></div>
     <div class="body" id="import-body">${TOP_TABS_HTML}${CIRCUITS_HTML}
-${OFFSETS_HTML}
 ${REFS_HTML}
+${OFFSETS_HTML}
 ${SETS_HTML}
     </div>
     <input id="vbo-input" type="file" multiple accept=".vbo" hidden>

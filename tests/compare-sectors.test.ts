@@ -761,6 +761,7 @@ describe('ミニセクター表(案件 6): 「セクター」欄', () => {
     session.addRef('u', 1);
     const r = session.refsOf(session.logs[0].circuit!.id)[0];
     expect($('#cmp-sub-base').textContent).toContain('基準設定');
+    expect(Array.from(root.querySelectorAll('#cmp-sub-base .menu-note')).map((n) => n.textContent)[0]).toBe('自動');      // 「割当最速」にも、ほかと同じ見出し(案件 86)
     pick(`ref:${r.id}`);
     expect(baseTag()).toBe(`基準: ${session.refLabel(r)}`);
     expect(tones('A', 'base')).toBeGreaterThan(0);                           // A のラップが基準の走行そのもの
@@ -805,7 +806,8 @@ describe('ミニセクター表(案件 6): 「セクター」欄', () => {
     const r = session.refsOf(session.logs[0].circuit!.id)[0];
     session.renameRef(r.id, 'CR');
     pick(`ref:${r.id}`);
-    expect(info.textContent).toBe(`基準ACR${formatLapTime(lap.duration)}`);
+    expect(info.textContent).toBe(`基準1ACR${formatLapTime(lap.duration)}`);    // 基準の走行のときの札は、データ管理の「基準 N」と同じ番号(案件 86)
+    expect(info.querySelector('.bi-chip')!.textContent).toBe('基準1');
     expect(info.querySelector('.bi-icon')!.textContent).toBe('A');       // 基準の走行と同じラップを割り当てたカード(A)のアイコンが出る
     session.toggleAssignment('A', { logId: 'u', lap: lap.number });
     session.toggleAssignment('B', { logId: 'u', lap: lap.number });

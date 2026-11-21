@@ -792,7 +792,8 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
       const same = cars.find((c) => c.lap === sel.lap);              // 基準の走行と同じラップを割り当てたカードがあれば、そのアイコンも出す
       const icon = same ? `<span class="chip s${same.slot.toLowerCase()} bi-icon" aria-hidden="true">${same.slot}</span>` : '';
       title = `比較基準(${baseLabel()}${same ? ' = ' + same.slot : ''}): ${time}`;
-      html = `<span class="bi-chip">基準</span>${icon}<span class="bi-run">${esc(baseLabel())}</span><span class="bi-time num">${time}</span>`;
+      const no = session.refsOfByTime(circuitKey()).findIndex((r) => r.id === sel.ref.id) + 1;      // データ管理の基準LAP設定の「基準 N」と同じ番号(案件 86)
+      html = `<span class="bi-chip">基準${no || ''}</span>${icon}<span class="bi-run">${esc(baseLabel())}</span><span class="bi-time num">${time}</span>`;
     } else { const c = baseCar(); if (c) html = one(c.log, c.lap, `比較基準(${baseLabel()})`, c.slot); }
     if (box.dataset.k === html + title) return;                  // 変わっていなければ書かない
     box.dataset.k = html + title;
@@ -835,7 +836,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
     const item = (key: string, text: string, title: string) =>
       `<button type="button" role="menuitemradio" data-act="minibase" data-key="${esc(key)}" aria-checked="${key === cur}"${key === cur ? ' class="on"' : ''} title="${esc(title)}">${esc(text)}</button>`;
     const refs = session.refsOfByTime(circuitKey());
-    const parts = [item('fastest', '割当最速', '割り当てた車のうち、最速のラップの区間と比べます')];
+    const parts = ['<div class="menu-note">自動</div>', item('fastest', '割当最速', '割り当てた車のうち、最速のラップの区間と比べます')];
     if (refs.length) {
       parts.push('<div class="menu-note">基準設定</div>');
       for (const r of refs) {

@@ -13,6 +13,7 @@
   --surface-2: #eef1f5;    /* 表の見出し・ファイル見出し */
   --sec-bg: #f4f6f9;       /* セクション枠の中 */
   --sec-head: #e3e8ee;     /* セクション見出し */
+  --sec-title: color-mix(in srgb, var(--accent) 16%, #e3e8ee);   /* データ管理の節のタイトル部(案件 86。ライトだけ色を付ける) */
   --border: #c3cad4;
   --border-strong: #9aa4b2;
   --cell-line: #d5dae1;    /* 表の罫線 */
@@ -60,6 +61,7 @@
   --surface-2: #22262a;
   --sec-bg: #23282c;
   --sec-head: #2e3439;
+  --sec-title: #2e3439;
   --border: #40474e;
   --border-strong: #5a636c;
   --cell-line: #394047;
@@ -757,6 +759,7 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .sets-group-h{display:flex;align-items:center;gap:12px;min-height:40px;padding:0 16px;background:var(--sec-head);border-bottom:1px solid var(--border-strong);border-radius:calc(var(--r-l) - 1px) calc(var(--r-l) - 1px) 0 0}
 .sets-group .set-sec:last-of-type{border-radius:0 0 calc(var(--r-l) - 1px) calc(var(--r-l) - 1px)}
 .sets-group-h h2{font-size:14px}
+.body>.sec>.sec-h,.sets-group-h{background:var(--sec-title)}   /* データ管理の「サーキット」「走行ライン補正データ」「ミニセクターの基準LAP設定」「比較セット」のタイトル部(案件 86) */
 .sets-group-sub{font-size:11px;color:var(--muted)}
 .sets-group .set-sec{border:0;border-radius:0;box-shadow:none;border-top:1px solid var(--border)}
 .sets-group .set-sec:first-of-type{border-top:0}
@@ -1450,7 +1453,7 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .refs-ccount{font-weight:400;font-size:11px;color:var(--muted)}
 .refs-row{display:grid;grid-template-columns:minmax(0,1fr) 72px 34px 62px;align-items:center;gap:2px 6px;padding:5px 6px;font-size:13px}
 .refs-head{color:var(--muted);font-size:12px}
-.refs-file>summary{cursor:pointer;list-style:none;padding-top:7px;padding-bottom:7px;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r-m);font-weight:700}
+.refs-file>summary{position:relative;cursor:pointer;list-style:none;padding-top:16px;padding-bottom:7px;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r-m);font-weight:700}
 .refs-file>summary .rc-time,.refs-file>summary .rc-rank,.refs-file>summary .rc-diff{font-weight:400}
 .refs-file{margin-top:6px;border-top:0}
 .refs-file>summary::-webkit-details-marker{display:none}
@@ -1465,18 +1468,65 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 .rc-time,.rc-rank,.rc-diff{text-align:right;white-space:nowrap}
 .refs-run{font-weight:700}
 .refs-fn{color:var(--muted);font-size:12px}
-.refs-chip{margin-left:6px;padding:0 6px;border:1px solid var(--accent);border-radius:999px;color:var(--accent);font-size:11px;white-space:nowrap}
+.refs-chip{margin-left:5px;padding:0 4px;border:1px solid var(--accent);border-radius:999px;color:var(--accent);font-size:9px;line-height:1.3;vertical-align:1px;white-space:nowrap}   /* 基準 N・(A)〜(D) の札は同じ大きさ(案件 86) */
 .refs-lap.is-ref .refs-chip{background:var(--accent);color:var(--accent-on,#fff)}
+.refs-cd{width:14px;height:14px;margin-left:5px;font-size:9px;font-weight:800;vertical-align:-1px}   /* カードの丸(A〜D)と同じ色・形で小さく(案件 86) */
+.refs-lap{position:relative}
+.refs-lap.is-using{padding-top:15px}   /* 「(基準表示中)」を出す行だけ、上の余白を増やす */
+.refs-using{background:var(--accent);color:var(--accent-on,#fff);font-weight:400}   /* 「基準表示中」の札(基準 N と同じ形・同じ大きさ) */
+.refs-lap .refs-using{position:absolute;top:3px;left:22px;margin:0;pointer-events:none}
+.refs-tags{position:absolute;top:3px;left:22px;display:flex;gap:4px;font-weight:400}   /* 走行ログのタイトル部の上の狭いところ */
+.refs-tags .refs-chip{margin:0}   /* 行の高さ・LAP 名の位置は変えず、上の余白に小さく出す(案件 86) */
 .refs-set{height:22px;padding:0 10px;border:1px solid var(--accent);border-radius:999px;background:transparent;color:var(--accent);font:inherit;font-size:11px;font-weight:700;white-space:nowrap;cursor:pointer}
 .refs-set:hover{background:color-mix(in srgb,var(--accent) 14%,transparent)}
 .refs-name{width:11em;max-width:60%;height:24px;font-size:12px}
 .refs-del{margin-left:6px;flex:none}
 .refs-ok{flex:none}
 .refs-lap .btn{height:22px;min-height:22px;padding:0 10px;font-size:11px}
+.refs-ph{display:none}   /* スマホの縦画面だけの部品(編集・札の段・解除・閉じる) */
+/* スマホの縦画面(案件 86): 行は「編集」| 札(上)と LAP 名 | タイム・順位・差。基準にする・解除・表示名は、「編集」で開く下の段 */
+@media (max-width:767px){
+  .refs-lap .refs-pc{display:none}
+  .refs-lap.is-using{padding-top:5px}
+  .refs-lap .rc-name{display:flex;align-items:center;gap:8px;padding-left:6px;overflow:visible}
+  .refs-lap .refs-edit{display:inline-flex;align-items:center;flex:none}
+  .refs-mid{display:flex;flex-direction:column;justify-content:center;min-width:0}
+  .refs-ltags{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-bottom:1px}
+  .refs-ltags .refs-chip,.refs-ltags .refs-cd{margin:0;vertical-align:baseline}
+  .refs-lap .refs-ltags .refs-using{position:static}
+  .refs-ln{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .refs-lap .rc-act{display:none}
+  .refs-lap.editing .rc-act{display:flex;flex-wrap:wrap;padding-left:6px}
+  .refs-lap.editing .rc-act .refs-ph{display:inline-flex;align-items:center}
+  .refs-lap .rc-act .refs-del{margin-left:0}
+  #import-body:not(.tabbed){padding-bottom:192px}   /* 最下部の余白: 節のタイトルの高さ(48px)の 4 つ分 */
+}
 @media (min-width:768px){
   .refs-row{grid-template-columns:minmax(0,1fr) 72px 34px 62px 250px}
   .refs-lap .rc-act{grid-column:auto;padding-left:0;justify-content:flex-end}
 }
 
-/* 上のタブ: おまけの機能(走行ライン補正データ・基準設定)は、必須の 2 つ(サーキット・比較セット)から少し離して右側に置く */
-.top-tab.gap{margin-left:28px}
+/* 上のタブ(案件 86): 「基本設定」(サーキット・比較セット)と「拡張機能設定」(走行ライン補正データ・ミニセクターの基準LAP設定)に分け、それぞれ上に見出しと水平線を付ける */
+.top-tabs{align-items:flex-end;gap:0}
+.top-grp{display:flex;flex-direction:column;align-items:stretch}
+.top-grp+.top-grp{margin-left:28px}
+.top-grp-h{padding:0 8px 1px;margin-bottom:8px;border-bottom:2px solid var(--accent);color:var(--muted);font-size:15px;text-align:center}
+.top-grp-tabs{display:flex;flex-wrap:wrap;align-items:flex-end;gap:4px}
+/* スマホの縦画面(幅 768px 未満): サーキットの上の切り替えスライド。基本設定 = サーキット・比較セット、拡張機能設定 = 補正データ・基準LAP設定 */
+.top-mode{position:relative;display:grid;grid-template-columns:1fr 1fr;padding:3px;border:1px solid var(--border-strong);border-radius:999px;background:var(--surface-2)}
+.top-mode::before{content:'';position:absolute;top:3px;bottom:3px;left:3px;width:calc(50% - 3px);border-radius:999px;background:var(--accent);transition:transform .2s}
+.top-mode[data-mode="ext"]::before{transform:translateX(100%)}
+.top-mode button{position:relative;height:30px;border:0;background:transparent;color:var(--muted);font:inherit;font-weight:700;cursor:pointer}
+.top-mode button[aria-pressed="true"]{color:var(--accent-on,#fff)}
+.body:not(.tabbed) .mode-off{display:none!important}
+/* 比較セットの折りたたみ(案件 86。スマホの縦画面。初めは開く) */
+.sets-fold{display:inline-flex;align-items:center;padding:4px;border:0;background:transparent;cursor:pointer;color:inherit}
+.sets-fold .chev{transform:rotate(45deg)}
+.sets-group.folded .sets-fold .chev{transform:rotate(-45deg)}
+.sets-group.folded>:not(.sets-group-h){display:none!important}
+.sets-group.folded>.sets-group-h{border-bottom:0;border-radius:calc(var(--r-l) - 1px)}
+.tabbed .sets-fold{display:none}
+.tabbed .sets-group.folded>:not(.sets-group-h){display:revert!important}
+
+/* 各画面(使い方・データ管理・設定)の最下部のフッター(案件 87) */
+.app-foot{padding:18px 16px 22px;text-align:center;color:var(--muted);font-size:11px}
