@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SCRUB_FULL_PX, SCRUB_KNEE_PX, SCRUB_KNEE_RATE, SCRUB_MAX_FRAME_MS, SCRUB_PX_PER_SEC, SCRUB_STALE_MS, SCRUB_START_PX, ScrubVelocity, scrubMagnitude } from '../src/core/scrub';
+import { SCRUB_WARMUP_MS, SCRUB_WARMUP_RATE, SCRUB_FULL_PX, SCRUB_KNEE_PX, SCRUB_KNEE_RATE, SCRUB_MAX_FRAME_MS, SCRUB_PX_PER_SEC, SCRUB_STALE_MS, SCRUB_START_PX, ScrubVelocity, scrubMagnitude } from '../src/core/scrub';
 
 const W = 265;   // 表の幅(px)。スマホの横画面で、これくらい
 
@@ -126,6 +126,30 @@ describe('ミニセクター表のドラッグ(案件 90)', () => {
     cap.press(0, 0);
     drag(cap, 0, SCRUB_PX_PER_SEC, 0, 500);
     expect(big).toBeCloseTo(cap.advance(500 + SCRUB_MAX_FRAME_MS), 6);
+  });
+
+  it('ドラッグの最初の一瞬(WARMUP_MS)は、速く動かしても、ゆっくりだけ進める。そのあとは通常どおり', () => {
+    const v = new ScrubVelocity(180, W);
+    v.press(0, 0);
+    v.begin(0);                                           // 3px を超えた時点で、ドラッグとみなす
+    drag(v, 0, SCRUB_FULL_PX * 2, 0, SCRUB_WARMUP_MS - 20);   // 最初から全力
+    expect(v.rate(SCRUB_WARMUP_MS - 20)).toBeCloseTo(SCRUB_WARMUP_RATE, 6);
+    expect(v.rate(SCRUB_WARMUP_MS - 20)).toBeLessThan(scrubMagnitude(SCRUB_FULL_PX * 2, 180, W));
+    drag(v, v['lastX'] as number, SCRUB_FULL_PX * 2, SCRUB_WARMUP_MS - 20, 400);
+    expect(v.rate(SCRUB_WARMUP_MS + 380)).toBeGreaterThan(50);   // 最初の一瞬が過ぎたら、速さのとおり
+  });
+
+  it('最初の一瞬でも、遅い動き(1× 以下)はそのまま。戻る方向も同じ', () => {
+    const v = new ScrubVelocity(180, W);
+    v.press(500, 0);
+    v.begin(0);
+    drag(v, 500, -SCRUB_PX_PER_SEC * 0.5, 0, 100);
+    expect(v.rate(100)).toBeCloseTo(-0.5, 2);
+    const w = new ScrubVelocity(180, W);
+    w.press(500, 0);
+    w.begin(0);
+    drag(w, 500, -SCRUB_FULL_PX * 2, 0, 100);
+    expect(w.rate(100)).toBeCloseTo(-SCRUB_WARMUP_RATE, 6);
   });
 
   it('幅が分からないとき(0)は、固定のゲインのまま', () => {

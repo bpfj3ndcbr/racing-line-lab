@@ -1008,6 +1008,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
     s.vel.move(e.clientX, performance.now());
     if (s.moving || !s.vel.isDrag(e.clientX)) return;
     s.moving = true;
+    s.vel.begin(performance.now());                              // 最初の一瞬は、速く動かしても、ゆっくりだけ進める(乱雑に触っても一気に進まない)
     if (engine.playing) engine.pause();                          // ドラッグ中は、指の動きで再生位置を動かす
     if (typeof requestAnimationFrame === 'function') s.raf = requestAnimationFrame(scrubFrame);
   });
