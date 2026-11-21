@@ -35,17 +35,26 @@ export function segmentRange(lap: Lap, j: number, n: number): { a: number; b: nu
   return { a, b };
 }
 
+/** ミニセクターの区切り方(案件 91): 'dist' = 距離で等分(初期値) / 'time' = 時間で等分 */
+export type MiniSplit = 'dist' | 'time';
+
 /**
- * 時間の区間 [a, b](ラップ開始からの秒)を、走行距離で n 等分したときの、区間ごとの平均速度(km/h)。
+ * 時間の区間 [a, b](ラップ開始からの秒)を n 等分したときの、区間ごとの平均速度(km/h)。
+ * split = 'dist': 走行距離で等分する。 split = 'time': 時間で等分する(GPS の距離の誤差で、区切りの時刻がずれない)。
  * 区間の時間が 0 のとき(止まっている・サンプルが無い)は null。
  */
-export function miniSpeeds(s: LapSeries, a: number, b: number, n = MINI_COUNT): (number | null)[] {
+export function miniSpeeds(s: LapSeries, a: number, b: number, n = MINI_COUNT, split: MiniSplit = 'dist'): (number | null)[] {
   const da = sampleSeries(s, a).dist;
   const db = sampleSeries(s, b).dist;
   const cuts: { d: number; t: number }[] = [];
   for (let j = 0; j <= n; j++) {
-    const d = da + ((db - da) * j) / n;
-    cuts.push({ d, t: timeAtDistance(s, d) });
+    if (split === 'time') {
+      const t = a + ((b - a) * j) / n;
+      cuts.push({ d: sampleSeries(s, t).dist, t });
+    } else {
+      const d = da + ((db - da) * j) / n;
+      cuts.push({ d, t: timeAtDistance(s, d) });
+    }
   }
   const out: (number | null)[] = [];
   for (let j = 0; j < n; j++) {
@@ -57,11 +66,15 @@ export function miniSpeeds(s: LapSeries, a: number, b: number, n = MINI_COUNT): 
 }
 
 /**
- * 時刻 t(ラップ開始からの秒)が、時間の区間 [a, b] を距離で n 等分した、何番目の区間にあるか(0 始まり)。
+ * 時刻 t(ラップ開始からの秒)が、時間の区間 [a, b] を n 等分した、何番目の区間にあるか(0 始まり)。split は miniSpeeds と同じ。
  * 区間の外(まだ入っていない・もう過ぎた)は -1。b ちょうどは最後の区間。
  */
-export function miniIndexAt(s: LapSeries, a: number, b: number, t: number, n = MINI_COUNT): number {
+export function miniIndexAt(s: LapSeries, a: number, b: number, t: number, n = MINI_COUNT, split: MiniSplit = 'dist'): number {
   if (t < a || t > b) return -1;
+  if (split === 'time') {
+    if (!(b > a)) return 0;
+    return Math.min(n - 1, Math.max(0, Math.floor(((t - a) / (b - a)) * n)));
+  }
   const da = sampleSeries(s, a).dist;
   const db = sampleSeries(s, b).dist;
   if (!(db > da)) return 0;

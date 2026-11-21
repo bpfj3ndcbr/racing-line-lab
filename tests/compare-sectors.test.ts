@@ -710,6 +710,96 @@ describe('ミニセクター表(案件 6): 「セクター」欄', () => {
     expect(session.getSetting('compare.sectorsFirst', false)).toBe(true);
   });
 
+  describe('ミニセクターの区切り方(案件 91)', () => {
+    const shown = () => Array.from(root.querySelectorAll('#cmp-sectors .mini-cell[data-slot="A"]'))
+      .map((c) => Array.from(c.querySelectorAll('.mini-seg')).map((g) => g.getAttribute('data-v')));
+    const expected = (split: 'dist' | 'time') => {
+      const r = session.resolveRef(session.assignment.A)!;
+      const ser = buildLapSeries(r.log.log, r.lap, r.log.offset);
+      const n = r.lap.sectorTimes.length;
+      return Array.from({ length: n + 1 }, (_, k) => {
+        const g = segmentRange(r.lap, k, n);
+        return g ? miniSpeeds(ser, g.a, g.b, 5, split).map((v) => (v === null ? '' : v.toFixed(1))) : Array(5).fill('');
+      });
+    };
+    const btn = () => $<HTMLButtonElement>('#cmp-sync-tags [data-act="minisplit"]');
+
+    it('札は「セグメント」の組にあり、初めは「距離分割」。押すと「時間分割」になり、表の値が時間で分けた値に変わる(もう一度押すと戻る)', () => {
+      setupOne();
+      expect(btn().closest('.tg-grp-seg')).not.toBeNull();
+      expect(btn().textContent).toBe('距離分割');
+      expect(shown()).toEqual(expected('dist'));
+      btn().click();
+      expect(btn().textContent).toBe('時間分割');
+      expect(session.getSetting('compare.miniSplit', 'dist')).toBe('time');
+      expect(shown()).toEqual(expected('time'));
+      expect(shown()).not.toEqual(expected('dist'));            // 件数だけでなく、値が変わっていること
+      expect(shown().length).toBeGreaterThan(0);
+      btn().click();
+      expect(btn().textContent).toBe('距離分割');
+      expect(session.getSetting('compare.miniSplit', 'dist')).toBe('dist');
+      expect(shown()).toEqual(expected('dist'));
+    });
+
+    it('覚えている区切り方で始まる。使えない値は距離分割', () => {
+      session.setSetting('compare.miniSplit', 'time');
+      setupOne();
+      expect(btn().textContent).toBe('時間分割');
+      expect(shown()).toEqual(expected('time'));
+    });
+
+    it('見出し(「セクター」「セグメント」)が出る。注記は札の下で、先頭に ⓘ の案内ボタンがある', () => {
+      setupOne();
+      expect(Array.from(root.querySelectorAll('#cmp-sync-tags .tg-title')).map((e) => e.textContent)).toEqual(['セクター', 'セグメント']);
+      const note = $('#cmp-sync-tags .mini-note');
+      expect(note.textContent).toContain('ミニセクターの誤差について');
+      expect(note.firstElementChild!.querySelector('[data-act="mini-info"] svg')).not.toBeNull();       // 先頭に ⓘ
+      // 札の下(DOM の順で、札の組のあと)
+      const kids = Array.from($('#cmp-sync-tags').children);
+      expect(kids.indexOf($('#cmp-sync-tags .tg-grps'))).toBeLessThan(kids.indexOf(note));
+      btn().click();
+      expect($('#cmp-sync-tags .mini-note').textContent).toContain('ミニセクターの誤差について');     // 区切り方を替えても出る
+    });
+
+    it('ⓘ を押すと説明のダイアログが出て、「閉じる」で閉じる', () => {
+      setupOne();
+      $<HTMLButtonElement>('#cmp-sync-tags [data-act="mini-info"]').click();
+      const dlg = document.querySelector('.modal')!;
+      expect(dlg).not.toBeNull();
+      expect(dlg.textContent).toContain('GPSの位置・距離からセクター間を5分割して求めているため誤差があります');
+      expect(dlg.textContent).toContain('「距離分割」「時間分割」それぞれ違いが出ます');
+      const close = dlg.querySelector<HTMLButtonElement>('[data-dialog="ok"]')!;
+      expect(close.textContent).toBe('閉じる');
+      close.click();
+      expect(document.querySelector('.modal')).toBeNull();
+    });
+
+    it('セクターが無いサーキットでは、札の組は隠れるが、注記は出る', async () => {
+      setupOne();
+      const c = session.circuits[0];
+      $<HTMLButtonElement>('[data-act="nav"][data-view="import"]').click();
+      session.setCircuitLines(c.id, c.control, []);
+      await flush();
+      $<HTMLButtonElement>('[data-act="nav"][data-view="compare"]').click();
+      expect($<HTMLElement>('#cmp-sync-tags .tg-grps').hidden).toBe(true);
+      expect($<HTMLElement>('#cmp-sync-tags .mini-note').hidden).toBe(false);
+    });
+
+    it('時間分割のとき、通過済みの区間は時間の割合で決まる(再生中の色の濃さ)', () => {
+      setupOne();
+      btn().click();
+      const r = session.resolveRef(session.assignment.A)!;
+      const n = r.lap.sectorTimes.length;
+      const g = segmentRange(r.lap, 1, n)!;
+      // 区間 1 の真ん中を過ぎた時刻へ移すと、時間分割では 5 つのうち 3 つ目まで通過済み(0.5 × 5 = 2.5 → 3 つ目の途中)
+      const seek = root.querySelector<HTMLInputElement>('#cmp-seek')!;
+      seek.value = String(g.a + (g.b - g.a) * 0.5);
+      seek.dispatchEvent(new Event('input', { bubbles: true }));
+      const done = Array.from(root.querySelectorAll('#cmp-sectors .mini-cell[data-slot="A"][data-sk="1"] .mini-seg')).filter((e) => e.classList.contains('done')).length;
+      expect(done).toBe(2);
+    });
+  });
+
   it('比較を離れてサーキットのセクターを変えると、戻ったとき、ミニセクター表は新しいセクターで計算し直される', async () => {
     setupOne();
     const shown = () => Array.from(root.querySelectorAll('#cmp-sectors .mini-cell[data-slot="A"]'))

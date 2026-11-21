@@ -9,6 +9,7 @@ import { mountSettingsView } from './settingsView';
 import { logoSvg } from './logo';
 import { bindToast, mountToast } from './toast';
 import { showAbout } from './aboutView';
+import { INFO_ICON } from './icons';
 import { mountHelpView } from './helpView';
 import { createFooter } from './footer';
 import { applyAnalytics } from '../io/analytics';
@@ -22,9 +23,6 @@ import { installAppleFilePicker } from './fileKind';
 import { installFilePickGuard } from './filePickGuard';
 
 export type ViewName = 'help' | 'import' | 'compare' | 'settings';
-
-/** About ボタンの ⓘ アイコン(線画。文字色に合わせる) */
-const INFO_ICON = '<svg class="ico" width="11" height="11" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 7.2v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="4.9" r=".95" fill="currentColor"/></svg>';
 
 /** スマホを横向きにしたとき、比較以外の画面に重ねる案内のアイコン(縦向きのスマホ。表示は CSS の @media で決める。案件 46) */
 const PHONE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/></svg>';

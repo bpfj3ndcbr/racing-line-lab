@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MINI_COUNT, fastestLap, miniSpeeds, miniTone, sectorRange, segmentRange } from '../src/core/miniSector';
+import { MINI_COUNT, fastestLap, miniIndexAt, miniSpeeds, miniTone, sectorRange, segmentRange } from '../src/core/miniSector';
 import type { LapSeries } from '../src/core/series';
 import type { Lap } from '../src/core/types';
 
@@ -106,5 +106,45 @@ describe('自己ベストの選び方と色分け', () => {
     expect(miniTone(28, 30, 35)).toBe('slower');
     expect(miniTone(28, null, 35)).toBe('none'); // 基準が無い
     expect(miniTone(null, 30, 35)).toBe('none');
+  });
+});
+
+describe('ミニセクターの区切り方(案件 91): 距離分割と時間分割', () => {
+  // 0〜5 秒は 72 km/h(20 m/s)、5〜10 秒は 36 km/h(10 m/s)。距離は 0〜150 m
+  const t = Array.from({ length: 11 }, (_, i) => i);
+  const s = seriesOf(t, t.map((x) => (x <= 5 ? 72 : 36)));
+
+  it('既定は距離分割で、split に \'dist\' を渡したときと同じ', () => {
+    expect(miniSpeeds(s, 0, 10)).toEqual(miniSpeeds(s, 0, 10, MINI_COUNT, 'dist'));
+    expect(miniIndexAt(s, 0, 10, 7)).toBe(miniIndexAt(s, 0, 10, 7, MINI_COUNT, 'dist'));
+  });
+
+  it('時間分割は、区間が 2 秒ずつ。0〜4 秒は 72 km/h、6〜10 秒は 36 km/h、4〜6 秒はその間', () => {
+    const out = miniSpeeds(s, 0, 10, MINI_COUNT, 'time') as number[];
+    expect(out).toHaveLength(MINI_COUNT);
+    expect(out[0]).toBeCloseTo(72, 6);
+    expect(out[1]).toBeCloseTo(72, 6);
+    expect(out[2]).toBeGreaterThan(36);
+    expect(out[2]).toBeLessThan(72);
+    expect(out[3]).toBeCloseTo(36, 6);
+    expect(out[4]).toBeCloseTo(36, 6);
+  });
+
+  it('時間分割は、区間の外・内の番号が時間の割合で決まる(b ちょうどは最後)', () => {
+    expect(miniIndexAt(s, 0, 10, -1, MINI_COUNT, 'time')).toBe(-1);
+    expect(miniIndexAt(s, 0, 10, 11, MINI_COUNT, 'time')).toBe(-1);
+    expect(miniIndexAt(s, 0, 10, 0, MINI_COUNT, 'time')).toBe(0);
+    expect(miniIndexAt(s, 0, 10, 3.9, MINI_COUNT, 'time')).toBe(1);
+    expect(miniIndexAt(s, 0, 10, 4, MINI_COUNT, 'time')).toBe(2);
+    expect(miniIndexAt(s, 0, 10, 10, MINI_COUNT, 'time')).toBe(MINI_COUNT - 1);
+    // 距離分割では、同じ時刻でも別の番号(速い前半に距離が多いため)
+    expect(miniIndexAt(s, 0, 10, 3.5, MINI_COUNT, 'time')).toBe(1);
+    expect(miniIndexAt(s, 0, 10, 3.5, MINI_COUNT, 'dist')).toBe(2);
+  });
+
+  it('区間の時間が 0 のときは、どちらの分割でも null', () => {
+    const flat = seriesOf([0, 1, 2], [36, 36, 36]);
+    expect(miniSpeeds(flat, 1, 1, MINI_COUNT, 'time')).toEqual([null, null, null, null, null]);
+    expect(miniIndexAt(flat, 1, 1, 1, MINI_COUNT, 'time')).toBe(0);
   });
 });
