@@ -1334,15 +1334,16 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
   .cmp-side .sync-tags .tg-swap{display:none}                    /* 入替(セクターとグラフの上下)は、横向きではタブで切り替えるので出さない */
   .cmp-side .sec-h-row{display:none}                              /* 「セクター」タブの中の「セクター」の見出しは、タブの名前と同じなので出さない */
   .cmp-cards{order:1;flex:none;padding:6px 8px}
-  .side-tabs{display:flex;order:2;flex:none;gap:4px;padding:4px 8px 0;border-bottom:1px solid var(--accent)}
-  .side-tabs button{flex:1;height:28px;border:1px solid var(--border-strong);border-bottom:0;border-radius:var(--r-m) var(--r-m) 0 0;background:var(--surface-2);color:var(--muted);font:inherit;font-size:12px;font-weight:700;cursor:pointer}
-  .side-tabs button.on{border:1px solid var(--accent);border-top:3px solid var(--accent);border-bottom:1px solid var(--border);margin-bottom:-1px;height:30px;background:var(--sec-bg);color:var(--text)}
+  .side-tabs{display:flex;order:2;flex:none;gap:4px;padding:3px 8px 0;border-bottom:1px solid var(--accent)}
+  .side-tabs button{flex:1;height:22px;border:1px solid var(--border-strong);border-bottom:0;border-radius:var(--r-m) var(--r-m) 0 0;background:var(--surface-2);color:var(--muted);font:inherit;font-size:10px;font-weight:700;cursor:pointer}
+  .side-tabs button.on{border:1px solid var(--accent);border-top:3px solid var(--accent);border-bottom:1px solid var(--border);margin-bottom:-1px;height:24px;background:var(--sec-bg);color:var(--text)}
   .cmp-side .sec-block{order:3;flex:1 1 0;min-height:0;overflow-y:auto;overscroll-behavior:contain;border-top:0;padding:6px 8px}   /* セクターの操作は、タブの下をスクロールして出す */
   .side-graph{order:3;flex:1 1 0;height:auto;border-bottom:0;border-top:0}
   .cmp-side[data-tab="graph"] .sec-block,.cmp-side[data-tab="sectors"] .side-graph{display:none}
   .cmp-side>.splitter{display:none}
   .cmp-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}   /* 列の幅は右の列の幅を等分する。文字に合わせて広がらない(広げるのは compareView の sideNeedW。案件 89) */
-  .cmp-cards .card{min-height:40px;padding:2px 6px;gap:6px;min-width:0}
+  .cmp-cards .card{min-height:0;padding:1px 6px;gap:6px;min-width:0}   /* グラフの高さを確保するため、カードは低く(案件 89) */
+  .cmp-cards .card-body>*{line-height:1.15}                          /* 3 行の行の間を詰める */
   /* 横軸が「時間」のカードの 3 行目(速度 / タイム差)は、数字が変わっても幅が動かないよう、いちばん長い形の分を空けておく */
   .cmp-cards .card .c3:has(.c3-gap:not([hidden]))::after{content:"000km/h / +00.00s";display:block;height:0;overflow:hidden;visibility:hidden}
   .cmp-cards .card .chip{width:20px;height:20px;font-size:11px}
