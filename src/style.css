@@ -1459,6 +1459,9 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
 /* ミニセクター表の上のドラッグのステージ(案件 90)。横向きのセクタータブでだけ出す。表の上を全部おおい、縦の動きは使わない */
 @media (orientation:landscape) and (max-height:500px){
   .secs .mini-tbl{position:relative}
+  /* ミニセクター表の見出し(S1・S2…)の上と、セグメント(色のセル)との間の余白を、半分に詰める(案件 91 のあとの調整。縦画面はそのまま) */
+  .secs .mini-tbl{row-gap:1px}
+  .mini-head{height:12px;line-height:12px}
   .cmp-side[data-tab="sectors"] .mini-stage{display:block;position:absolute;inset:0;z-index:1;touch-action:none;cursor:ew-resize}
 }
 @media (max-width:420px) and (orientation:portrait){
