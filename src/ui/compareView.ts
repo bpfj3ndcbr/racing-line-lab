@@ -998,7 +998,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
     const el = (e.target as HTMLElement).closest<HTMLElement>('.mini-stage');
     if (!el || scrub || engine.duration <= 0) return;
     try { el.setPointerCapture(e.pointerId); } catch { /* 無視 */ }
-    const vel = new ScrubVelocity();                              // 速さは固定(1× = 150px/秒。core/scrub.ts)
+    const vel = new ScrubVelocity(engine.duration);               // 速さの決め方は core/scrub.ts(遅いところは固定、速いところはコースの長さに合わせる)
     vel.press(e.clientX, performance.now());
     scrub = { id: e.pointerId, vel, wasPlaying: engine.playing, moving: false, raf: 0 };
   });
