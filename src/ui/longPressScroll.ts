@@ -8,6 +8,7 @@
  * - そのあと MOVE_PX を超えて動いたとき、縦の動きが横より大きければ、それ以降の指の動きを画面の縦のスクロールにする。
  *   横なら何もしない(地図の移動・グラフのインジケータの移動など、今までどおり)。
  * - 長押しせずにすぐなぞったときも、今までどおり。
+ * - enabled が false を返すとき(設定でオフ)は、何もしない(案件 92)。
  * - マウス・ペンは対象外。2 本目の指が触れたら取りやめる(拡大・縮小は地図・グラフの側)。
  * - スクロールを始めたら、触れた要素に LONG_PRESS_SCROLL_EVENT を送る(グラフは、触れた瞬間に動かした再生位置を戻す)。
  */
@@ -29,7 +30,7 @@ export function scrollerOf(el: Element): Element {
 }
 
 /** root の中で、長押しのあと縦になぞる操作を、画面のスクロールにする。戻り値は受け付けをやめる関数 */
-export function installLongPressScroll(root: HTMLElement): () => void {
+export function installLongPressScroll(root: HTMLElement, enabled: () => boolean = () => true): () => void {
   const doc = root.ownerDocument;
   const win = doc.defaultView ?? window;
   type Press = { id: number; x: number; y: number; lastY: number; target: Element; timer: number; held: boolean; scrolling: boolean; scroller?: Element; ring?: HTMLElement };
@@ -55,6 +56,7 @@ export function installLongPressScroll(root: HTMLElement): () => void {
   };
 
   const onDown = (e: PointerEvent) => {
+    if (!enabled()) return;                                       // 設定でオフのときは、長押しを受け付けない(案件 92)
     if (e.pointerType !== 'touch') return;
     fingers.add(e.pointerId);
     if (fingers.size > 1) { finish(); return; }                  // 2 本の指は地図・グラフの側に任せる

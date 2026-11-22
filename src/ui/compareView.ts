@@ -34,7 +34,7 @@ export interface CompareDeps {
 export interface CompareView {
   show(): void; hide(): void; readonly engine: PlaybackEngine;
   /** 設定タブで初期値が変わったとき、その項目を比較画面にも反映する(「記憶する」項目は何もしない) */
-  applyPref(key: PrefKey | 'yRange' | 'startPos' | 'autoLoad' | 'smooth'): void;
+  applyPref(key: PrefKey | 'yRange' | 'startPos' | 'autoLoad' | 'smooth' | 'longPress'): void;
 }
 
 const RATES = RATE_CHOICES;
@@ -414,7 +414,7 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   const relayout = () => { applyLayout(); sideSplit.refresh(); graphSplit.refresh(); };
 
   installScrollGrip(root.querySelector<HTMLElement>('#cmp-grip')!);   // スマホの縦画面: つまみを押さえたまま上下に動かすと、画面をスクロールする(案件 79)
-  installLongPressScroll(root);   // 長押ししてから縦になぞると、画面をスクロールする(地図・グラフの上でも。案件 44)
+  installLongPressScroll(root, () => prefs.longPress);   // 長押ししてから縦になぞると、画面をスクロールする(地図・グラフの上でも。案件 44。設定でオフにできる。案件 92)
   const graph: SpeedGraph = new SpeedGraph($('cmp-graph'), (v) => {
     const r = ref();
     if (!r) return;
@@ -1567,10 +1567,10 @@ export function mountCompareView(root: HTMLElement, session: Session, deps: Comp
   renderLegend();
   syncModeUi();
 
-  function applyPref(key: PrefKey | 'yRange' | 'startPos' | 'autoLoad' | 'smooth') {
+  function applyPref(key: PrefKey | 'yRange' | 'startPos' | 'autoLoad' | 'smooth' | 'longPress') {
     if (key === 'yRange') { graph.setYRange(prefs.yMin, prefs.yMax); return; }
     if (key === 'startPos') { if (visible && cars.length) applyInitialView(); return; }
-    if (key === 'autoLoad') return;
+    if (key === 'autoLoad' || key === 'longPress') return;   // 長押しは、判定のたびに設定を読む(案件 92)
     if (key === 'smooth') { if (visible) updateFrame(); return; }
     if (prefs.get(key).remember) return;                       // 「記憶する」の項目は、前回の状態のまま
     const v = prefs.initial(key);

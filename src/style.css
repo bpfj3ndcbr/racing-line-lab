@@ -1377,9 +1377,9 @@ body.resizing iframe,body.resizing .map{pointer-events:none}
   .cmp-map .map-ov.tr{right:8px;top:8px}
   .cmp-map .ov-menu-btn{min-height:30px;height:30px;padding:0 10px;font-size:11px}
 
-  /* 比較以外の画面: 縦向きにするよう案内を重ねる(上部バーも覆う) */
-  body:has(#view-compare[hidden]) .rotate-note{display:flex}
-  body:has(#view-compare[hidden]){overflow:hidden}
+  /* 比較・設定以外の画面: 縦向きにするよう案内を重ねる(上部バーも覆う)。設定は横向きでも見られる(案件 92) */
+  body:has(#view-compare[hidden]):has(#view-settings[hidden]) .rotate-note{display:flex}
+  body:has(#view-compare[hidden]):has(#view-settings[hidden]){overflow:hidden}
 }
 /* 横向きでも幅の狭い機種(667px など): タブ・セクターボタンの動作を詰め、About はアイコンだけにして、比較セットの幅を空ける */
 @media (orientation:landscape) and (max-height:500px) and (max-width:760px){

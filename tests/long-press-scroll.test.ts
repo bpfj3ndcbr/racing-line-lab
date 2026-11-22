@@ -53,6 +53,27 @@ describe('長押ししてから縦になぞると、画面をスクロールす�
     expect(ring()).toBeNull();
   });
 
+  it('設定でオフのとき(enabled が false)は、長押しをしても合図もスクロールも出ず、オンに戻すとまた効く(案件 92)', () => {
+    stop();
+    let on = false;
+    stop = installLongPressScroll(root, () => on);
+    ptr(target, 'pointerdown', 100, 100);
+    vi.advanceTimersByTime(HOLD_MS);
+    expect(ring()).toBeNull();
+    ptr(target, 'pointermove', 102, 60);
+    ptr(target, 'pointerup', 102, 60);
+    expect(scrolls).toEqual([]);
+    expect(started).toBe(0);
+
+    on = true;
+    ptr(target, 'pointerdown', 100, 100);
+    vi.advanceTimersByTime(HOLD_MS);
+    expect(ring()).not.toBeNull();
+    ptr(target, 'pointermove', 102, 60);
+    expect(started).toBe(1);
+    ptr(target, 'pointerup', 102, 60);
+  });
+
   it('長押しせずにすぐなぞったとき・マウス・2 本の指では、スクロールしない', () => {
     ptr(target, 'pointerdown', 100, 100);
     vi.advanceTimersByTime(100);
