@@ -71,7 +71,7 @@ export type StartPos = 'center' | 'control' | 'view';
 /** 前回見ていた地図の位置(案件 54)。サーキットごとの位置なので、サーキットの id と一緒に覚える */
 export interface LastView { circuit: string; lat: number; lon: number; zoom: number }
 export const LAST_VIEW_KEY = 'compare.view';
-interface Saved { items?: Partial<Record<PrefKey, { remember?: unknown; value?: unknown }>>; yMin?: unknown; yMax?: unknown; startPos?: unknown; autoLoad?: unknown; analytics?: unknown; mapPrefetch?: unknown; mapPersist?: unknown; smooth?: unknown; startAbout?: unknown }
+interface Saved { items?: Partial<Record<PrefKey, { remember?: unknown; value?: unknown }>>; yMin?: unknown; yMax?: unknown; startPos?: unknown; autoLoad?: unknown; analytics?: unknown; mapPrefetch?: unknown; mapPersist?: unknown; smooth?: unknown; startAbout?: unknown; longPress?: unknown }
 
 export class Prefs {
   constructor(private s: PrefStore) {}
@@ -146,6 +146,10 @@ export class Prefs {
   /** 走行アニメ(地図の車)の位置と向きをなめらかにする(案件 48)。初期値はオフ */
   get smooth(): boolean { return this.saved().smooth === true; }
   setSmooth(v: boolean) { this.write({ ...this.saved(), smooth: v }); }
+
+  /** 比較画面で、長押ししてから縦になぞると画面をスクロールする(案件 44・92)。初期値はオフ */
+  get longPress(): boolean { return this.saved().longPress === true; }
+  setLongPress(v: boolean) { this.write({ ...this.saved(), longPress: v }); }
 
   /** 前回見ていた地図の位置(案件 54)。保存が無い・読めないときは null */
   lastView(): LastView | null {

@@ -96,7 +96,7 @@ describe('スマホの横向き(案件 46)', () => {
   it('比較以外の画面に重ねる案内がある(文言)。表示は CSS で、ふだんは出さない', () => {
     const note = $('#rotate-note');
     expect(note.textContent).toContain('この画面は縦向きでお使いください');
-    expect(note.textContent).toContain('横向きで使えるのは「比較」の画面です');
+    expect(note.textContent).toContain('横向きで使えるのは「比較」と「設定」の画面です');
     expect(note.querySelector('button')).toBeNull();             // 比較画面へのボタンは置かない
     expect(note.querySelector('.rn-head')!.textContent).toBe('Racing Line Lab');   // アプリの案内と分かるよう、ロゴとアプリ名の帯
     expect(note.querySelector('.rn-head svg.logo')).not.toBeNull();
@@ -105,7 +105,7 @@ describe('スマホの横向き(案件 46)', () => {
 
   it('横向きの指定は、幅の @media(767px まで)のあとに置き、比較が隠れているときだけ案内を出す', () => {
     expect(css.indexOf(LAND)).toBeGreaterThan(css.indexOf('@media (max-width:767px){'));
-    expect(landBlock()).toContain('body:has(#view-compare[hidden]) .rotate-note{display:flex}');
+    expect(landBlock()).toContain('body:has(#view-compare[hidden]):has(#view-settings[hidden]) .rotate-note{display:flex}');   // 設定は横向きでも見られる(案件 92)
   });
 
   it('比較画面は左右に並べ、画面の高さに収める(上部バーは 1 行)', () => {

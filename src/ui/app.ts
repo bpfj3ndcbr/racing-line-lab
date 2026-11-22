@@ -53,7 +53,7 @@ export function mountApp(root: HTMLElement, session: Session, theme: ThemeContro
     <div id="view-import"></div>
     <div id="view-compare" hidden></div>
     <div id="view-settings" hidden></div>
-    <div class="rotate-note" id="rotate-note" role="status"><div class="rn-box"><div class="rn-head">${logoSvg(28)}<span class="rn-name">Racing Line Lab</span></div><div class="rn-body">${PHONE_ICON}<p>この画面は縦向きでお使いください</p><p class="sub">横向きで使えるのは「比較」の画面です</p></div></div></div>`;
+    <div class="rotate-note" id="rotate-note" role="status"><div class="rn-box"><div class="rn-head">${logoSvg(28)}<span class="rn-name">Racing Line Lab</span></div><div class="rn-body">${PHONE_ICON}<p>この画面は縦向きでお使いください</p><p class="sub">横向きで使えるのは「比較」と「設定」の画面です</p></div></div></div>`;
 
   const helpEl = root.querySelector<HTMLElement>('#view-help')!;
   const importEl = root.querySelector<HTMLElement>('#view-import')!;

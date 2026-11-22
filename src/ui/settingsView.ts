@@ -19,7 +19,7 @@ const rangeText = (lo: number, hi: number) => (hi >= SPEED_RANGE.max ? `${lo} km
 const rangePos = (v: number) => (v - SPEED_RANGE.min) / (SPEED_RANGE.max - SPEED_RANGE.min);
 
 type Opt = { v: string; label: string };
-type Plain = { name: string; kind: 'yrange' | 'startpos' | 'autoload' | 'analytics' | 'mapAreas' | 'mapPrefetch' | 'mapPersist' | 'smooth' | 'startabout' | 'update'; hint?: string };
+type Plain = { name: string; kind: 'yrange' | 'startpos' | 'autoload' | 'analytics' | 'mapAreas' | 'mapPrefetch' | 'mapPersist' | 'smooth' | 'longpress' | 'startabout' | 'update'; hint?: string };
 type Row =
   | { key: PrefKey; name: string; kind: 'seg'; opts: Opt[]; hint?: string }
   | { key: PrefKey; name: string; kind: 'switch'; on: string; off: string; hint?: string }
@@ -28,6 +28,7 @@ type Row =
 const GROUPS: { title: string; rows: (Row | Plain)[] }[] = [
   { title: '外観', rows: [
     { key: 'theme', name: 'テーマ', kind: 'seg', opts: [{ v: 'light', label: 'ライト' }, { v: 'dark', label: 'ダーク' }] },
+    { name: '長押しでスクロール', kind: 'longpress', hint: '比較画面で、画面を長押ししてから上下になぞると、画面がスクロールします。地図やグラフの上でも使えます。オフのときは、地図・グラフの操作だけになります。' },
   ] },
   { title: 'マップ', rows: [
     { key: 'mapMode', name: '描画', kind: 'seg', opts: [{ v: 'line', label: '走行ライン' }, { v: 'speed', label: '速度' }, { v: 'accel', label: '加減速' }, { v: 'none', label: 'なし' }] },
@@ -73,7 +74,7 @@ export interface MapSaveDeps { store: TileStore | null; areas: MapAreas; mapFact
 
 const mb = (bytes: number) => (bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`);
 
-export function mountSettingsView(root: HTMLElement, prefs: Prefs, onChange: (key: PrefKey | 'yRange' | 'startPos' | 'autoLoad' | 'analytics' | 'smooth' | 'startAbout') => void, onFactoryReset: () => void = () => {}, mapSave?: MapSaveDeps, updates: UpdateWatcher | null = null): { refresh(): void } {
+export function mountSettingsView(root: HTMLElement, prefs: Prefs, onChange: (key: PrefKey | 'yRange' | 'startPos' | 'autoLoad' | 'analytics' | 'smooth' | 'longPress' | 'startAbout') => void, onFactoryReset: () => void = () => {}, mapSave?: MapSaveDeps, updates: UpdateWatcher | null = null): { refresh(): void } {
   let resetArmed = false;
   let updBusy = false, updMsg = '', newerVer = '';
   let wipeArmed = false;
@@ -187,6 +188,11 @@ export function mountSettingsView(root: HTMLElement, prefs: Prefs, onChange: (ke
           return `<div class="srow"><div class="sname">${r.name}</div><div class="sctl"><button type="button" role="switch" class="switch${on ? ' on' : ''}" data-smooth aria-checked="${on}" aria-label="${r.name}"><i></i></button>`
             + `<span class="swl">${on ? 'オン' : 'オフ'}</span></div><div class="srem"></div>${r.hint ? `<div class="shint">${r.hint}</div>` : ''}</div>`;
         }
+        if (r.kind === 'longpress') {
+          const on = prefs.longPress;
+          return `<div class="srow"><div class="sname">${r.name}</div><div class="sctl"><button type="button" role="switch" class="switch${on ? ' on' : ''}" data-longpress aria-checked="${on}" aria-label="${r.name}"><i></i></button>`
+            + `<span class="swl">${on ? 'オン' : 'オフ'}</span></div><div class="srem"></div>${r.hint ? `<div class="shint">${r.hint}</div>` : ''}</div>`;
+        }
         if (r.kind === 'analytics') {
           const can = !window.rllNative, on = prefs.analytics && can;      // デスクトップ版は「オフ」のまま変えられない
           return `<div class="srow"><div class="sname">${r.name}</div><div class="sctl"><button type="button" role="switch" class="switch${on ? ' on' : ''}" data-analytics aria-checked="${on}" aria-label="${r.name}"${can ? '' : ' disabled'}><i></i></button>`
@@ -274,6 +280,8 @@ export function mountSettingsView(root: HTMLElement, prefs: Prefs, onChange: (ke
     if (sa) { resetArmed = false; prefs.setStartAbout(!prefs.startAbout); onChange('startAbout'); render(); return; }
     const sm = t.closest<HTMLButtonElement>('[data-smooth]');
     if (sm) { resetArmed = false; prefs.setSmooth(!prefs.smooth); onChange('smooth'); render(); return; }
+    const lp = t.closest<HTMLButtonElement>('[data-longpress]');
+    if (lp) { resetArmed = false; prefs.setLongPress(!prefs.longPress); onChange('longPress'); render(); return; }
     const an = t.closest<HTMLButtonElement>('[data-analytics]');
     if (an && !an.disabled) { resetArmed = false; prefs.setAnalytics(!prefs.analytics); onChange('analytics'); render(); return; }
     if (mapSave && tiles && !busy) {
@@ -322,7 +330,7 @@ export function mountSettingsView(root: HTMLElement, prefs: Prefs, onChange: (ke
       resetArmed = false;
       prefs.reset();
       render();
-      (['theme', 'mapMode', 'labels', 'zoom', 'follow', 'xKind', 'sync', 'rate', 'yRange', 'startPos', 'autoLoad', 'analytics', 'smooth', 'startAbout'] as const).forEach((k) => onChange(k));
+      (['theme', 'mapMode', 'labels', 'zoom', 'follow', 'xKind', 'sync', 'rate', 'yRange', 'startPos', 'autoLoad', 'analytics', 'smooth', 'longPress', 'startAbout'] as const).forEach((k) => onChange(k));
     }
   });
 
